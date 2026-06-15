@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Search, Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Pedidos.module.css';
 import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { Modal } from '../../../shared/ui/Modal';
 
 interface Pedido {
   id: string;
@@ -12,6 +15,7 @@ interface Pedido {
   items: number;
   total: string;
   estado: 'Nuevo' | 'En producción' | 'Listo' | 'Despachado' | 'Entregado' | 'Cancelado';
+  observaciones?: string;
 }
 
 const mockPedidos: Pedido[] = [
@@ -65,119 +69,131 @@ export const AdminPedidos: React.FC = () => {
       </div>
 
       <div className={s.toolbar}>
-        <div className={s.searchBox}>
-          <Search size={16} className={s.searchIcon} />
-          <input
-            type="text"
-            placeholder="Buscar pedidos..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={s.searchInput}
-          />
-        </div>
+        <SearchInput
+          placeholder="Buscar pedidos..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onSearch={(value) => setSearch(value)}
+          debounceMs={100}
+          minChars={0}
+        />
       </div>
 
-      <div className={s.tableWrapper}>
-        <table className={s.table}>
-          <thead>
-            <tr>
-              <th>ID Pedido</th>
-              <th>Cliente</th>
-              <th>Asesor</th>
-              <th>Fecha</th>
-              <th>Items</th>
-              <th>Total</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPedidos.map(pedido => (
-              <tr key={pedido.id}>
-                <td className={s.tdMono}>{pedido.id}</td>
-                <td className={s.tdPrimary}>{pedido.cliente}</td>
-                <td>{pedido.asesor}</td>
-                <td>{pedido.fecha}</td>
-                <td>{pedido.items}</td>
-                <td>{pedido.total}</td>
-                <td>
-                  <Badge variant={orderStatuses[pedido.estado]}>
-                    {pedido.estado}
-                  </Badge>
-                </td>
-                <td>
-                  <div className={s.actions}>
-                    <button className={s.actionBtn} onClick={() => { setSelectedPedido(pedido); setViewModalOpen(true); }}>Ver</button>
-                    <button className={s.actionBtn} onClick={() => { setSelectedPedido(pedido); setEditModalOpen(true); }}>Editar</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<Pedido>
+        data={filteredPedidos}
+        pageSize={10}
+        emptyMessage="No se encontraron pedidos"
+        enableSorting
+        enableColumnFilters
+        enableRowSelection
+        enableExport
+        exportFileName="pedidos"
+        maxVisibleColumns={5}
+        columns={[
+          { key: 'id', header: 'ID Pedido', width: '110px', sortable: true, filterable: true, render: (p) => <span className={s.tdMono}>{p.id}</span> },
+          { key: 'cliente', header: 'Cliente', sortable: true, filterable: true, render: (p) => <span className={s.tdPrimary}>{p.cliente}</span> },
+          { key: 'asesor', header: 'Asesor', render: (p) => p.asesor },
+          { key: 'fecha', header: 'Fecha', width: '110px', render: (p) => p.fecha },
+          { key: 'total', header: 'Total', width: '120px', render: (p) => p.total },
+          { key: 'estado', header: 'Estado', width: '130px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
+            { value: 'Nuevo', label: 'Nuevo' },
+            { value: 'En producción', label: 'En producción' },
+            { value: 'Listo', label: 'Listo' },
+            { value: 'Despachado', label: 'Despachado' },
+            { value: 'Entregado', label: 'Entregado' },
+            { value: 'Cancelado', label: 'Cancelado' },
+          ], render: (p) => (
+            <Badge variant={orderStatuses[p.estado]}>{p.estado}</Badge>
+          )},
+        ]}
+        actions={(p) => [
+          { label: 'Editar', onClick: () => { setSelectedPedido(p); setEditModalOpen(true); } },
+        ]}
+        detailPanel={{
+          title: (p) => `Pedido ${p.id}`,
+          render: (p, onClose) => (
+            <div className={s.detailModalContent}>
+              <div className={s.detailSection}>
+                <h4 className={s.detailSectionTitle}>Detalles del pedido</h4>
+                <div className={s.detailGrid}>
+                  <div className={s.detailItem}><span className={s.detailLabel}>ID</span><span>{p.id}</span></div>
+                  <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{p.cliente}</span></div>
+                  <div className={s.detailItem}><span className={s.detailLabel}>Asesor</span><span>{p.asesor}</span></div>
+                  <div className={s.detailItem}><span className={s.detailLabel}>Items</span><span>{p.items}</span></div>
+                  <div className={s.detailItem}><span className={s.detailLabel}>Total</span><span>{p.total}</span></div>
+                  <div className={s.detailItem}><span className={s.detailLabel}>Estado</span><span><Badge variant={orderStatuses[p.estado]}>{p.estado}</Badge></span></div>
+                </div>
+              </div>
+              <div className={s.modalActions}>
+                <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+              </div>
+            </div>
+          ),
+        }}
+      />
 
       {/* Modal Ver Pedido */}
-      {viewModalOpen && selectedPedido && (
-        <div className={s.modalOverlay} onClick={closeModals}>
-          <div className={s.modal} onClick={e => e.stopPropagation()}>
-            <div className={s.modalHeader}>
-              <h2 className={s.modalTitle}>Detalle de Pedido</h2>
-              <button className={s.closeBtn} onClick={closeModals}><X size={16} /></button>
+      <Modal
+        open={viewModalOpen && !!selectedPedido}
+        onClose={closeModals}
+        title="Detalle de Pedido"
+        size="md"
+      >
+        {selectedPedido && (
+          <div className={s.detailModalContent}>
+            <div className={s.detailSection}>
+              <h4 className={s.detailSectionTitle}>Detalles del pedido</h4>
+              <div className={s.detailGrid}>
+                <div className={s.detailItem}><span className={s.detailLabel}>ID</span><span>{selectedPedido.id}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{selectedPedido.cliente}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Asesor</span><span>{selectedPedido.asesor}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Fecha</span><span>{selectedPedido.fecha}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Items</span><span>{selectedPedido.items}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Total</span><span>{selectedPedido.total}</span></div>
+              </div>
             </div>
-            <div className={s.modalBody}>
-              <div className={s.detailRow}><span>ID:</span> {selectedPedido.id}</div>
-              <div className={s.detailRow}><span>Cliente:</span> {selectedPedido.cliente}</div>
-              <div className={s.detailRow}><span>Asesor:</span> {selectedPedido.asesor}</div>
-              <div className={s.detailRow}><span>Fecha:</span> {selectedPedido.fecha}</div>
-              <div className={s.detailRow}><span>Items:</span> {selectedPedido.items}</div>
-              <div className={s.detailRow}><span>Total:</span> {selectedPedido.total}</div>
-              <div className={s.detailRow}><span>Estado:</span> <Badge variant={orderStatuses[selectedPedido.estado]}>{selectedPedido.estado}</Badge></div>
+            <div className={s.modalActions}>
+              <Button variant="secondary" onClick={closeModals}>Cerrar</Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Modal Editar Pedido */}
-      {editModalOpen && selectedPedido && (
-        <div className={s.modalOverlay} onClick={closeModals}>
-          <div className={s.modal} onClick={e => e.stopPropagation()}>
-            <div className={s.modalHeader}>
-              <h2 className={s.modalTitle}>{selectedPedido && Object.keys(selectedPedido).length ? 'Editar Pedido' : 'Nuevo Pedido'}</h2>
-              <button className={s.closeBtn} onClick={closeModals}><X size={16} /></button>
+      <Modal
+        open={editModalOpen}
+        onClose={closeModals}
+        title={selectedPedido ? 'Editar Pedido' : 'Nuevo Pedido'}
+        size="md"
+      >
+        <form className={s.form}>
+          <div className={s.formRow}>
+            <div className={s.field}>
+              <label className={s.label}>Cliente</label>
+              <select className={s.select} defaultValue={selectedPedido?.cliente}>
+                <option>Almacén El Sol</option>
+                <option>Boutique Moda+</option>
+                <option>Textiles Andina</option>
+              </select>
             </div>
-            <div className={s.modalBody}>
-              <form className={s.form}>
-                <div className={s.formRow}>
-                  <div className={s.field}>
-                    <label className={s.label}>Cliente</label>
-                    <select className={s.select} defaultValue={selectedPedido?.cliente}>
-                      <option>Almacén El Sol</option>
-                      <option>Boutique Moda+</option>
-                      <option>Textiles Andina</option>
-                    </select>
-                  </div>
-                  <div className={s.field}>
-                    <label className={s.label}>Estado</label>
-                    <select className={s.select} defaultValue={selectedPedido?.estado}>
-                      <option>Nuevo</option>
-                      <option>En producción</option>
-                      <option>Listo</option>
-                      <option>Despachado</option>
-                      <option>Entregado</option>
-                      <option>Cancelado</option>
-                    </select>
-                  </div>
-                </div>
-                <div className={s.formActions}>
-                  <Button variant="secondary" onClick={closeModals}>Cancelar</Button>
-                  <Button onClick={closeModals}>{selectedPedido ? 'Guardar cambios' : 'Crear pedido'}</Button>
-                </div>
-              </form>
+            <div className={s.field}>
+              <label className={s.label}>Estado</label>
+              <select className={s.select} defaultValue={selectedPedido?.estado}>
+                <option>Nuevo</option>
+                <option>En producción</option>
+                <option>Listo</option>
+                <option>Despachado</option>
+                <option>Entregado</option>
+                <option>Cancelado</option>
+              </select>
             </div>
           </div>
-        </div>
-      )}
+          <div className={s.formActions}>
+            <Button variant="secondary" onClick={closeModals}>Cancelar</Button>
+            <Button onClick={closeModals}>{selectedPedido ? 'Guardar cambios' : 'Crear pedido'}</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

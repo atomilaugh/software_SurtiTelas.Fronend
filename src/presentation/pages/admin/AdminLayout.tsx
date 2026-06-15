@@ -1,157 +1,163 @@
-import React, { useState } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ShoppingBag, Factory, Package, Truck, UserCheck, BarChart2, Settings, Moon, Sun, Menu, Home, LogOut, Search, Download, Bell } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Settings2, Users, UserCog, Shield, Package, PackageOpen, Boxes, AlertTriangle, Archive, Factory, Workflow, ClipboardList, ShoppingCart, Receipt, UserSearch, BarChart3, TrendingUp, Users2, LineChart, Store } from 'lucide-react';
 import s from '../../../styles/admin/AdminLayout.module.css';
+import { Sidebar, SidebarItem } from '@/shared/layouts/Sidebar';
 import { useAuth } from '@/app/providers/AppProviders';
+import { useDashboardTheme } from '@/core/hooks/useDashboardTheme';
+import { TopHeader } from '@/presentation/components/TopHeader';
+import { cn } from '@/shared/utils';
 import logoImg from '@/assets/images/logos/partner-logo-2-Photoroom.png';
 
-const adminMenu = [
-  { section: 'Principal' },
-  { icon: LayoutDashboard, label: 'Dashboard', key: 'dashboard' },
-  { section: 'Gestión' },
-  { icon: Users, label: 'Clientes', key: 'clientes', badge: '128' },
-  { icon: ShoppingBag, label: 'Pedidos', key: 'pedidos', badge: '14' },
-  { icon: Factory, label: 'Producción', key: 'produccion' },
-  { icon: Package, label: 'Inventario', key: 'inventario' },
-  { icon: Truck, label: 'Domicilios', key: 'domicilios' },
-  { section: 'Equipo' },
-  { icon: UserCheck, label: 'Asesores', key: 'asesores' },
-  { section: 'Análisis' },
-  { icon: BarChart2, label: 'Reportes', key: 'reportes' },
-  { section: 'Sistema' },
-  { icon: Settings, label: 'Configuración', key: 'configuracion' },
+const adminMenu: SidebarItem[] = [
+  { icon: LayoutDashboard, label: 'Dashboard General', key: 'dashboard' },
+  {
+    icon: Settings2,
+    label: 'Configuración',
+    key: 'configuracion',
+    subItems: [
+      { icon: Shield, label: 'Roles', key: 'roles' },
+      { icon: UserCog, label: 'Permisos', key: 'permisos' },
+    ],
+  },
+  {
+    icon: Users,
+    label: 'Usuarios',
+    key: 'usuarios',
+    subItems: [
+      { icon: UserSearch, label: 'Gestión de Usuarios', key: 'gestion-usuarios' },
+      { icon: Shield, label: 'Seguridad', key: 'seguridad' },
+    ],
+  },
+  {
+    icon: Package,
+    label: 'Existencias',
+    key: 'inventario',
+    subItems: [
+      { icon: PackageOpen, label: 'Productos Terminados', key: 'productos' },
+      { icon: Boxes, label: 'Insumos', key: 'insumos' },
+      { icon: AlertTriangle, label: 'Alertas de Stock', key: 'alertas-stock' },
+      { icon: Archive, label: 'Stock Devuelto', key: 'stock-devuelto' },
+    ],
+  },
+  {
+    icon: Factory,
+    label: 'Producción en Talleres Externos',
+    key: 'produccion',
+    subItems: [
+      { icon: ClipboardList, label: 'Registro de Talleres', key: 'talleres' },
+      { icon: Workflow, label: 'Control de Prendas', key: 'prendas' },
+      { icon: ClipboardList, label: 'Asignación de Producción', key: 'asignacion' },
+      { icon: LineChart, label: 'Seguimiento', key: 'seguimiento' },
+    ],
+  },
+  {
+    icon: ShoppingCart,
+    label: 'Ventas y Pedidos',
+    key: 'ventas-pedidos',
+    subItems: [
+      { icon: ShoppingCart, label: 'Pedidos', key: 'pedidos' },
+      { icon: Receipt, label: 'Recibos', key: 'facturacion' },
+      { icon: Users2, label: 'Clientes', key: 'clientes' },
+    ],
+  },
+  {
+    icon: TrendingUp,
+    label: 'Dashboard de Reportes (Analítica)',
+    key: 'reportes',
+    subItems: [
+      { icon: BarChart3, label: 'Reportes de Ventas', key: 'reportes-ventas' },
+      { icon: Users2, label: 'Reportes de Usuarios', key: 'reportes-usuarios' },
+      { icon: Factory, label: 'Reportes de Producción', key: 'reportes-produccion' },
+      { icon: Package, label: 'Reportes de Inventario', key: 'reportes-inventario' },
+    ],
+  },
+  { icon: Store, label: 'Catálogo Digital', key: 'catalogo' },
 ];
 
 export const AdminLayout: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
-  const location = useLocation();
+  const [darkMode, toggleTheme] = useDashboardTheme();
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('surtitelas.sidebarCollapsed') === 'true';
+  });
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  const toggleTheme = () => {
-    const newTheme = !darkMode;
-    setDarkMode(newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme ? 'dark' : 'light');
-  };
+  useEffect(() => {
+    window.localStorage.setItem('surtitelas.sidebarCollapsed', String(isCollapsed));
+  }, [isCollapsed]);
 
-  const handleGoHome = () => navigate('/');
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  const currentPath = location.pathname.split('/').pop() || 'dashboard';
+  const handleSearch = (value: string) => {
+    console.log('Buscar:', value);
+  };
+
+  const handleNotificationClick = (path: string) => {
+    navigate(path);
+  };
+
+  const handleExport = () => {
+    const csvContent = [
+      ['Producto', 'Cantidad', 'Precio', 'Total'],
+      ['Camiseta Negra', '10', '$25.000', '$250.000'],
+      ['Pantalón Jeans', '5', '$45.000', '$225.000'],
+    ].map(e => e.join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'reporte-surtitelas.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSidebarToggle = (collapsed: boolean) => {
+    setIsCollapsed(collapsed);
+  };
 
   return (
-    <div className={s.layout}>
-      <aside className={`${s.sidebar} ${sidebarOpen ? s.sidebarOpen : ''}`}>
-        <div className={s.logo}>
-          <img src={logoImg} alt="Surtitelas" className={s.logoImg} />
-          <div>
-            <span className={s.logoText}>Surtitelas</span>
-            <span className={s.logoSub}>Admin Panel</span>
-          </div>
-        </div>
+    <div className={cn(s.appLayout, isCollapsed && s.collapsed)}>
+      <Sidebar
+        menu={adminMenu}
+        basePath="/admin"
+        logo={logoImg}
+        brandName="SURTI CAMISETAS"
+        panelLabel="Admin Panel"
+        user={{ name: 'Admin User', role: 'Administrador', initials: 'AU' }}
+        onLogout={handleLogout}
+        showCollapse={true}
+        homeHref="/"
+        onToggleCollapse={handleSidebarToggle}
+      />
 
-        <nav className={s.nav}>
-          {adminMenu.map((item, i) => {
-            if (item.section) {
-              return (
-                <div key={i} className={s.navSection}>
-                  {item.section}
-                </div>
-              );
-            }
-            const Icon = item.icon!;
-            return (
-              <NavLink
-                key={i}
-                to={`/admin/${item.key}`}
-                className={({ isActive }) =>
-                  `${s.navItem} ${isActive ? s.navItemActive : ''}`
-                }
-              >
-                <Icon className={s.navIcon} />
-                <span>{item.label}</span>
-                {item.badge && <span className={s.navBadge}>{item.badge}</span>}
-              </NavLink>
-            );
-          })}
-        </nav>
+      <div className={s.mainContent}>
+        <TopHeader
+          user={{
+            name: 'Admin User',
+            email: 'admin@surticamisetas.com',
+            role: 'admin',
+            initial: 'AU',
+          }}
+          notificationCount={4}
+          onSearch={handleSearch}
+          onToggleTheme={toggleTheme}
+          onExport={handleExport}
+          onNotificationClick={handleNotificationClick}
+          darkMode={darkMode}
+        />
 
-        <div className={s.sidebarFooter}>
-          <div className={s.userCard}>
-            <div className={s.userAvatar}>A</div>
-            <div>
-              <div className={s.userName}>Admin User</div>
-              <div className={s.userRole}>Administrador</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={s.sidebarFooterActions}>
-          <button className={s.footerBtn} onClick={handleGoHome}>
-            <Home size={18} className={s.footerIcon} />
-            Ir al inicio
-          </button>
-          <button className={s.footerBtn} onClick={handleLogout}>
-            <LogOut size={18} className={s.footerIcon} />
-            Cerrar sesión
-          </button>
-        </div>
-      </aside>
-
-      {sidebarOpen && <div className={s.sidebarOverlay} onClick={() => setSidebarOpen(false)} />}
-
-<div className={s.main}>
-         <header className={s.header}>
-           <div className={s.headerLeft}>
-             <button
-               className={s.menuBtn}
-               onClick={() => setSidebarOpen(true)}
-             >
-               <Menu size={20} />
-             </button>
-             <nav className={s.breadcrumb}>
-               <span className={s.breadcrumbCurrent}>
-                 {adminMenu.find(i => i.key === currentPath)?.label || 'Dashboard'}
-               </span>
-             </nav>
-           </div>
-
-           <div className={s.headerRight}>
-             <div className={s.searchWrapper}>
-               <Search size={16} className={s.searchIcon} />
-               <input 
-                 type="text" 
-                 placeholder="Buscar..." 
-                 className={s.searchInput}
-               />
-             </div>
-
-             <button className={s.exportBtn}>
-               <Download size={16} />
-               Exportar
-             </button>
-
-             <div className={s.notificationWrapper}>
-               <button className={s.iconBtn}>
-                 <Bell size={20} />
-               </button>
-               <span className={s.badge}>4</span>
-             </div>
-
-             <button className={s.iconBtn} onClick={toggleTheme}>
-               {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-             </button>
-           </div>
-         </header>
-
-         <main className={s.content}>
-           <Outlet />
-         </main>
-       </div>
+        <main className={s.pageContent}>
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 };

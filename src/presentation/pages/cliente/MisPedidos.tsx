@@ -1,204 +1,75 @@
-import React, { useState } from 'react';
-import { ChevronDown, MapPin, Truck } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { ChevronDown, MessageCircle, Archive, Package, CreditCard, User } from 'lucide-react';
 import s from './MisPedidos.module.css';
 import { Badge } from '@/shared/ui/Badge';
+import { usePedidos } from '@/core/stores';
+import { DetailModal } from '@/shared/ui/DetailModal';
+import { Modal } from '@/shared/ui/Modal';
+import { Button } from '@/shared/ui/Button';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import type { Pedido } from '@/core/types';
 
-interface ItemPedido {
-  ref: string;
-  nombre: string;
-  detalle: string;
-  cantidad: number;
-  precioUnit: number;
-}
-
-interface Pedido {
-  id: string;
-  fecha: string;
-  items: ItemPedido[];
-  subtotal: number;
-  descuento: number;
-  iva: number;
-  total: number;
-  estado: string;
-  estadoTracking: number;
-  direccionEntrega: string;
-  domiciliario: string | null;
-}
-
-const misPedidos: Pedido[] = [
-  {
-    id: '#PD-2401',
-    fecha: '05 Jun 2026',
-    items: [
-      { ref: 'CAM-001', nombre: 'Camiseta Básica Unisex', detalle: 'Talla M / Color Negro', cantidad: 12, precioUnit: 28000 },
-      { ref: 'BLU-001', nombre: 'Blusa Campesina Bordada', detalle: 'Talla S / Color Beige', cantidad: 8, precioUnit: 48000 },
-      { ref: 'PAN-001', nombre: 'Pantalón Cargo Hombre', detalle: 'Talla 32 / Color Azul', cantidad: 4, precioUnit: 82000 },
-    ],
-    subtotal: 1112000,
-    descuento: 80000,
-    iva: 0,
-    total: 1032000,
-    estado: 'En producción',
-    estadoTracking: 1,
-    direccionEntrega: 'Cra 15 #45-23, Chapinero, Bogotá',
-    domiciliario: null,
-  },
-  {
-    id: '#PD-2395',
-    fecha: '28 May 2026',
-    items: [
-      { ref: 'VES-001', nombre: 'Vestido Casual Verano', detalle: 'Talla M / Color Coral', cantidad: 6, precioUnit: 68000 },
-      { ref: 'CAM-002', nombre: 'Camiseta Polo Piqué', detalle: 'Talla L / Color Blanco', cantidad: 10, precioUnit: 42000 },
-    ],
-    subtotal: 828000,
-    descuento: 0,
-    iva: 0,
-    total: 828000,
-    estado: 'Listo',
-    estadoTracking: 2,
-    direccionEntrega: 'Cra 15 #45-23, Chapinero, Bogotá',
-    domiciliario: 'Carlos Ruiz',
-  },
-  {
-    id: '#PD-2390',
-    fecha: '20 May 2026',
-    items: [
-      { ref: 'SUD-001', nombre: 'Sudadera Premium con Capucha', detalle: 'Talla L / Color Gris', cantidad: 4, precioUnit: 96000 },
-    ],
-    subtotal: 384000,
-    descuento: 38400,
-    iva: 0,
-    total: 345600,
-    estado: 'En camino',
-    estadoTracking: 3,
-    direccionEntrega: 'Cra 15 #45-23, Chapinero, Bogotá',
-    domiciliario: 'Carlos Ruiz',
-  },
-  {
-    id: '#PD-2385',
-    fecha: '15 May 2026',
-    items: [
-      { ref: 'CAM-001', nombre: 'Camiseta Básica Unisex', detalle: 'Talla S / Color Blanco', cantidad: 20, precioUnit: 28000 },
-    ],
-    subtotal: 560000,
-    descuento: 56000,
-    iva: 0,
-    total: 504000,
-    estado: 'Entregado',
-    estadoTracking: 4,
-    direccionEntrega: 'Cra 15 #45-23, Chapinero, Bogotá',
-    domiciliario: 'Carlos Ruiz',
-  },
-  {
-    id: '#PD-2380',
-    fecha: '10 May 2026',
-    items: [
-      { ref: 'BLU-001', nombre: 'Blusa Campesina Bordada', detalle: 'Talla XS / Color Terracota', cantidad: 6, precioUnit: 48000 },
-    ],
-    subtotal: 288000,
-    descuento: 0,
-    iva: 0,
-    total: 288000,
-    estado: 'Entregado',
-    estadoTracking: 4,
-    direccionEntrega: 'Cl 80 #20-15, Suba, Bogotá',
-    domiciliario: 'María López',
-  },
-  {
-    id: '#PD-2375',
-    fecha: '05 May 2026',
-    items: [
-      { ref: 'PAN-001', nombre: 'Pantalón Cargo Hombre', detalle: 'Talla 30 / Color Negro', cantidad: 8, precioUnit: 82000 },
-      { ref: 'CAM-002', nombre: 'Camiseta Polo Piqué', detalle: 'Talla M / Color Rojo', cantidad: 10, precioUnit: 42000 },
-    ],
-    subtotal: 1028000,
-    descuento: 0,
-    iva: 0,
-    total: 1028000,
-    estado: 'Entregado',
-    estadoTracking: 4,
-    direccionEntrega: 'Cra 15 #45-23, Chapinero, Bogotá',
-    domiciliario: 'Carlos Ruiz',
-  },
-  {
-    id: '#PD-2370',
-    fecha: '01 May 2026',
-    items: [
-      { ref: 'VES-001', nombre: 'Vestido Casual Verano', detalle: 'Talla S / Color Azul cielo', cantidad: 5, precioUnit: 68000 },
-    ],
-    subtotal: 340000,
-    descuento: 0,
-    iva: 0,
-    total: 340000,
-    estado: 'Entregado',
-    estadoTracking: 4,
-    direccionEntrega: 'Cra 15 #45-23, Chapinero, Bogotá',
-    domiciliario: 'María López',
-  },
-  {
-    id: '#PD-2365',
-    fecha: '28 Abr 2026',
-    items: [
-      { ref: 'CAM-001', nombre: 'Camiseta Básica Unisex', detalle: 'Talla L / Color Gris', cantidad: 15, precioUnit: 28000 },
-    ],
-    subtotal: 420000,
-    descuento: 42000,
-    iva: 0,
-    total: 378000,
-    estado: 'Entregado',
-    estadoTracking: 4,
-    direccionEntrega: 'Cra 15 #45-23, Chapinero, Bogotá',
-    domiciliario: 'Carlos Ruiz',
-  },
-  {
-    id: '#PD-2360',
-    fecha: '20 Abr 2026',
-    items: [
-      { ref: 'SUD-001', nombre: 'Sudadera Premium con Capucha', detalle: 'Talla XL / Color Navy', cantidad: 3, precioUnit: 96000 },
-    ],
-    subtotal: 288000,
-    descuento: 0,
-    iva: 0,
-    total: 288000,
-    estado: 'Cancelado',
-    estadoTracking: 0,
-    direccionEntrega: 'Cra 15 #45-23, Chapinero, Bogotá',
-    domiciliario: null,
-  },
-];
-
-const filtrosEstado = [
-  { label: 'Todos', key: 'todos', count: 24 },
-  { label: 'Nuevo', key: 'nuevo', count: 0 },
-  { label: 'En producción', key: 'produccion', count: 1 },
-  { label: 'Listo', key: 'listo', count: 1 },
-  { label: 'Despachado', key: 'despachado', count: 0 },
-  { label: 'En camino', key: 'camino', count: 0 },
-  { label: 'Entregado', key: 'entregado', count: 21 },
-  { label: 'Cancelado', key: 'cancelado', count: 1 },
-];
+const statusVariant = (estado: Pedido['estado']) => {
+  if (estado === 'Entregado') return 'success';
+  if (estado === 'En producción' || estado === 'Despachado' || estado === 'En camino') return 'info';
+  if (estado === 'Listo') return 'warning';
+  if (estado === 'Cancelado') return 'danger';
+  return 'default';
+};
 
 export const MisPedidos: React.FC = () => {
+  const navigate = useNavigate();
+  const { pedidos, updatePedido } = usePedidos();
   const [activeFilter, setActiveFilter] = useState('todos');
   const [expandedPedido, setExpandedPedido] = useState<string | null>(null);
+  const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
+  const [chatPedido, setChatPedido] = useState<Pedido | null>(null);
+  const [mensajeAsesor, setMensajeAsesor] = useState('');
+  const [cancelPedido, setCancelPedido] = useState<Pedido | null>(null);
 
-  const filteredPedidos = misPedidos.filter(p =>
-    activeFilter === 'todos' || p.estado.toLowerCase().replace(' ', '') === activeFilter
-  );
+  const filteredPedidos = useMemo(() => {
+    return pedidos.filter(p =>
+      activeFilter === 'todos' || p.estado.toLowerCase().replace(' ', '') === activeFilter
+    );
+  }, [pedidos, activeFilter]);
 
-  const trackingSteps = ['Pedido recibido', 'En producción', 'Listo para envío', 'En camino', 'Entregado'];
+  const filtrosEstado = [
+    { label: 'Todos', key: 'todos', count: pedidos.length },
+    { label: 'Nuevo', key: 'nuevo', count: pedidos.filter(p => p.estado === 'Nuevo').length },
+    { label: 'En producción', key: 'produccion', count: pedidos.filter(p => p.estado === 'En producción').length },
+    { label: 'Listo', key: 'listo', count: pedidos.filter(p => p.estado === 'Listo').length },
+    { label: 'Despachado', key: 'despachado', count: pedidos.filter(p => p.estado === 'Despachado').length },
+    { label: 'En camino', key: 'camino', count: pedidos.filter(p => p.estado === 'En camino').length },
+    { label: 'Entregado', key: 'entregado', count: pedidos.filter(p => p.estado === 'Entregado').length },
+    { label: 'Cancelado', key: 'cancelado', count: pedidos.filter(p => p.estado === 'Cancelado').length },
+  ];
+
+  const contactarAsesor = () => {
+    if (!chatPedido) return;
+    if (!mensajeAsesor.trim()) {
+      toast.error('Escribe un mensaje para tu asesor');
+      return;
+    }
+    const texto = `Hola, tengo una consulta sobre el pedido ${chatPedido.id}: ${mensajeAsesor}`;
+    navigator.clipboard?.writeText(texto).catch(() => undefined);
+    toast.success('Mensaje copiado para enviar por WhatsApp');
+    setMensajeAsesor('');
+    setChatPedido(null);
+  };
+
+  const cancelarPedido = () => {
+    if (!cancelPedido) return;
+    updatePedido(cancelPedido.id, { estado: 'Cancelado', observaciones: cancelPedido.observaciones || 'Cancelado por solicitud del cliente' });
+    toast.success(`Pedido ${cancelPedido.id} cancelado`);
+    setCancelPedido(null);
+  };
 
   return (
     <div className={s.pedidosLayout}>
       <h1 className={s.pageTitle}>Mis Pedidos</h1>
       <p className={s.pageSubtitle}>Historial y seguimiento de tus compras</p>
-
-      <div className={s.infoBanner}>
-        <MapPin size={18} className={s.infoBannerIcon} />
-        <span className={s.infoBannerText}>
-          Para realizar un nuevo pedido o hacer cambios en uno existente, comunícate con tu asesor asignado Camila Torres al <strong>310 234 5678</strong>.
-        </span>
-      </div>
 
       <div className={s.estadoTabs}>
         {filtrosEstado.map(filtro => (
@@ -214,134 +85,204 @@ export const MisPedidos: React.FC = () => {
       </div>
 
       <div>
-        {filteredPedidos.map((pedido) => (
-          <div key={pedido.id} className={`${s.pedidoCard} ${expandedPedido === pedido.id ? s.pedidoCardExpanded : ''}`}>
-            <div
-              className={s.pedidoCardHeader}
-              onClick={() => setExpandedPedido(expandedPedido === pedido.id ? null : pedido.id)}
-            >
-              <div className={s.pedidoId}>{pedido.id}</div>
-
-              <div className={s.pedidoMeta}>
-                <div className={s.pedidoMetaItem}>
-                  <span className={s.pedidoMetaLabel}>Fecha</span>
-                  <span className={s.pedidoMetaValue}>{pedido.fecha}</span>
-                </div>
-                <div className={s.pedidoMetaItem}>
-                  <span className={s.pedidoMetaLabel}>Items</span>
-                  <span className={s.pedidoMetaValue}>{pedido.items.length}</span>
-                </div>
-                <div className={s.pedidoMetaItem}>
-                  <span className={s.pedidoMetaLabel}>Total</span>
-                  <span className={`${s.pedidoMetaValue} ${s.pedidoMetaValueStrong}`}>{pedido.total.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <Badge variant={
-                pedido.estado === 'Entregado' ? 'success' :
-                pedido.estado === 'En producción' ? 'info' :
-                pedido.estado === 'Listo' ? 'warning' :
-                pedido.estado === 'Cancelado' ? 'danger' : 'default'
-              }>
-                {pedido.estado}
-              </Badge>
-
-              <ChevronDown
-                size={18}
-                className={`${s.pedidoChevron} ${expandedPedido === pedido.id ? s.pedidoChevronOpen : ''}`}
-              />
-            </div>
-
-            {expandedPedido === pedido.id && (
-              <div className={s.pedidoExpanded}>
-                <div className={s.pedidoExpandedInner}>
-                  <div>
-                    <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '12px' }}>
-                      Detalle de artículos
-                    </h3>
-                    <table className={s.itemsTable}>
-                      <thead>
-                        <tr>
-                          <th>Referencia</th>
-                          <th>Producto</th>
-                          <th>Cantidad</th>
-                          <th>Precio</th>
-                          <th>Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pedido.items.map((item, idx) => (
-                          <tr key={idx}>
-                            <td className={s.itemRef}>{item.ref}</td>
-                            <td>
-                              <div className={s.itemNombre}>{item.nombre}</div>
-                              <div className={s.itemDetalle}>{item.detalle}</div>
-                            </td>
-                            <td>{item.cantidad}</td>
-                            <td>${item.precioUnit.toLocaleString()}</td>
-                            <td>${(item.cantidad * item.precioUnit).toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {pedido.estadoTracking < 4 && (
-                      <div className={s.pedidoTracking}>
-                        <div className={s.pedidoTrackingTitle}>Seguimiento del pedido</div>
-                        <div className={s.trackingStepsRow}>
-                          {trackingSteps.map((step, idx) => (
-                            <React.Fragment key={step}>
-                              <div className={s.trackingStepInline}>
-                                <div className={`${s.trackingStepDot} ${idx < pedido.estadoTracking ? s['trackingStepDot--done'] : idx === pedido.estadoTracking ? s['trackingStepDot--active'] : s['trackingStepDot--pending']}`}>
-                                  {idx < pedido.estadoTracking ? '✓' : idx === pedido.estadoTracking ? '●' : ''}
-                                </div>
-                                <span className={`${s.trackingStepInlineLabel} ${idx === pedido.estadoTracking ? s['trackingStepInlineLabel--active'] : ''} ${idx < pedido.estadoTracking ? s['trackingStepInlineLabel--done'] : ''}`}>
-                                  {step}
-                                </span>
-                              </div>
-                              {idx < trackingSteps.length - 1 && (
-                                <div className={`${s.trackingConnector} ${idx < pedido.estadoTracking ? s['trackingConnector--done'] : s['trackingConnector--pending']}`} />
-                              )}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className={s.pedidoResumen}>
-                      <div className={s.resumenRow}>
-                        <span>Subtotal</span>
-                        <span className={s.resumenValor}>${pedido.subtotal.toLocaleString()}</span>
-                      </div>
-                      {pedido.descuento > 0 && (
-                        <div className={s.resumenRow}>
-                          <span>Descuento</span>
-                          <span className={s.resumenValor}>-${pedido.descuento.toLocaleString()}</span>
-                        </div>
-                      )}
-                      <div className={s.resumenRow}>
-                        <span>IVA</span>
-                        <span className={s.resumenValor}>${pedido.iva.toLocaleString()}</span>
-                      </div>
-                      <div className={s.resumenRow}>
-                        <span>Total</span>
-                        <span className={s.resumenValor}>${pedido.total.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    <div className={s.entregaInfo}>
-                      <Truck size={18} className={s.entregaInfoIcon} />
-                      <span>{pedido.direccionEntrega}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+        {filteredPedidos.length === 0 ? (
+          <div style={{ padding: '40px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+            No hay pedidos registrados
           </div>
-        ))}
+        ) : (
+          filteredPedidos.map((pedido) => (
+            <div key={pedido.id} className={`${s.pedidoCard} ${expandedPedido === pedido.id ? s.pedidoCardExpanded : ''}`}>
+              <div
+                className={s.pedidoCardHeader}
+                onClick={() => setExpandedPedido(expandedPedido === pedido.id ? null : pedido.id)}
+              >
+                <div className={s.pedidoId}>{pedido.id}</div>
+
+                <div className={s.pedidoMeta}>
+                  <div className={s.pedidoMetaItem}>
+                    <span className={s.pedidoMetaLabel}>Fecha</span>
+                    <span className={s.pedidoMetaValue}>{pedido.fecha}</span>
+                  </div>
+                  <div className={s.pedidoMetaItem}>
+                    <span className={s.pedidoMetaLabel}>Items</span>
+                    <span className={s.pedidoMetaValue}>{pedido.items}</span>
+                  </div>
+                  <div className={s.pedidoMetaItem}>
+                    <span className={s.pedidoMetaLabel}>Total</span>
+                    <span className={`${s.pedidoMetaValue} ${s.pedidoMetaValueStrong}`}>{pedido.total}</span>
+                  </div>
+                </div>
+
+                <Badge variant={statusVariant(pedido.estado)}>
+                  {pedido.estado}
+                </Badge>
+
+                <ChevronDown
+                  size={18}
+                  className={`${s.pedidoChevron} ${expandedPedido === pedido.id ? s.pedidoChevronOpen : ''}`}
+                />
+              </div>
+
+              {expandedPedido === pedido.id && (
+                <div className={s.pedidoExpanded}>
+                  <div className={s.pedidoExpandedInner}>
+                    <div>
+                      <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '12px' }}>
+                        Detalle de artículos
+                      </h3>
+                      <table className={s.itemsTable}>
+                        <thead>
+                          <tr>
+                            <th>Referencia</th>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Precio</th>
+                            <th>Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(pedido.itemsList || []).map((item, idx) => (
+                            <tr key={idx}>
+                              <td className={s.itemRef}>—</td>
+                              <td>
+                                <div className={s.itemNombre}>{item.nombre}</div>
+                              </td>
+                              <td>{item.cantidad}</td>
+                              <td>${String(item.precio).toLocaleString()}</td>
+                              <td>${(item.cantidad * item.precio).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                          {(pedido.itemsList || []).length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-4 text-center text-sm text-[var(--color-text-muted)]">Sin detalle de artículos registrado.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div>
+                      <div className={s.pedidoResumen}>
+                        <div className={s.resumenRow}>
+                          <span>Total</span>
+                          <span className={s.resumenValor}>{pedido.total}</span>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className={s.whatsappBtn}
+                          onClick={() => setChatPedido(pedido)}
+                        >
+                          <MessageCircle size={14} />
+                          Consultar por WhatsApp
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 items-center justify-center rounded-xl border border-[var(--color-border)] bg-transparent px-3 text-sm font-medium text-[var(--color-text-primary)]"
+                          onClick={() => setSelectedPedido(pedido)}
+                        >
+                          <Archive size={14} style={{ marginRight: 6 }} />
+                          Ver detalle
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 items-center justify-center rounded-xl bg-[var(--btn-primary-bg)] px-3 text-sm font-medium text-[var(--btn-primary-text)]"
+                          onClick={() => navigate(`/cliente/seguimiento/${encodeURIComponent(pedido.id)}`)}
+                        >
+                          <Package size={14} style={{ marginRight: 6 }} />
+                          Seguimiento
+                        </button>
+                        {pedido.estado === 'Nuevo' && (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 px-3 text-sm font-medium text-red-400"
+                            onClick={() => setCancelPedido(pedido)}
+                          >
+                            Cancelar pedido
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
+
+      <DetailModal
+        children={null}
+        open={Boolean(selectedPedido)}
+        onClose={() => setSelectedPedido(null)}
+        title={selectedPedido ? `Pedido ${selectedPedido.id}` : 'Pedido'}
+        subtitle={selectedPedido?.fecha}
+        size="xl"
+        header={{
+          icon: <Archive size={18} />,
+          status: selectedPedido ? <Badge variant={statusVariant(selectedPedido.estado)}>{selectedPedido.estado}</Badge> : undefined,
+        }}
+        sections={[
+          {
+            title: 'Información del pedido',
+            fields: [
+              { label: 'Cliente', value: selectedPedido?.cliente, icon: <User size={16} /> },
+              { label: 'Total', value: selectedPedido?.total, icon: <CreditCard size={16} /> },
+              { label: 'Artículos', value: selectedPedido?.items, icon: <Package size={16} /> },
+              { label: 'Observaciones', value: selectedPedido?.observaciones || 'Sin observaciones', fullWidth: true, icon: <MessageCircle size={16} /> },
+            ],
+          },
+          {
+            title: 'Detalle de artículos',
+            children: (
+              <div className="overflow-x-auto rounded-2xl border border-[var(--color-border)]">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-[var(--color-bg-elevated)] text-left text-[var(--color-text-secondary)]">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Producto</th>
+                      <th className="px-4 py-3 font-medium text-right">Cantidad</th>
+                      <th className="px-4 py-3 font-medium text-right">Precio</th>
+                      <th className="px-4 py-3 font-medium text-right">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedPedido?.itemsList || []).map((item, index) => (
+                      <tr key={`${item.nombre}-${index}`} className="border-t border-[var(--color-border)]">
+                        <td className="px-4 py-3 text-[var(--color-text-primary)]">{item.nombre}</td>
+                        <td className="px-4 py-3 text-right text-[var(--color-text-primary)]">{item.cantidad}</td>
+                        <td className="px-4 py-3 text-right text-[var(--color-text-primary)]">${item.precio.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-[var(--color-text-primary)]">${(item.cantidad * item.precio).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ),
+          },
+        ]}
+      />
+
+      <Modal open={Boolean(chatPedido)} onClose={() => setChatPedido(null)} title={`Consultar pedido ${chatPedido?.id}`} size="sm">
+        <div className="grid gap-4">
+          <p className="text-sm text-[var(--color-text-secondary)]">Escribe la consulta y copia el mensaje para enviarlo por tu canal de WhatsApp.</p>
+          <textarea className="min-h-28 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" placeholder="Ej: ¿Cuándo sale despachado mi pedido?" value={mensajeAsesor} onChange={e => setMensajeAsesor(e.target.value)} />
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setChatPedido(null)}>Cancelar</Button>
+            <Button onClick={contactarAsesor}><MessageCircle size={14} /> Copiar mensaje</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmationModal
+        open={Boolean(cancelPedido)}
+        onClose={() => setCancelPedido(null)}
+        onConfirm={cancelarPedido}
+        title="Cancelar pedido"
+        description={`¿Estás seguro de cancelar el pedido ${cancelPedido?.id}? Esta acción cambiará el estado a Cancelado.`}
+        variant="danger"
+        confirmLabel="Cancelar pedido"
+      />
     </div>
   );
 };

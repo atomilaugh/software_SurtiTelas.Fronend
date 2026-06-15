@@ -15,13 +15,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5 w-full">
         {label && (
-          <label htmlFor={inputId} className="text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+          <label htmlFor={inputId} className="text-[12px] font-medium" style={{ color: 'var(--color-text-secondary)' }}>
             {label}
           </label>
         )}
         <div className="relative flex items-center">
           {leftIcon && (
-            <span className="absolute left-3 pointer-events-none" style={{ color: 'var(--text-tertiary)' }}>
+            <span className="absolute left-3 pointer-events-none" style={{ color: 'var(--color-text-muted)' }}>
               {leftIcon}
             </span>
           )}
@@ -35,16 +35,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               rightIcon && 'pr-9',
               className
             )}
+            style={{
+              background: 'var(--input-bg, var(--color-bg-elevated))',
+              borderColor: error ? 'var(--color-error)' : 'var(--input-border, var(--color-border))',
+              color: 'var(--input-text, var(--color-text-primary))',
+            }}
             {...props}
           />
           {rightIcon && (
-            <span className="absolute right-3" style={{ color: 'var(--text-tertiary)' }}>
+            <span className="absolute right-3" style={{ color: 'var(--color-text-muted)' }}>
               {rightIcon}
             </span>
           )}
         </div>
-        {error && <p className="text-[11px] text-red-500">{error}</p>}
-        {hint && !error && <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{hint}</p>}
+        {error && <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>{error}</p>}
+        {hint && !error && <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{hint}</p>}
       </div>
     );
   }

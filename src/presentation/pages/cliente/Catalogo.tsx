@@ -1,8 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Package, User, Paperclip, CheckCircle2, Clock, CreditCard, FileText, Download } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Send, Package, User, Paperclip, CheckCircle2, Clock, CreditCard, FileText, Download, Archive, MessageCircle } from 'lucide-react';
 import s from './Catalogo.module.css';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
+import { DetailModal } from '@/shared/ui/DetailModal';
+import { Badge } from '@/shared/ui/Badge';
 
 interface Mensaje {
   id: number;
@@ -11,29 +15,45 @@ interface Mensaje {
   hora: string;
 }
 
+interface PedidoActivo {
+  id: string;
+  estado: 'En Proceso' | 'Completado';
+  fecha: string;
+  total: string;
+  items: string;
+}
+
+const pedidosActivos: PedidoActivo[] = [
+  { id: '#PED-8821', estado: 'En Proceso', fecha: '08 Jun, 2026', total: '$1.240.000', items: '18 artículos' },
+  { id: '#PED-8810', estado: 'Completado', fecha: '01 Jun, 2026', total: '$860.000', items: '9 artículos' },
+];
+
 export const CatalogoCliente: React.FC = () => {
+  const navigate = useNavigate();
   const [isPedidoModalOpen, setIsPedidoModalOpen] = useState(false);
-  const [pedidoData, setPedidoData] = useState({ detalle: '', urgencia: 'Normal' });
+  const [pedidoData, setPedidoData] = useState({ detalle: '', urgencia: 'Estándar' });
   const [nuevoMensaje, setNuevoMensaje] = useState('');
-  
+  const [selectedPedido, setSelectedPedido] = useState<PedidoActivo | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [mensajes, setMensajes] = useState<Mensaje[]>([
-    { 
-      id: 1, 
-      texto: '¡Hola Andrés! Soy Camila, tu asesora asignada. ¿En qué te puedo ayudar hoy con tu inventario de SurtiTelas?', 
-      remitente: 'asesor', 
-      hora: '09:00 AM' 
+    {
+      id: 1,
+      texto: '¡Hola Andrés! Soy Camila, tu asesora asignada. ¿En qué te puedo ayudar hoy con tu inventario de SurtiTelas?',
+      remitente: 'asesor',
+      hora: '09:00 AM'
     },
-    { 
-      id: 2, 
-      texto: 'Tengo una duda sobre los tiempos de entrega para un pedido de 50 unidades de lino.', 
-      remitente: 'cliente', 
-      hora: '09:05 AM' 
+    {
+      id: 2,
+      texto: 'Tengo una duda sobre los tiempos de entrega para un pedido de 50 unidades de lino.',
+      remitente: 'cliente',
+      hora: '09:05 AM'
     },
-    { 
-      id: 3, 
-      texto: 'Claro que sí. Los pedidos estándar toman de 3 a 5 días hábiles. Si lo marcas como prioritario en el sistema, lo despachamos en 48 horas. ¿Te gustaría generar la solicitud de una vez?', 
-      remitente: 'asesor', 
-      hora: '09:06 AM' 
+    {
+      id: 3,
+      texto: 'Claro que sí. Los pedidos estándar toman de 3 a 5 días hábiles. Si lo marcas como prioritario en el sistema, lo despachamos en 48 horas. ¿Te gustaría generar la solicitud de una vez?',
+      remitente: 'asesor',
+      hora: '09:06 AM'
     }
   ]);
 
@@ -56,6 +76,25 @@ export const CatalogoCliente: React.FC = () => {
 
     setMensajes([...mensajes, mensaje]);
     setNuevoMensaje('');
+    toast.success('Mensaje enviado a tu asesor');
+  };
+
+  const handleCrearPedido = () => {
+    if (!pedidoData.detalle.trim()) {
+      toast.error('Describe tu requerimiento');
+      return;
+    }
+    toast.success(`Pedido creado: ${pedidoData.detalle.substring(0, 50)}...`);
+    setIsPedidoModalOpen(false);
+    setPedidoData({ detalle: '', urgencia: 'Estándar' });
+  };
+
+  const handleAttach = () => fileInputRef.current?.click();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) toast.success(`Archivo adjunto: ${file.name}`);
+    e.target.value = '';
   };
 
   return (
@@ -68,8 +107,6 @@ export const CatalogoCliente: React.FC = () => {
       </header>
 
       <div className={s.dashboardGrid}>
-        
-        {/* COLUMNA IZQUIERDA: Interfaz de Chat Integrado */}
         <div className={s.chatContainer}>
           <div className={s.chatHeader}>
             <div className={s.asesorProfile}>
@@ -97,13 +134,14 @@ export const CatalogoCliente: React.FC = () => {
           </div>
 
           <form className={s.chatInputArea} onSubmit={enviarMensaje}>
-            <button type="button" className={s.attachBtn} title="Adjuntar archivo">
+            <button type="button" className={s.attachBtn} title="Adjuntar archivo" onClick={handleAttach}>
               <Paperclip size={20} />
             </button>
-            <input 
-              type="text" 
-              className={s.chatInput} 
-              placeholder="Escribe tu mensaje aquí..." 
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+            <input
+              type="text"
+              className={s.chatInput}
+              placeholder="Escribe tu mensaje aquí..."
               value={nuevoMensaje}
               onChange={(e) => setNuevoMensaje(e.target.value)}
             />
@@ -113,10 +151,7 @@ export const CatalogoCliente: React.FC = () => {
           </form>
         </div>
 
-        {/* COLUMNA DERECHA: Widgets de Contexto y Herramientas */}
         <div className={s.sidebar}>
-          
-          {/* Widget 1: Resumen de Cuenta */}
           <div className={s.widgetCard}>
             <div className={s.widgetHeader}>
               <h3>Resumen de Cuenta</h3>
@@ -134,7 +169,6 @@ export const CatalogoCliente: React.FC = () => {
             </div>
           </div>
 
-          {/* Widget 2: Gestión Rápida */}
           <div className={s.widgetCard}>
             <h3>Gestión Rápida</h3>
             <p className={s.widgetText}>Inicia un requerimiento formal para que sea procesado por bodega.</p>
@@ -144,59 +178,50 @@ export const CatalogoCliente: React.FC = () => {
             </Button>
           </div>
 
-          {/* Widget 3: Pedidos Activos */}
           <div className={s.widgetCard}>
             <div className={s.widgetHeader}>
               <h3>Pedidos Activos</h3>
-              <Button variant="ghost" size="sm" className={s.textBtn}>Ver todos</Button>
+              <Button variant="ghost" size="sm" className={s.textBtn} onClick={() => navigate('/cliente/pedidos')}>Ver todos</Button>
             </div>
             <div className={s.orderList}>
-              <div className={s.orderItem}>
-                <div className={s.orderIcon}><Clock size={16} color="#3b82f6" /></div>
-                <div className={s.orderInfo}>
-                  <strong>#PED-8821</strong>
-                  <span>En Proceso • 08 Jun, 2026</span>
-                </div>
-              </div>
-              <div className={s.orderItem}>
-                <div className={s.orderIcon}><CheckCircle2 size={16} color="#10b981" /></div>
-                <div className={s.orderInfo}>
-                  <strong>#PED-8810</strong>
-                  <span>Completado • 01 Jun, 2026</span>
-                </div>
-              </div>
+              {pedidosActivos.map((pedido) => (
+                <button type="button" key={pedido.id} className={s.orderItem} onClick={() => setSelectedPedido(pedido)}>
+                  <div className={s.orderIcon}><Clock size={16} color={pedido.estado === 'Completado' ? '#10b981' : '#3b82f6'} /></div>
+                  <div className={s.orderInfo}>
+                    <strong>{pedido.id}</strong>
+                    <span>{pedido.estado} • {pedido.fecha}</span>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Widget 4: Documentos y Recursos */}
           <div className={s.widgetCard}>
             <div className={s.widgetHeader}>
               <h3>Recursos Útiles</h3>
               <FileText size={18} className={s.widgetIcon} />
             </div>
             <div className={s.resourceList}>
-              <a href="#" className={s.resourceItem}>
+              <a href="#" className={s.resourceItem} onClick={(e) => { e.preventDefault(); toast.info('Descargando Catálogo Telas Verano 2026.pdf') }}>
                 <div className={s.resourceIcon}><FileText size={16} /></div>
                 <span className={s.resourceName}>Catálogo Telas Verano 2026.pdf</span>
                 <Download size={14} className={s.downloadIcon} />
               </a>
-              <a href="#" className={s.resourceItem}>
+              <a href="#" className={s.resourceItem} onClick={(e) => { e.preventDefault(); toast.info('Descargando Ficha Técnica de Lavado.pdf') }}>
                 <div className={s.resourceIcon}><FileText size={16} /></div>
                 <span className={s.resourceName}>Ficha Técnica de Lavado.pdf</span>
                 <Download size={14} className={s.downloadIcon} />
               </a>
             </div>
           </div>
-
         </div>
       </div>
 
-      {/* Modal para crear pedido */}
       <Modal open={isPedidoModalOpen} onClose={() => setIsPedidoModalOpen(false)} title="Generar Pedido Personalizado">
         <div className={s.form}>
           <div className={s.field}>
             <label className={s.label}>Detalles del requerimiento</label>
-            <textarea 
+            <textarea
               className={s.textarea}
               placeholder="Ej: Necesito 2 rollos de algodón peinado negro y 1 de gris jaspeado..."
               value={pedidoData.detalle}
@@ -205,22 +230,49 @@ export const CatalogoCliente: React.FC = () => {
           </div>
           <div className={s.field}>
             <label className={s.label}>Nivel de Urgencia</label>
-            <select className={s.select} onChange={(e) => setPedidoData({...pedidoData, urgencia: e.target.value})}>
-              <option>Estándar (3-5 días)</option>
-              <option>Prioritario (48 hrs)</option>
+            <select className={s.select} value={pedidoData.urgencia} onChange={(e) => setPedidoData({...pedidoData, urgencia: e.target.value})}>
+              <option value="Estándar">Estándar (3-5 días)</option>
+              <option value="Prioritario">Prioritario (48 hrs)</option>
             </select>
           </div>
           <div className={s.modalActions}>
             <Button variant="secondary" onClick={() => setIsPedidoModalOpen(false)}>Cancelar</Button>
-            <Button onClick={() => {
-              console.log('Pedido enviado:', pedidoData);
-              setIsPedidoModalOpen(false);
-            }}>
-              Confirmar Pedido
-            </Button>
+            <Button onClick={handleCrearPedido}>Confirmar Pedido</Button>
           </div>
         </div>
       </Modal>
+
+      <DetailModal
+        children={null}
+        open={Boolean(selectedPedido)}
+        onClose={() => setSelectedPedido(null)}
+        title={selectedPedido ? `Pedido ${selectedPedido.id}` : 'Pedido'}
+        subtitle={selectedPedido?.fecha}
+        header={{
+          icon: <Archive size={18} />,
+          status: selectedPedido ? <Badge variant={selectedPedido.estado === 'Completado' ? 'success' : 'info'}>{selectedPedido.estado}</Badge> : undefined,
+        }}
+        sections={[
+          {
+            title: 'Resumen',
+            fields: [
+              { label: 'Estado', value: selectedPedido?.estado, icon: <CheckCircle2 size={16} /> },
+              { label: 'Fecha', value: selectedPedido?.fecha, icon: <Clock size={16} /> },
+              { label: 'Artículos', value: selectedPedido?.items, icon: <Package size={16} /> },
+              { label: 'Total estimado', value: selectedPedido?.total, icon: <CreditCard size={16} /> },
+            ],
+          },
+          {
+            title: 'Soporte',
+            children: (
+              <Button onClick={() => { setSelectedPedido(null); toast.success('Asesor notificado para revisar este pedido'); }}>
+                <MessageCircle size={14} />
+                Notificar a mi asesor
+              </Button>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 };

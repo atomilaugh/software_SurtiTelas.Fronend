@@ -2,18 +2,18 @@
 import { cn } from '@/shared/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none transition-all duration-200 select-none whitespace-nowrap',
   {
     variants: {
       variant: {
-        default: 'bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300',
-        primary: 'bg-slate-900 text-white dark:bg-white dark:text-slate-900',
-        success: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-        warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-        danger: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-        info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-        purple: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-        outline: 'border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300',
+        default: 'border border-[var(--color-border)] bg-[var(--color-bg-elevated)] text-[var(--color-text-secondary)]',
+        primary: 'border border-indigo-500/40 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
+        success: 'border border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+        warning: 'border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300',
+        danger: 'border border-red-500/40 bg-red-500/15 text-red-700 dark:text-red-300',
+        info: 'border border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300',
+        purple: 'border border-purple-500/40 bg-purple-500/15 text-purple-700 dark:text-purple-300',
+        outline: 'border border-[var(--color-border)] bg-transparent text-[var(--color-text-secondary)]',
       },
     },
     defaultVariants: { variant: 'default' },
@@ -30,18 +30,16 @@ export const Badge = ({ variant, children, className, dot }: BadgeProps) => (
   <span className={cn(badgeVariants({ variant }), className)}>
     {dot && (
       <span className={cn(
-        'w-1.5 h-1.5 rounded-full',
+        'h-1.5 w-1.5 rounded-full shadow-[0_0_0_2px_rgba(255,255,255,0.7)]',
         variant === 'success' && 'bg-emerald-500',
         variant === 'warning' && 'bg-amber-500',
         variant === 'danger' && 'bg-red-500',
         variant === 'info' && 'bg-blue-500',
         variant === 'purple' && 'bg-purple-500',
-        (!variant || variant === 'default') && 'bg-slate-500',
+        variant === 'primary' && 'bg-indigo-500',
+        (!variant || variant === 'default') && 'bg-[var(--color-text-muted)]',
       )} />
     )}
     {children}
   </span>
 );
-
-
-

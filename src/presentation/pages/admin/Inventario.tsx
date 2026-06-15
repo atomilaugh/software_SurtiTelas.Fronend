@@ -1,59 +1,121 @@
-import React, { useState } from 'react';
-import { Search, Plus, Edit, Trash2, X } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Edit, Trash2, X, Package, AlertTriangle } from 'lucide-react';
+import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Inventario.module.css';
-import { Badge } from '../../../shared/ui/Badge';
-import { Button } from '../../../shared/ui/Button';
-
-interface InventarioItem {
-  id: string;
-  referencia: string;
-  descripcion: string;
-  tela: string;
-  color: string;
-  disponible: number;
-  stockMinimo: number;
-  costo: string;
-  venta: string;
-}
-
-const mockInventario: InventarioItem[] = [
-  { id: 'I-001', referencia: 'CAM-001', descripcion: 'Camiseta básica', tela: 'Algodón', color: 'Blanco', disponible: 150, stockMinimo: 50, costo: '$25.000', venta: '$45.000' },
-  { id: 'I-002', referencia: 'CAM-002', descripcion: 'Camiseta básica', tela: 'Poliéster', color: 'Negro', disponible: 25, stockMinimo: 50, costo: '$28.000', venta: '$48.000' },
-  { id: 'I-003', referencia: 'CAM-003', descripcion: 'Pantaloneta', tela: 'Lino', color: 'Beige', disponible: 0, stockMinimo: 30, costo: '$35.000', venta: '$55.000' },
-  { id: 'I-004', referencia: 'CAM-004', descripcion: 'Blusa', tela: 'Seda', color: 'Rojo', disponible: 80, stockMinimo: 40, costo: '$45.000', venta: '$75.000' },
-  { id: 'I-005', referencia: 'CAM-005', descripcion: 'Chaqueta', tela: 'Denim', color: 'Azul', disponible: 12, stockMinimo: 40, costo: '$85.000', venta: '$145.000' },
-];
-
-const getStockStatus = (item: InventarioItem): 'success' | 'warning' | 'danger' | 'info' | 'default' => {
-  if (item.disponible === 0) return 'danger';
-  if (item.disponible > item.stockMinimo * 2) return 'success';
-  return 'warning';
-};
-
-const getStockLabel = (item: InventarioItem) => {
-  if (item.disponible === 0) return 'Agotado';
-  if (item.disponible > item.stockMinimo * 2) return 'OK';
-  return 'Bajo stock';
-};
+import { Button } from '@/shared/ui/Button';
+import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '@/shared/ui/DataTable';
+import { useAppStore } from '@/core/stores';
+import type { Producto } from '@/core/types';
 
 export const AdminInventario: React.FC = () => {
   const [search, setSearch] = useState('');
   const [ajusteModalOpen, setAjusteModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<InventarioItem | null>(null);
+  const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const filtered = mockInventario.filter(i =>
-    i.referencia.toLowerCase().includes(search.toLowerCase()) ||
-    i.descripcion.toLowerCase().includes(search.toLowerCase())
-  );
+  const productos = useAppStore(s => s.productos);
+  const addMovimiento = useAppStore(s => s.addMovimiento);
+  const updateProducto = useAppStore(s => s.updateProducto);
+  const deleteProducto = useAppStore(s => s.deleteProducto);
+
+  const [editCantidad, setEditCantidad] = useState(0);
+  const [editMotivo, setEditMotivo] = useState('Ingreso de mercancía');
+  const [editTipo, setEditTipo] = useState<'entrada' | 'salida' | 'ajuste'>('entrada');
+
+  const filtered = useMemo(() => {
+    return productos.filter(p =>
+      p.ref.toLowerCase().includes(search.toLowerCase()) ||
+      p.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      (p.tela && p.tela.toLowerCase().includes(search.toLowerCase()))
+    );
+  }, [productos, search]);
+
+  const tableData = useMemo(() => filtered.map(p => ({ ...p, id: p.ref })), [filtered]);
 
   const closeModals = () => {
     setAjusteModalOpen(false);
     setEditModalOpen(false);
-    setDeleteModalOpen(false);
-    setSelectedItem(null);
+    setSelectedProducto(null);
+    setEditCantidad(0);
+    setEditMotivo('Ingreso de mercancía');
+    setEditTipo('entrada');
+    setFormError(null);
+    setSaving(false);
   };
+
+  const openAjusteModal = () => {
+    setSelectedProducto(null);
+    setEditCantidad(0);
+    setEditMotivo('Ingreso de mercancía');
+    setEditTipo('entrada');
+    setFormError(null);
+    setAjusteModalOpen(true);
+  };
+
+
+  const handleGuardarAjuste = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      addMovimiento({
+        tipo: editTipo,
+        productoRef: selectedProducto?.ref || '',
+        cantidad: Math.abs(editCantidad),
+        motivo: editMotivo,
+        usuario: 'admin',
+      });
+      closeModals();
+    } catch {
+      setFormError('Error al registrar movimiento');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEliminar = (ref: string) => {
+    if (confirm('¿Está seguro de eliminar este producto?')) {
+      deleteProducto(ref);
+    }
+  };
+
+  const columns: DataTableColumn<Producto>[] = [
+    { key: 'ref', header: 'Referencia', sortable: true },
+    { key: 'nombre', header: 'Producto', sortable: true },
+    { key: 'cantidadStock', header: 'Disponible', sortable: true, align: 'right' },
+    { key: 'stock', header: 'Estado', sortable: true },
+  ];
+
+  const detailPanel: DataTableDetailPanel<Producto> = {
+    title: item => `Detalle: ${item.nombre}`,
+    size: 'lg',
+    header: item => ({
+      icon: <Package size={18} />,
+      title: 'Producto en inventario',
+      code: item.ref,
+      subtitle: item.tela ? `Tela: ${item.tela}` : undefined,
+      meta: item.stock === 'OK' ? 'Disponible para producción' : 'Requiere atención de stock',
+      status: item.stock === 'OK' ? 'Activo' : item.stock,
+      badgeVariant: item.stock === 'OK' ? 'success' : item.stock === 'Bajo stock' ? 'warning' : 'danger',
+    }),
+    kpis: item => [
+      { label: 'Stock actual', value: item.cantidadStock, icon: <Package size={16} />, tone: item.stock === 'OK' ? 'success' : item.stock === 'Bajo stock' ? 'warning' : 'danger' },
+      { label: 'Estado', value: item.stock, icon: <AlertTriangle size={16} />, tone: item.stock === 'OK' ? 'success' : item.stock === 'Bajo stock' ? 'warning' : 'danger' },
+    ],
+    render: (item) => (
+      <div className={s.detailPanel}>
+        <div className={s.detailRow}><span>Tela:</span> {item.tela}</div>
+        <div className={s.detailRow}><span>Referencia:</span> {item.ref}</div>
+        <div className={s.detailRow}><span>Stock:</span> {item.cantidadStock}</div>
+      </div>
+    ),
+  };
+
+  const actions: DataTableAction<Producto>[] = [
+    { label: 'Editar', icon: <Edit size={14} />, onClick: (item) => { setSelectedProducto(item); setEditCantidad(item.cantidadStock); setEditModalOpen(true); } },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => handleEliminar(item.ref) },
+  ];
 
   return (
     <div>
@@ -62,72 +124,38 @@ export const AdminInventario: React.FC = () => {
           <h1 className={s.pageTitle}>Inventario</h1>
           <p className={s.pageSubtitle}>Gestión de productos y stock</p>
         </div>
-        <Button onClick={() => setAjusteModalOpen(true)}>
-          <Plus size={16} />
+        <Button leftIcon={<Plus size={16} />} onClick={openAjusteModal}>
           Ajustar stock
         </Button>
       </div>
 
       <div className={s.toolbar}>
-        <div className={s.searchBox}>
-          <Search size={16} className={s.searchIcon} />
-          <input
-            type="text"
-            placeholder="Buscar productos..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={s.searchInput}
-          />
-        </div>
+        <SearchInput
+          placeholder="Buscar productos..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onSearch={(value) => setSearch(value)}
+          debounceMs={100}
+          minChars={0}
+        />
       </div>
 
       <div className={s.tableWrapper}>
-        <table className={s.table}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Referencia</th>
-              <th>Descripción</th>
-              <th>Tela</th>
-              <th>Color</th>
-              <th>Disponible</th>
-              <th>Stock mín.</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(item => (
-              <tr key={item.id}>
-                <td className={s.tdMono}>{item.id}</td>
-                <td className={s.tdPrimary}>{item.referencia}</td>
-                <td>{item.descripcion}</td>
-                <td>{item.tela}</td>
-                <td>{item.color}</td>
-                <td>{item.disponible}</td>
-                <td>{item.stockMinimo}</td>
-                <td>
-                  <Badge variant={getStockStatus(item)}>
-                    {getStockLabel(item)}
-                  </Badge>
-                </td>
-                <td>
-                  <div className={s.actions}>
-                    <button className={s.actionBtn} title="Editar" onClick={() => { setSelectedItem(item); setEditModalOpen(true); }}>
-                      <Edit size={14} />
-                    </button>
-                    <button className={`${s.actionBtn} ${s.actionBtnDanger}`} title="Eliminar" onClick={() => { setSelectedItem(item); setDeleteModalOpen(true); }}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          data={tableData}
+          columns={columns}
+          detailPanel={detailPanel}
+          actions={actions}
+          enableColumnFilters={false}
+          enableExport={false}
+          enableRowSelection={false}
+          enableSorting={true}
+          toolbarLeft={null}
+          maxVisibleColumns={5}
+          emptyMessage="No se encontraron productos"
+        />
       </div>
 
-      {/* Modal Ajustar Stock */}
       {ajusteModalOpen && (
         <div className={s.modalOverlay} onClick={closeModals}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
@@ -136,27 +164,46 @@ export const AdminInventario: React.FC = () => {
               <button className={s.closeBtn} onClick={closeModals}><X size={16} /></button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form}>
+              <form className={s.form} onSubmit={handleGuardarAjuste}>
+                {formError && (
+                  <div className={s.formErrorBanner}>
+                    {formError}
+                  </div>
+                )}
                 <div className={s.field}>
-                  <label className={s.label}>Referencia</label>
-                  <input type="text" className={s.input} placeholder="Referencia del producto" />
+                  <label className={s.label}>Producto (Referencia)</label>
+                  <select className={s.select} value={selectedProducto?.ref || ''} onChange={e => {
+                    const prod = productos.find(p => p.ref === e.target.value);
+                    setSelectedProducto(prod || null);
+                  }} required>
+                    <option value="">Seleccionar producto...</option>
+                    {productos.map(p => <option key={p.ref} value={p.ref}>{p.ref} - {p.nombre}</option>)}
+                  </select>
                 </div>
                 <div className={s.field}>
-                  <label className={s.label}>Cantidad a ajustar</label>
-                  <input type="number" className={s.input} placeholder="Ej: +50 o -20" />
+                  <label className={s.label}>Tipo de movimiento</label>
+                  <select className={s.select} value={editTipo} onChange={e => setEditTipo(e.target.value as 'entrada' | 'salida' | 'ajuste')}>
+                    <option value="entrada">Entrada (+)</option>
+                    <option value="salida">Salida (-)</option>
+                    <option value="ajuste">Ajuste</option>
+                  </select>
+                </div>
+                <div className={s.field}>
+                  <label className={s.label}>Cantidad</label>
+                  <input type="number" className={s.input} value={editCantidad} onChange={e => setEditCantidad(Number(e.target.value))} min="0" required />
                 </div>
                 <div className={s.field}>
                   <label className={s.label}>Motivo</label>
-                  <select className={s.input}>
+                  <select className={s.select} value={editMotivo} onChange={e => setEditMotivo(e.target.value)}>
                     <option>Ingreso de mercancía</option>
                     <option>Devolución cliente</option>
                     <option>Daño/rotura</option>
                     <option>Corrección inventario</option>
                   </select>
                 </div>
-                <div className={s.formActions}>
-                  <button className={s.btnSecondary} type="button" onClick={closeModals}>Cancelar</button>
-                  <button className={s.btnPrimary} type="button" onClick={closeModals}>Aplicar ajuste</button>
+                <div className={s.modalFooter}>
+                  <Button type="button" variant="secondary" onClick={closeModals} disabled={saving}>Cancelar</Button>
+                  <Button type="submit" loading={saving}>Aplicar ajuste</Button>
                 </div>
               </form>
             </div>
@@ -164,8 +211,7 @@ export const AdminInventario: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Editar Item */}
-      {editModalOpen && selectedItem && (
+      {editModalOpen && selectedProducto && (
         <div className={s.modalOverlay} onClick={closeModals}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
@@ -173,41 +219,30 @@ export const AdminInventario: React.FC = () => {
               <button className={s.closeBtn} onClick={closeModals}><X size={16} /></button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form}>
+              <form className={s.form} onSubmit={e => {
+                e.preventDefault();
+                updateProducto(selectedProducto.ref, { 
+                  cantidadStock: editCantidad,
+                });
+                closeModals();
+              }}>
                 <div className={s.field}>
-                  <label className={s.label}>Descripción</label>
-                  <input type="text" className={s.input} defaultValue={selectedItem.descripcion} />
+                  <label className={s.label}>Referencia</label>
+                  <input type="text" className={s.input} value={selectedProducto.ref} readOnly style={{ opacity: 0.6 }} />
                 </div>
                 <div className={s.field}>
-                  <label className={s.label}>Stock mínimo</label>
-                  <input type="number" className={s.input} defaultValue={selectedItem.stockMinimo} />
+                  <label className={s.label}>Nombre</label>
+                  <input type="text" className={s.input} value={selectedProducto.nombre} readOnly style={{ opacity: 0.6 }} />
                 </div>
-                <div className={s.formActions}>
-                  <button className={s.btnSecondary} type="button" onClick={closeModals}>Cancelar</button>
-                  <button className={s.btnPrimary} type="button" onClick={closeModals}>Guardar cambios</button>
+                <div className={s.field}>
+                  <label className={s.label}>Stock actual</label>
+                  <input type="number" className={s.input} value={editCantidad} onChange={e => setEditCantidad(Number(e.target.value))} min="0" required />
+                </div>
+                <div className={s.modalFooter}>
+                  <Button type="button" variant="secondary" onClick={closeModals} disabled={saving}>Cancelar</Button>
+                  <Button type="submit" loading={saving}>Guardar cambios</Button>
                 </div>
               </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Eliminar */}
-      {deleteModalOpen && selectedItem && (
-        <div className={s.modalOverlay} onClick={closeModals}>
-          <div className={s.modal} onClick={e => e.stopPropagation()}>
-            <div className={s.modalHeader}>
-              <h2 className={s.modalTitle}>Confirmar eliminación</h2>
-              <button className={s.closeBtn} onClick={closeModals}><X size={16} /></button>
-            </div>
-            <div className={s.modalBody}>
-              <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                ¿Está seguro de eliminar el producto <strong>{selectedItem.referencia}</strong>? Esta acción no se puede revertir.
-              </p>
-              <div className={s.formActions}>
-                <button className={s.btnSecondary} type="button" onClick={closeModals}>Cancelar</button>
-                <button className={s.btnDanger} type="button" onClick={closeModals}>Eliminar</button>
-              </div>
             </div>
           </div>
         </div>

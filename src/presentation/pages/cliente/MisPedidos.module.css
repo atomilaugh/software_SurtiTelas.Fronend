@@ -257,6 +257,39 @@
   margin-top: 4px;
 }
 
+.whatsappBtn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-success);
+  background: transparent;
+  color: var(--color-success);
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.whatsappBtn:hover {
+  background: var(--color-success);
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 768px) {
+  .pedidoMeta {
+    gap: 10px;
+  }
+  
+  .pedidoExpandedInner {
+    grid-template-columns: 1fr;
+  }
+}
+
 .resumenRow--total {
   font-size: 1rem;
   font-weight: 800;
@@ -309,8 +342,8 @@
   flex-shrink: 0;
 }
 
-.trackingStepDot--done { background: var(--color-success); color: #000; }
-.trackingStepDot--active { background: var(--color-accent); color: #000; box-shadow: 0 0 0 4px rgba(244,162,97,0.2); }
+.trackingStepDot--done { background: var(--color-success); color: var(--color-text-primary); }
+.trackingStepDot--active { background: var(--color-accent); color: var(--color-text-primary); box-shadow: 0 0 0 4px rgba(244,162,97,0.2); }
 .trackingStepDot--pending { background: var(--color-bg-elevated); border: 2px solid var(--color-border); color: var(--color-text-muted); }
 
 .trackingStepInlineLabel {
@@ -349,14 +382,4 @@
 .entregaInfoIcon {
   color: var(--color-info);
   flex-shrink: 0;
-}
-
-@media (max-width: 768px) {
-  .pedidoMeta {
-    gap: 10px;
-  }
-  
-  .pedidoExpandedInner {
-    grid-template-columns: 1fr;
-  }
 }

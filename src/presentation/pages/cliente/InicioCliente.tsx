@@ -1,31 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../admin/StatCard';
-import { ShoppingBag, Clock, CheckCircle2, DollarSign, ArrowRight, Package, User, MapPin } from 'lucide-react';
+import { ShoppingBag, Clock, CheckCircle2, DollarSign, ArrowRight, Package, User, MapPin, MessageCircle, Archive } from 'lucide-react';
 import s from './InicioCliente.module.css';
 import { Badge } from '@/shared/ui/Badge';
-
-const stats = [
-  { label: 'Pedidos Realizados', value: '24', trend: 'Total histórico', trendUp: true, Icon: ShoppingBag, color: 'accent' as const },
-  { label: 'En Proceso', value: '2', trend: 'Activos ahora', trendUp: true, Icon: Clock, color: 'warning' as const },
-  { label: 'Entregados', value: '21', trend: '87% completados', trendUp: true, Icon: CheckCircle2, color: 'success' as const },
-  { label: 'Total Comprado', value: '$8.4M', trend: 'Acumulado', trendUp: true, Icon: DollarSign, color: 'info' as const },
-];
-
-const pedidoActivo = {
-  id: '#PD-2401',
-  fecha: '05 Jun 2026',
-  items: 24,
-  total: '$2.480.000',
-  estado: 'En producción',
-  tracking: [
-    { label: 'Pedido recibido', desc: 'Tu pedido fue registrado', time: '05 Jun, 10:30', done: true, active: false },
-    { label: 'En producción', desc: 'Estamos confeccionando', time: '06 Jun, 08:15', done: false, active: true },
-    { label: 'Listo para envío', desc: 'Empacado y listo', time: '', done: false, active: false },
-    { label: 'En camino', desc: 'Domiciliario en ruta', time: '', done: false, active: false },
-    { label: 'Entregado', desc: 'Recibido en tu dirección', time: '', done: false, active: false },
-  ],
-};
+import { useAppStore, usePedidos } from '@/core/stores';
+import { DetailModal } from '@/shared/ui/DetailModal';
+import { Modal } from '@/shared/ui/Modal';
+import { Button } from '@/shared/ui/Button';
+import type { Pedido } from '@/core/types';
 
 const asesorAsignado = {
   nombre: 'Camila Torres',
@@ -35,14 +19,52 @@ const asesorAsignado = {
   whatsapp: '310 234 5678',
 };
 
-const ultimosPedidos = [
-  { id: '#PD-2402', fecha: '08 Jun 2026', estado: 'Listo', total: '$1.200.000' },
-  { id: '#PD-2400', fecha: '02 Jun 2026', estado: 'Entregado', total: '$850.000' },
-  { id: '#PD-2395', fecha: '28 May 2026', estado: 'Entregado', total: '$1.870.000' },
-  { id: '#PD-2390', fecha: '20 May 2026', estado: 'Entregado', total: '$620.000' },
-];
+const statusVariant = (estado: Pedido['estado']) => {
+  if (estado === 'Entregado') return 'success';
+  if (estado === 'En producción' || estado === 'Despachado' || estado === 'En camino') return 'info';
+  if (estado === 'Listo') return 'warning';
+  if (estado === 'Cancelado') return 'danger';
+  return 'default';
+};
 
 export const InicioCliente: React.FC = () => {
+  const pedidos = usePedidos().pedidos;
+  const [pedidoActivoState, setPedidoActivoState] = useState<Pedido | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessage, setChatMessage] = useState('');
+  const addNotificacion = useAppStore(s => s.addNotificacion);
+
+  const pedidoActivo = pedidos.find(p => p.estado !== 'Entregado' && p.estado !== 'Cancelado') || pedidos[0] || null;
+  const totalPedidos = pedidos.length;
+  const pedidosEnProceso = pedidos.filter(p => p.estado === 'En producción' || p.estado === 'Listo' || p.estado === 'Despachado' || p.estado === 'En camino').length;
+  const pedidosEntregados = pedidos.filter(p => p.estado === 'Entregado').length;
+
+  const stats = [
+    { label: 'Pedidos Realizados', value: String(totalPedidos), trend: 'Total histórico', trendUp: true, Icon: ShoppingBag, color: 'accent' as const },
+    { label: 'En Proceso', value: String(pedidosEnProceso), trend: 'Activos ahora', trendUp: true, Icon: Clock, color: 'warning' as const },
+    { label: 'Entregados', value: String(pedidosEntregados), trend: 'Completados', trendUp: true, Icon: CheckCircle2, color: 'success' as const },
+    { label: 'Total Comprado', value: '$8.4M', trend: 'Acumulado', trendUp: true, Icon: DollarSign, color: 'info' as const },
+  ];
+
+  const ultimosPedidos = pedidos.slice(0, 5);
+
+  const enviarMensaje = () => {
+    if (!chatMessage.trim()) {
+      toast.error('Escribe un mensaje para tu asesor');
+      return;
+    }
+    addNotificacion({
+      tipo: 'info',
+      titulo: 'Mensaje a asesor',
+      mensaje: chatMessage,
+    });
+    toast.success('Mensaje enviado a tu asesor');
+    setChatMessage('');
+    setChatOpen(false);
+  };
+
+  const openPedido = (pedido: Pedido) => setPedidoActivoState(pedido);
+
   return (
     <div className={s.inicioLayout}>
       <h1 className={s.pageTitle}>Dashboard</h1>
@@ -81,31 +103,48 @@ export const InicioCliente: React.FC = () => {
         <div className={s.pedidoActivoCard}>
           <div className={s.pedidoActivoHeader}>
             <div className={s.pedidoActivoTitle}>Pedido activo</div>
-            <Badge variant="info">{pedidoActivo.estado}</Badge>
+            <Badge variant={pedidoActivo ? statusVariant(pedidoActivo.estado) : 'default'}>{pedidoActivo?.estado || 'Sin pedido'}</Badge>
           </div>
           <div className={s.pedidoActivoBody}>
             <div className={s.pedidoActivoId}>
-              {pedidoActivo.id} • {pedidoActivo.fecha} • {pedidoActivo.items} artículos • Total: {pedidoActivo.total}
+              {pedidoActivo ? `${pedidoActivo.id} • ${pedidoActivo.fecha} • ${pedidoActivo.items} artículos • Total: ${pedidoActivo.total}` : 'No tienes pedidos activos'}
             </div>
 
             <div className={s.trackingTimeline}>
-              {pedidoActivo.tracking.map((step, idx) => (
-                <div key={idx} className={s.trackingStep}>
-                  <div className={s.trackingLeft}>
-                    <div className={`${s.trackingDot} ${step.done ? s['trackingDot--done'] : step.active ? s['trackingDot--active'] : s['trackingDot--pending']}`}>
-                      {step.done ? '✓' : step.active ? '●' : ''}
-                    </div>
-                    <div className={`${s.trackingLine} ${step.done ? s['trackingLine--done'] : s['trackingLine--pending']}`} />
-                  </div>
-                  <div className={s.trackingContent}>
-                    <div className={`${s.trackingLabel} ${!step.done && !step.active ? s.trackingLabelPending : ''}`}>
-                      {step.label}
-                    </div>
-                    <div className={s.trackingDesc}>{step.desc}</div>
-                    {step.time && <div className={s.trackingTime}>— {step.time}</div>}
-                  </div>
+              <div className={s.trackingStep}>
+                <div className={s.trackingLeft}>
+                  <div className={`${s.trackingDot} ${s['trackingDot--done']}`}>✓</div>
+                  <div className={`${s.trackingLine} ${s['trackingLine--done']}`} />
                 </div>
-              ))}
+                <div className={s.trackingContent}>
+                  <div className={s.trackingLabel}>Pedido recibido</div>
+                  <div className={s.trackingDesc}>Tu pedido fue registrado</div>
+                </div>
+              </div>
+              <div className={s.trackingStep}>
+                <div className={s.trackingLeft}>
+                  <div className={`${s.trackingDot} ${pedidoActivo?.estado === 'En producción' ? s['trackingDot--active'] : s['trackingDot--done']}`}>
+                    {pedidoActivo?.estado === 'En producción' ? '●' : '✓'}
+                  </div>
+                  <div className={`${s.trackingLine} ${pedidoActivo && ['En producción', 'Listo', 'Despachado', 'En camino', 'Entregado'].includes(pedidoActivo.estado) ? s['trackingLine--done'] : s['trackingLine--pending']}`} />
+                </div>
+                <div className={s.trackingContent}>
+                  <div className={s.trackingLabel}>En producción</div>
+                  <div className={s.trackingDesc}>Estamos confeccionando</div>
+                </div>
+              </div>
+              <div className={s.trackingStep}>
+                <div className={s.trackingLeft}>
+                  <div className={`${s.trackingDot} ${pedidoActivo?.estado === 'Listo' ? s['trackingDot--done'] : s['trackingDot--pending']}`}>
+                    {pedidoActivo?.estado === 'Listo' ? '✓' : ''}
+                  </div>
+                  <div className={`${s.trackingLine} ${pedidoActivo && ['Listo', 'Despachado', 'En camino', 'Entregado'].includes(pedidoActivo.estado) ? s['trackingLine--done'] : s['trackingLine--pending']}`} />
+                </div>
+                <div className={s.trackingContent}>
+                  <div className={s.trackingLabel}>Listo para envío</div>
+                  <div className={s.trackingDesc}>Empacado y listo</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -127,12 +166,15 @@ export const InicioCliente: React.FC = () => {
             <User size={14} className={s.asesorContactIcon} />
             {asesorAsignado.email}
           </div>
+          <button className={s.asesorChatBtn} type="button" onClick={() => setChatOpen(true)}>
+            💬 Chatear con {asesorAsignado.nombre.split(' ')[0]}
+          </button>
         </div>
       </div>
 
       <div className={s.bottomGrid}>
         <div className={s.quickAccessGrid}>
-          <Link to="/cliente/catalogo" className={s.quickAccessCard} style={{ textDecoration: 'none' }}>
+          <Link to="/cliente/catalogo" className={s.quickAccessCard} style={{ textDecoration: 'none' }} onClick={() => toast.info('Navegando al catálogo')}>
             <div className={`${s.quickAccessIcon} ${s.quickAccessIconAccent}`}>
               <Package size={22} />
             </div>
@@ -141,7 +183,7 @@ export const InicioCliente: React.FC = () => {
             <ArrowRight size={16} className={s.quickAccessArrow} />
           </Link>
 
-          <Link to="/cliente/pedidos" className={s.quickAccessCard} style={{ textDecoration: 'none' }}>
+          <Link to="/cliente/pedidos" className={s.quickAccessCard} style={{ textDecoration: 'none' }} onClick={() => toast.info('Navegando a mis pedidos')}>
             <div className={`${s.quickAccessIcon} ${s.quickAccessIconSuccess}`}>
               <ShoppingBag size={22} />
             </div>
@@ -150,7 +192,7 @@ export const InicioCliente: React.FC = () => {
             <ArrowRight size={16} className={s.quickAccessArrow} />
           </Link>
 
-          <Link to="/cliente/perfil" className={s.quickAccessCard} style={{ textDecoration: 'none' }}>
+          <Link to="/cliente/perfil" className={s.quickAccessCard} style={{ textDecoration: 'none' }} onClick={() => toast.info('Navegando a mi perfil')}>
             <div className={`${s.quickAccessIcon} ${s.quickAccessIconInfo}`}>
               <User size={22} />
             </div>
@@ -165,18 +207,72 @@ export const InicioCliente: React.FC = () => {
             <div className={s.historialTitle}>Últimos pedidos</div>
           </div>
           <div className={s.historialList}>
-            {ultimosPedidos.map((pedido) => (
-              <div key={pedido.id} className={s.historialItem}>
-                <div>
-                  <div className={s.historialId}>{pedido.id}</div>
-                  <div className={s.historialMeta}>{pedido.fecha} • {pedido.estado}</div>
-                </div>
-                <div className={s.historialTotal}>{pedido.total}</div>
-              </div>
-            ))}
+            {ultimosPedidos.length === 0 ? (
+              <div style={{ padding: '20px', color: 'var(--color-text-secondary)' }}>No hay pedidos</div>
+            ) : (
+              ultimosPedidos.map((pedido) => (
+                <button type="button" key={pedido.id} className={s.historialItem} onClick={() => openPedido(pedido)}>
+                  <div>
+                    <div className={s.historialId}>{pedido.id}</div>
+                    <div className={s.historialMeta}>{pedido.fecha} • {pedido.estado}</div>
+                  </div>
+                  <div className={s.historialTotal}>{pedido.total}</div>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>
+
+      <DetailModal
+        children={null}
+        open={Boolean(pedidoActivoState)}
+        onClose={() => setPedidoActivoState(null)}
+        title={pedidoActivoState ? `Pedido ${pedidoActivoState.id}` : 'Pedido'}
+        subtitle={pedidoActivoState?.fecha}
+        size="lg"
+        header={{
+          icon: <Archive size={18} />,
+          status: pedidoActivoState ? <Badge variant={statusVariant(pedidoActivoState.estado)}>{pedidoActivoState.estado}</Badge> : undefined,
+        }}
+        sections={[
+          {
+            title: 'Seguimiento',
+            fields: [
+              { label: 'Cliente', value: pedidoActivoState?.cliente, icon: <User size={16} /> },
+              { label: 'Total', value: pedidoActivoState?.total, icon: <DollarSign size={16} /> },
+              { label: 'Artículos', value: pedidoActivoState?.items, icon: <Package size={16} /> },
+              { label: 'Observaciones', value: pedidoActivoState?.observaciones || 'Sin observaciones', fullWidth: true, icon: <MessageCircle size={16} /> },
+            ],
+          },
+          {
+            title: 'Artículos',
+            children: (
+              <div className="grid gap-2">
+                {(pedidoActivoState?.itemsList || []).map((item, index) => (
+                  <div key={`${item.nombre}-${index}`} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-medium text-[var(--color-text-primary)]">{item.nombre}</div>
+                      <div className="text-sm text-[var(--color-text-muted)]">x{item.cantidad}</div>
+                    </div>
+                  </div>
+                ))}
+                {(!(pedidoActivoState?.itemsList || []).length) && <div className="text-sm text-[var(--color-text-muted)]">Sin detalle de artículos registrado.</div>}
+              </div>
+            ),
+          },
+        ]}
+      />
+
+      <Modal open={chatOpen} onClose={() => setChatOpen(false)} title={`Chatear con ${asesorAsignado.nombre.split(' ')[0]}`} size="sm">
+        <div className="grid gap-4">
+          <textarea className="min-h-28 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" placeholder="Escribe tu consulta..." value={chatMessage} onChange={e => setChatMessage(e.target.value)} />
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setChatOpen(false)}>Cancelar</Button>
+            <Button onClick={enviarMensaje}><MessageCircle size={14} /> Enviar mensaje</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -502,7 +502,8 @@
   cursor: not-allowed;
 }
 
-.wishlist-btn:hover {
+.wishlist-btn:hover,
+.wishlist-btn.active {
   color: #ef4444;
 }
 

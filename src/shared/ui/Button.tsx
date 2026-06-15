@@ -8,13 +8,13 @@ const btn = cva(
   {
     variants: {
       variant: {
-        primary:   'bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-85 focus-visible:ring-[var(--border-focus)]',
-        secondary: 'bg-[var(--bg-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-muted)] border border-[var(--border-default)] focus-visible:ring-[var(--border-focus)]',
-        outline:   'border border-[var(--border-default)] bg-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:border-[var(--border-strong)] focus-visible:ring-[var(--border-focus)]',
-        ghost:     'bg-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]',
-        danger:    'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500',
-        success:   'bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500',
-        warning:   'bg-amber-500 text-white hover:bg-amber-600 focus-visible:ring-amber-500',
+        primary:   'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:bg-[var(--btn-primary-bg-hover)] focus-visible:ring-[var(--border-focus)]',
+        secondary: 'bg-[var(--btn-secondary-bg)] text-[var(--btn-secondary-text)] hover:bg-[var(--btn-secondary-bg-hover)] border border-[var(--btn-secondary-border)] focus-visible:ring-[var(--border-focus)]',
+        outline:   'border border-[var(--btn-outline-border)] bg-[var(--btn-outline-bg)] text-[var(--btn-outline-text)] hover:bg-[var(--btn-outline-bg-hover)] hover:border-[var(--border-strong)] focus-visible:ring-[var(--border-focus)]',
+        ghost:     'bg-transparent text-[var(--btn-ghost-text)] hover:bg-[var(--btn-ghost-bg-hover)] hover:text-[var(--text-primary)]',
+        danger:    'bg-[var(--btn-danger-bg)] text-[var(--btn-danger-text)] hover:bg-[var(--btn-danger-bg-hover)] focus-visible:ring-[var(--btn-danger-bg)]',
+        success:   'bg-[var(--btn-success-bg)] text-[var(--btn-success-text)] hover:opacity-90 focus-visible:ring-[var(--btn-success-bg)]',
+        warning:   'bg-[var(--btn-warning-bg)] text-[var(--btn-warning-text)] hover:opacity-90 focus-visible:ring-[var(--btn-warning-bg)]',
       },
       size: {
         xs:      'h-6 px-2.5 text-[11px] rounded-lg',
