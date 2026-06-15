@@ -1,14 +1,14 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "@/app/providers/AppProviders";
-import { CheckoutModal } from "@presentation/components/CheckoutModal";
+import CheckoutButton from "@/presentation/components/CheckoutButton";
+import { CheckoutModal } from "@/presentation/components/CheckoutModal";
 import "../styles/CartPage.css";
 
 const formatCurrency = (value: number) => `$${value.toLocaleString('es-CO')}`;
 
 const CartPage: React.FC = () => {
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const {
     items,
     totalItems,
@@ -22,6 +22,12 @@ const CartPage: React.FC = () => {
     removeFromCart,
     clearCart,
   } = useCart();
+
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  const handleCheckoutClick = () => {
+    setIsCheckoutOpen(true);
+  };
 
   return (
     <div className="cart-page">
@@ -129,16 +135,14 @@ const CartPage: React.FC = () => {
               <span>{formatCurrency(tax)}</span>
             </div>
             <div className="cart-summary-row">
-              <span>Envi­o</span>
+              <span>Envío</span>
               <span>{shipping === 0 ? 'Gratis' : formatCurrency(shipping)}</span>
             </div>
             <div className="cart-summary-total">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
-            <button className="cart-summary-cta" type="button" onClick={() => setIsCheckoutOpen(true)}>
-              Finalizar compra
-            </button>
+            <CheckoutButton total={total} disabled={items.length === 0} onContinueShopping={() => setIsCheckoutOpen(true)} />
           </aside>
         </div>
       )}
@@ -149,5 +153,6 @@ const CartPage: React.FC = () => {
 };
 
 export default CartPage;
+
 
 

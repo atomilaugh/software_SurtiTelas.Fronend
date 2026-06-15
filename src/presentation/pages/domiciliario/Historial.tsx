@@ -1,7 +1,9 @@
-import React from 'react';
-import { Eye } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { Eye, MapPin, Clock, Package } from 'lucide-react';
 import s from './Historial.module.css';
 import { Badge } from '@/shared/ui/Badge';
+import { DetailModal } from '@/shared/ui/DetailModal';
 
 interface Entrega {
   id: string;
@@ -34,6 +36,32 @@ const rendimiento = [
 ];
 
 export const DomiciliarioHistorial: React.FC = () => {
+  const [desde, setDesde] = useState('2026-06-01');
+  const [hasta, setHasta] = useState('2026-06-08');
+  const [selectedEntrega, setSelectedEntrega] = useState<Entrega | null>(null);
+
+  const filteredHistorial = useMemo(() => {
+    const desdeDate = new Date(`${desde}T00:00:00`).getTime();
+    const hastaDate = new Date(`${hasta}T23:59:59`).getTime();
+
+    const result: Record<string, Entrega[]> = {};
+    Object.entries(historialEntregas).forEach(([date, entregas]) => {
+      const fechaParts = date.split('-').map(part => part.trim());
+      const monthMap: Record<string, string> = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
+      const day = fechaParts[1]?.padStart(2, '0');
+      const month = monthMap[fechaParts[0] || ''];
+      const year = fechaParts[2];
+      if (!day || !month || !year) return;
+      const dateValue = new Date(`${year}-${month}-${day}T12:00:00`).getTime();
+      if (dateValue >= desdeDate && dateValue <= hastaDate) {
+        result[date] = entregas;
+      }
+    });
+    return result;
+  }, [desde, hasta]);
+
+  const totalFiltrado = Object.values(filteredHistorial).flat().length;
+
   return (
     <div>
       <h1 className={s.pageTitle}>Historial</h1>
@@ -54,48 +82,87 @@ export const DomiciliarioHistorial: React.FC = () => {
       <div className={s.historialFilters}>
         <div className={s.dateRangeGroup}>
           <span className={s.dateRangeLabel}>Desde:</span>
-          <input type="date" className={s.dateInput} defaultValue="2026-06-01" />
+          <input type="date" className={s.dateInput} value={desde} onChange={e => setDesde(e.target.value)} />
         </div>
         <div className={s.dateRangeGroup}>
           <span className={s.dateRangeLabel}>Hasta:</span>
-          <input type="date" className={s.dateInput} defaultValue="2026-06-08" />
+          <input type="date" className={s.dateInput} value={hasta} onChange={e => setHasta(e.target.value)} />
         </div>
       </div>
 
-      {Object.entries(historialEntregas).map(([date, entregas]) => (
-        <div key={date} className={s.dayGroup}>
-          <div className={s.dayGroupHeader}>
-            <span className={s.dayGroupDate}>{date}</span>
-            <div className={s.dayGroupLine} />
-            <span className={s.dayGroupCount}>{entregas.length} entregas</span>
-          </div>
-          {entregas.map((entrega) => (
-            <div key={entrega.id} className={s.historialRow}>
-              <span className={s.historialRowId}>{entrega.id}</span>
-              <span style={{ flex: 0.8 }}>{entrega.pedido}</span>
-              <div className={s.historialRowCliente}>
-                <div className={s.historialRowClienteName}>{entrega.cliente}</div>
-                <div className={s.historialRowAddress}>{entrega.direccion}</div>
-              </div>
-              <span className={s.historialRowHora}>{entrega.hora}</span>
-              <Badge variant={entrega.estado === 'Entregado' ? 'success' : 'danger'}>
-                {entrega.estado}
-              </Badge>
-              <span className={s.historialRowObs}>{entrega.observaciones || '-'}</span>
-              <button style={{
-                padding: '6px 10px',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-sm)',
-                background: 'transparent',
-                color: 'var(--color-text-secondary)',
-                cursor: 'pointer'
-              }}>
-                <Eye size={14} />
-              </button>
-            </div>
-          ))}
+      {Object.keys(filteredHistorial).length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[var(--color-border)] p-8 text-center text-[var(--color-text-muted)]">
+          No hay entregas en el rango seleccionado.
         </div>
-      ))}
+      ) : (
+        Object.entries(filteredHistorial).map(([date, entregas]) => (
+          <div key={date} className={s.dayGroup}>
+            <div className={s.dayGroupHeader}>
+              <span className={s.dayGroupDate}>{date}</span>
+              <div className={s.dayGroupLine} />
+              <span className={s.dayGroupCount}>{entregas.length} entregas</span>
+            </div>
+            {entregas.map((entrega) => (
+              <button type="button" key={entrega.id} className={s.historialRow} onClick={() => setSelectedEntrega(entrega)}>
+                <span className={s.historialRowId}>{entrega.id}</span>
+                <span style={{ flex: 0.8 }}>{entrega.pedido}</span>
+                <div className={s.historialRowCliente}>
+                  <div className={s.historialRowClienteName}>{entrega.cliente}</div>
+                  <div className={s.historialRowAddress}>{entrega.direccion}</div>
+                </div>
+                <span className={s.historialRowHora}>{entrega.hora}</span>
+                <Badge variant={entrega.estado === 'Entregado' ? 'success' : 'danger'}>
+                  {entrega.estado}
+                </Badge>
+                <span className={s.historialRowObs}>{entrega.observaciones || '-'}</span>
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)]">
+                  <Eye size={14} />
+                </span>
+              </button>
+            ))}
+          </div>
+        ))
+      )}
+
+      <div style={{ marginTop: 16, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+        Mostrando {totalFiltrado} entregas filtradas.
+      </div>
+
+      <DetailModal
+        children={null}
+        open={Boolean(selectedEntrega)}
+        onClose={() => setSelectedEntrega(null)}
+        title={selectedEntrega ? `Historial ${selectedEntrega.id}` : 'Historial'}
+        subtitle={selectedEntrega?.fecha}
+        size="lg"
+        header={{
+          icon: <Eye size={18} />,
+          status: selectedEntrega ? <Badge variant={selectedEntrega.estado === 'Entregado' ? 'success' : 'danger'}>{selectedEntrega.estado}</Badge> : undefined,
+        }}
+        sections={[
+          {
+            title: 'Detalle de entrega',
+            fields: [
+              { label: 'Pedido', value: selectedEntrega?.pedido, icon: <Package size={16} /> },
+              { label: 'Cliente', value: selectedEntrega?.cliente, icon: <Eye size={16} /> },
+              { label: 'Dirección', value: selectedEntrega?.direccion, icon: <MapPin size={16} /> },
+              { label: 'Fecha', value: selectedEntrega?.fecha, icon: <Clock size={16} /> },
+              { label: 'Hora', value: selectedEntrega?.hora, icon: <Clock size={16} /> },
+              { label: 'Observaciones', value: selectedEntrega?.observaciones || 'Sin observaciones', fullWidth: true, icon: <Eye size={16} /> },
+            ],
+          },
+        ]}
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" className="inline-flex h-8 items-center justify-center rounded-xl border border-[var(--color-border)] bg-transparent px-4 text-sm font-medium text-[var(--color-text-primary)]" onClick={() => {
+              toast.info(`Historial ${selectedEntrega?.id} listo para consulta`);
+              setSelectedEntrega(null);
+            }}>
+              Cerrar
+            </button>
+          </div>
+        }
+      />
     </div>
   );
 };

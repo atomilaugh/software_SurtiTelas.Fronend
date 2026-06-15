@@ -37,7 +37,7 @@
   justify-content: center;
   font-size: 0.85rem;
   font-family: var(--font-sans);
-  transition: var(--transition);
+  transition: var(--btn-transition);
 }
 
 .btn:hover:not(:disabled) {
@@ -47,9 +47,9 @@
 }
 
 .btn--active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #000;
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   font-weight: 700;
 }
 

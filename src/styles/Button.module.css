@@ -1,3 +1,8 @@
+/* ============================================================
+   BUTTON SYSTEM — Premium SaaS Design
+   Design references: Linear · Stripe · Vercel · Notion · Clerk
+   ============================================================ */
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -9,10 +14,12 @@
   font-weight: 500;
   font-family: var(--font-sans);
   cursor: pointer;
-  transition: var(--transition);
+  transition: var(--btn-transition);
   border: none;
   white-space: nowrap;
   text-decoration: none;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
 }
 
 .btn:disabled {
@@ -20,52 +27,155 @@
   cursor: not-allowed;
 }
 
-/* Variantes */
+.btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   PRIMARY
+   ============================================================ */
 .btn--primary {
-  background: var(--color-accent);
-  color: #000;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border: 1px solid var(--btn-primary-border);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: var(--color-accent-hover);
+  background: var(--btn-primary-bg-hover);
   transform: translateY(-1px);
 }
 
+.btn--primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* ============================================================
+   SECONDARY
+   ============================================================ */
 .btn--secondary {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
+  background: var(--btn-secondary-bg);
+  border: 1px solid var(--btn-secondary-border);
+  color: var(--btn-secondary-text);
 }
 
 .btn--secondary:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-text-primary);
-  background: var(--color-bg-elevated);
+  background: var(--btn-secondary-bg-hover);
+  color: var(--text-primary);
 }
 
-.btn--ghost {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
+/* ============================================================
+   SUCCESS
+   ============================================================ */
+.btn--success {
+  background: var(--btn-success-bg);
+  color: var(--btn-success-text);
+  border: 1px solid var(--btn-success-bg);
 }
 
-.btn--ghost:hover:not(:disabled) {
-  background: var(--color-bg-elevated);
-  color: var(--color-text-primary);
+.btn--success:hover:not(:disabled) {
+  opacity: 0.9;
 }
 
+/* ============================================================
+   WARNING
+   ============================================================ */
+.btn--warning {
+  background: var(--btn-warning-bg);
+  color: var(--btn-warning-text);
+  border: 1px solid var(--btn-warning-bg);
+}
+
+.btn--warning:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* ============================================================
+   DANGER
+   ============================================================ */
 .btn--danger {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-error);
+  background: var(--btn-danger-bg-outline);
+  border: 1px solid var(--btn-danger-border);
+  color: var(--btn-danger-text-outline);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: var(--color-error);
+  background: var(--btn-danger-hover-bg);
+  border-color: var(--btn-danger-border);
 }
 
-/* Tamaños */
+/* ============================================================
+   OUTLINE
+   ============================================================ */
+.btn--outline {
+  background: var(--btn-outline-bg);
+  border: 1px solid var(--btn-outline-border);
+  color: var(--btn-outline-text);
+}
+
+.btn--outline:hover:not(:disabled) {
+  background: var(--btn-outline-bg-hover);
+  border-color: var(--border-strong);
+}
+
+/* ============================================================
+   GHOST
+   ============================================================ */
+.btn--ghost {
+  background: var(--btn-ghost-bg);
+  color: var(--btn-ghost-text);
+  border: none;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--btn-ghost-bg-hover);
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   ICON
+   ============================================================ */
+.btn--icon {
+  padding: 9px;
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  border-radius: var(--radius-xl);
+}
+
+.btn--icon-sm {
+  padding: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+}
+
+.btn--icon-xs {
+  padding: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================================
+   TABLE ACTION
+   ============================================================ */
+.btn--table-action {
+  background: var(--btn-table-action-bg);
+  color: var(--btn-table-action-text);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  padding: 0;
+}
+
+.btn--table-action:hover:not(:disabled) {
+  background: var(--btn-table-action-hover-bg);
+  color: var(--btn-table-action-hover-text);
+}
+
+/* ============================================================
+   SIZES
+   ============================================================ */
 .btn--sm {
   padding: 6px 12px;
   font-size: 0.8rem;
@@ -76,8 +186,90 @@
   font-size: 1rem;
 }
 
-.btn--icon {
-  padding: 9px;
-  width: 36px;
-  height: 36px;
+.btn--xl {
+  padding: 14px 28px;
+  font-size: 1.05rem;
+}
+
+/* ============================================================
+   EXPORT BUTTON GROUP
+   ============================================================ */
+.btn--export {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--btn-transition);
+}
+
+.btn--export:hover:not(:disabled) {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+}
+
+/* ============================================================
+   FILTER BUTTON
+   ============================================================ */
+.btn--filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--btn-transition);
+}
+
+.btn--filter:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.btn--filter.active {
+  background: var(--color-accent);
+  color: var(--text-inverse);
+  border-color: var(--color-accent);
+}
+
+/* ============================================================
+   LOADING STATE
+   ============================================================ */
+.btn--loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.btn--loading .btn__spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: none;
+  }
 }

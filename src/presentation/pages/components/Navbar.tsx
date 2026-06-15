@@ -55,7 +55,7 @@ const Navbar: React.FC = () => {
         navigate("/domiciliario/dashboard");
         break;
       case "cliente":
-        navigate("/cliente/dashboard");
+        navigate("/cliente/inicio");
         break;
       default:
         navigate("/");

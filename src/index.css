@@ -2,181 +2,7 @@
 
 @import "tailwindcss";
 
-/* Design Tokens — SurtiCamisetas ERP */
-:root {
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-
-  /* Surfaces (Light) */
-  --bg-canvas:     #f6f6f7;
-  --bg-base:       #f6f6f7;
-  --bg-elevated:   #ffffff;
-  --bg-overlay:    #ffffff;
-  --bg-subtle:     #f0f0f2;
-  --bg-muted:      #e8e8eb;
-  --bg-inset:      #ebebed;
-
-  /* Borders (Light) */
-  --border-subtle:  rgba(0,0,0,0.055);
-  --border-default: rgba(0,0,0,0.085);
-  --border-strong:  rgba(0,0,0,0.14);
-  --border-focus:   #0f172a;
-
-  /* Text (Light) */
-  --text-primary:   #0d0d0f;
-  --text-secondary: #52525b;
-  --text-tertiary:  #a1a1aa;
-  --text-quaternary:#c4c4cc;
-  --text-inverse:   #ffffff;
-
-  /* Sidebar */
-  --sidebar-bg:          #0c0c0e;
-  --sidebar-border:      rgba(255,255,255,0.055);
-  --sidebar-text:        rgba(255,255,255,0.42);
-  --sidebar-text-hover:  rgba(255,255,255,0.82);
-  --sidebar-active-bg:   rgba(255,255,255,0.09);
-  --sidebar-hover-bg:    rgba(255,255,255,0.05);
-  --sidebar-section:     rgba(255,255,255,0.2);
-
-  /* Accent Colors */
-  --emerald:     #10b981;
-  --emerald-dim: rgba(16,185,129,0.12);
-  --blue:        #3b82f6;
-  --blue-dim:    rgba(59,130,246,0.12);
-  --violet:      #8b5cf6;
-  --violet-dim:  rgba(139,92,246,0.12);
-  --amber:       #f59e0b;
-  --amber-dim:   rgba(245,158,11,0.12);
-  --red:         #ef4444;
-  --red-dim:     rgba(239,68,68,0.12);
-  --cyan:        #06b6d4;
-  --cyan-dim:    rgba(6,182,212,0.12);
-
-  /* Shadows */
-  --shadow-xs:   0 1px 2px rgba(0,0,0,0.03);
-  --shadow-sm:   0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
-  --shadow-md:   0 3px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
-  --shadow-lg:   0 8px 20px rgba(0,0,0,0.07), 0 3px 8px rgba(0,0,0,0.04);
-  --shadow-xl:   0 16px 32px rgba(0,0,0,0.09), 0 6px 12px rgba(0,0,0,0.05);
-  --shadow-2xl:  0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.06);
-  --shadow-card: 0 0 0 1px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-inset: inset 0 1px 2px rgba(0,0,0,0.04);
-
-  /* Radius */
-  --r-xs:   4px;
-  --r-sm:   6px;
-  --r-md:   8px;
-  --r-lg:   12px;
-  --r-xl:   16px;
-  --r-2xl:  20px;
-  --r-3xl:  24px;
-  --r-full: 9999px;
-
-  /* Motion */
-  --ease-out:    cubic-bezier(0.0, 0.0, 0.2, 1.0);
-  --ease-in:     cubic-bezier(0.4, 0.0, 1.0, 1.0);
-  --ease-inout:  cubic-bezier(0.4, 0.0, 0.2, 1.0);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1.0);
-  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --t-fast:   120ms;
-  --t-base:   180ms;
-  --t-slow:   280ms;
-  --t-slower: 420ms;
-}
-
-/* Dark Mode Tokens */
-html.dark {
-  --bg-canvas:    #0a0a0c;
-  --bg-base:      #0a0a0c;
-  --bg-elevated:  #111114;
-  --bg-overlay:   #17171a;
-  --bg-subtle:    #1a1a1e;
-  --bg-muted:     #222226;
-  --bg-inset:     #1e1e22;
-
-  --border-subtle:  rgba(255,255,255,0.04);
-  --border-default: rgba(255,255,255,0.07);
-  --border-strong:  rgba(255,255,255,0.12);
-  --border-focus:   rgba(255,255,255,0.75);
-
-  --text-primary:    #f4f4f5;
-  --text-secondary:  #a1a1aa;
-  --text-tertiary:   #52525b;
-  --text-quaternary: #3f3f46;
-
-  --shadow-card: 0 0 0 1px rgba(255,255,255,0.05), 0 2px 8px rgba(0,0,0,0.3);
-  --shadow-sm:   0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
-  --shadow-md:   0 4px 12px rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.15);
-  --shadow-lg:   0 8px 24px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2);
-  --shadow-xl:   0 16px 40px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.25);
-  --shadow-2xl:  0 24px 56px rgba(0,0,0,0.5), 0 12px 24px rgba(0,0,0,0.3);
-
-  --sidebar-bg:     #0a0a0c;
-  --sidebar-border: rgba(255,255,255,0.045);
-}
-
-/* Paleta del usuario: variables adicionales para alerts, iconos y tokens UI */
-:root {
-  /* Paleta de colores principal - Grises y Beige */
-  --color-brand-black: #000000;
-  --color-brand-charcoal: #1A1A1A;
-  --color-brand-dark-gray: #3D3D3D;
-  --color-brand-medium-gray: #6B6B6B;
-  --color-brand-gray: #999999;
-  --color-brand-light-gray: #CCCCCC;
-  --color-brand-soft-gray: #E5E5E5;
-  --color-brand-beige-dark: #8B8173;
-  --color-brand-beige: #B5ADA1;
-  --color-brand-beige-light: #D4CFC4;
-  --color-brand-cream: #E8E3D8;
-  --color-brand-off-white: #F5F5F5;
-  --color-brand-white: #FAFAFA;
-
-  /* Tokens de UI */
-  --background: #FAFAFA;
-  --foreground: #1A1A1A;
-  --card: #FFFFFF;
-  --card-foreground: #1A1A1A;
-  --popover: #FFFFFF;
-  --popover-foreground: #1A1A1A;
-  --primary: #3D3D3D;
-  --primary-foreground: #FAFAFA;
-  --secondary: #E8E3D8;
-  --secondary-foreground: #1A1A1A;
-  --muted: #E5E5E5;
-  --muted-foreground: #6B6B6B;
-  --accent: #D4CFC4;
-  --accent-foreground: #1A1A1A;
-  --destructive: #d4183d;
-  --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: transparent;
-  --input-background: #F5F5F5;
-  --switch-background: #CCCCCC;
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --ring: #999999;
-
-  /* Charts */
-  --chart-1: #3D3D3D;
-  --chart-2: #6B6B6B;
-  --chart-3: #8B8173;
-  --chart-4: #B5ADA1;
-  --chart-5: #D4CFC4;
-
-  --radius: 0.625rem;
-
-  /* Sidebar */
-  --sidebar: #F5F5F5;
-  --sidebar-foreground: #1A1A1A;
-  --sidebar-primary: #3D3D3D;
-  --sidebar-primary-foreground: #FAFAFA;
-  --sidebar-accent: #E8E3D8;
-  --sidebar-accent-foreground: #1A1A1A;
-  --sidebar-border: #E5E5E5;
-  --sidebar-ring: #999999;
-}
-
+@import './styles/variables.css';
 
 /* Base Reset */
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
@@ -211,7 +37,7 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border-radius: var(--r-full);
+  border-radius: var(--radius-full);
   transition: background var(--t-base);
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
@@ -223,14 +49,14 @@ body {
 :focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
-  border-radius: var(--r-sm);
+  border-radius: var(--radius-sm);
 }
 
 /* Card */
 .card {
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
-  border-radius: var(--r-2xl);
+  border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-card);
   transition:
     box-shadow var(--t-base) var(--ease-out),
@@ -250,7 +76,7 @@ body {
   align-items: center;
   gap: 9px;
   padding: 6px 9px;
-  border-radius: var(--r-lg);
+  border-radius: var(--radius-lg);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -294,8 +120,8 @@ body {
   white-space: nowrap;
   user-select: none;
 }
-.erp-table thead th:first-child { border-radius: var(--r-lg) 0 0 0; }
-.erp-table thead th:last-child  { border-radius: 0 var(--r-lg) 0 0; }
+.erp-table thead th:first-child { border-radius: var(--radius-lg) 0 0 0; }
+.erp-table thead th:last-child  { border-radius: 0 var(--radius-lg) 0 0; }
 .erp-table tbody tr {
   transition: background var(--t-fast) var(--ease-out);
 }
@@ -316,7 +142,7 @@ body {
   padding: 0 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
-  border-radius: var(--r-lg);
+  border-radius: var(--radius-lg);
   color: var(--text-primary);
   font-size: 13px;
   font-family: var(--font-sans);
@@ -337,7 +163,7 @@ html.dark .erp-input:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.07); }
 .badge-base {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 1.5px 7px;
-  border-radius: var(--r-full);
+  border-radius: var(--radius-full);
   font-size: 11px; font-weight: 500; letter-spacing: 0.01em;
   white-space: nowrap;
 }
@@ -396,7 +222,7 @@ html.dark .erp-input:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.07); }
   );
   background-size: 800px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
-  border-radius: var(--r-md);
+  border-radius: var(--radius-md);
 }
 
 /* Header Glass */
@@ -471,7 +297,7 @@ html.dark .header-glass {
     gap: 12px;
     align-items: center;
     padding: 10px 14px;
-    border-radius: var(--r-md);
+    border-radius: var(--radius-md);
     font-size: 13px;
     background: var(--muted);
     color: var(--foreground);
@@ -515,5 +341,4 @@ html.dark .header-glass {
   .icon-muted   { color: var(--muted-foreground); }
   .icon-accent  { color: var(--accent); }
   .icon-destructive { color: var(--destructive); }
-
 }

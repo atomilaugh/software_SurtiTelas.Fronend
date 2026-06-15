@@ -1,7 +1,8 @@
 ﻿import React, { useMemo, useRef, useState } from 'react'
 import { X, Upload, CreditCard, BadgePercent, ShieldCheck, BadgeCheck } from 'lucide-react'
-import { toast } from 'react-hot-toast'
-import { useCart } from '@/app/providers/AppProviders'
+import { toast } from 'sonner'
+import { useCart, useAuth } from '@/app/providers/AppProviders'
+import { AuthRequiredModal } from './AuthRequiredModal'
 import './CheckoutModal.css'
 
 interface CheckoutModalProps {
@@ -23,11 +24,13 @@ const installmentOptions = [2, 3, 4, 6, 12]
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   const { subtotal, discount, tax, shipping, total, clearCart, items } = useCart()
+  const { isAuthenticated } = useAuth();
   const [selectedBank, setSelectedBank] = useState('')
   const [proofFile, setProofFile] = useState<File | null>(null)
   const [paymentType, setPaymentType] = useState<PaymentType>('immediate')
   const [installments, setInstallments] = useState(2)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const taxesLabel = useMemo(() => `IVA 19%`, [])
@@ -62,6 +65,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   }
 
   const handleConfirm = async () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      toast.warning('Necesitas una cuenta para finalizar la compra.');
+      return;
+    }
+
     if (!selectedBank) {
       toast.error('Selecciona un banco antes de continuar.')
       return
@@ -316,12 +325,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                 onClick={handleConfirm}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Confirmandoâ€¦' : 'Confirmar Pedido'}
+                {isSubmitting ? 'Procesando…' : 'Finalizar Compra'}
               </button>
             </div>
           </section>
         </div>
       </div>
+
+      {showAuthModal && (
+        <AuthRequiredModal
+          open={showAuthModal}
+          onOpenChange={setShowAuthModal}
+          onContinueShopping={() => setShowAuthModal(false)}
+        />
+      )}
     </div>
   )
 }

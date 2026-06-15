@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Search, Eye, Edit, Package, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { Edit, Package, CheckCircle2, Clock, XCircle, User, MapPin } from 'lucide-react';
+import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './AdminDomicilios.module.css';
-import { Badge } from '../../../shared/ui/Badge';
+import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '../../../shared/ui/DataTable';
 
 interface Domiciliario {
   id: string;
@@ -29,6 +31,44 @@ export const AdminDomicilios: React.FC = () => {
     d.zona.toLowerCase().includes(search.toLowerCase())
   );
 
+  const columns: DataTableColumn<Domiciliario>[] = [
+    { key: 'id', header: 'ID', sortable: true },
+    { key: 'nombre', header: 'Nombre', sortable: true },
+    { key: 'zona', header: 'Zona', sortable: true },
+    { key: 'entregas', header: 'Entregas', sortable: true, align: 'right' },
+    { key: 'estado', header: 'Estado', sortable: true },
+  ];
+
+  const detailPanel: DataTableDetailPanel<Domiciliario> = {
+    title: item => `Detalle: ${item.nombre}`,
+    size: 'lg',
+    header: item => ({
+      icon: <User size={18} />,
+      title: 'Domiciliario',
+      code: item.id,
+      subtitle: item.email,
+      meta: item.zona,
+      status: item.estado,
+      badgeVariant: item.estado === 'Activo' ? 'success' : 'default',
+    }),
+    kpis: item => [
+      { label: 'Entregas', value: item.entregas, icon: <Package size={16} />, tone: 'primary' },
+      { label: 'Zona', value: item.zona, icon: <MapPin size={16} />, tone: 'info' },
+    ],
+    render: (item) => (
+      <div className={s.detailPanel}>
+        <div className={s.detailRow}><span>Email:</span> {item.email}</div>
+        <div className={s.detailRow}><span>Teléfono:</span> {item.tel}</div>
+        <div className={s.detailRow}><span>Zona:</span> {item.zona}</div>
+        <div className={s.detailRow}><span>Entregas:</span> {item.entregas}</div>
+      </div>
+    ),
+  };
+
+  const actions: DataTableAction<Domiciliario>[] = [
+    { label: 'Editar', icon: <Edit size={14} />, onClick: () => toast.info('Editar domiciliario') },
+  ];
+
   return (
     <div>
       <div className={s.header}>
@@ -39,16 +79,14 @@ export const AdminDomicilios: React.FC = () => {
       </div>
 
       <div className={s.toolbar}>
-        <div className={s.searchBox}>
-          <Search size={16} className={s.searchIcon} />
-          <input
-            type="text"
-            placeholder="Buscar domiciliarios..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={s.searchInput}
-          />
-        </div>
+        <SearchInput
+          placeholder="Buscar domiciliarios..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onSearch={(value) => setSearch(value)}
+          debounceMs={100}
+          minChars={0}
+        />
       </div>
 
       <div className={s.statsGrid}>
@@ -75,48 +113,20 @@ export const AdminDomicilios: React.FC = () => {
       </div>
 
       <div className={s.tableWrapper}>
-        <table className={s.table}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Email</th>
-              <th>Teléfono</th>
-              <th>Zona</th>
-              <th>Entregas</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredDomiciliarios.map(domiciliario => (
-              <tr key={domiciliario.id}>
-                <td className={s.tdMono}>{domiciliario.id}</td>
-                <td className={s.tdPrimary}>{domiciliario.nombre}</td>
-                <td>{domiciliario.email}</td>
-                <td>{domiciliario.tel}</td>
-                <td>{domiciliario.zona}</td>
-                <td>{domiciliario.entregas}</td>
-                <td>
-                  <Badge variant={domiciliario.estado === 'Activo' ? 'info' : 'default'}>
-                    {domiciliario.estado}
-                  </Badge>
-                </td>
-                <td>
-                  <div className={s.actions}>
-                    <button className={s.actionBtn} title="Ver">
-                      <Eye size={14} />
-                    </button>
-                    <button className={s.actionBtn} title="Editar">
-                      <Edit size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          data={filteredDomiciliarios}
+          columns={columns}
+          detailPanel={detailPanel}
+          actions={actions}
+          enableColumnFilters={false}
+          enableExport={false}
+          enableRowSelection={false}
+          enableSorting={true}
+          toolbarLeft={null}
+          maxVisibleColumns={5}
+        />
       </div>
     </div>
   );
 };
+

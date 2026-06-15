@@ -1,6 +1,6 @@
-﻿import React from "react";
-import { Navigate } from "react-router-dom";
-import { ReactElement } from "react";
+﻿import React from 'react';
+import { Navigate } from 'react-router-dom';
+import type { ReactElement } from 'react';
 
 import { useAuth } from '@/app/providers/AppProviders';
 
@@ -9,39 +9,22 @@ interface Props {
   allowedRoles: string[];
 }
 
-const ProtectedRoute = ({
-  children,
-  allowedRoles,
-}: Props) => {
-  const { user, loading, logout } =
-    useAuth();
+const ProtectedRoute: React.FC<Props> = ({ children, allowedRoles }) => {
+  const { user, isAuthenticated } = useAuth();
 
-  if (loading) {
-    return (
-      <div
-        className="
-          min-h-screen
-          flex
-          items-center
-          justify-center
-        "
-      >
-        Cargando...
-      </div>
-    );
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (!user) {
-    return <Navigate to="/login" />;
+  if (!user || !allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
-  if (
-    !allowedRoles.includes(user.role)
-  ) {
-    return <Navigate to="/unauthorized" />;
-  }
-
-  return React.cloneElement(children, { userRole: user.role, userName: user.email?.split('@')[0] || 'Usuario', onLogout: logout });
+  return React.cloneElement(children, {
+    userRole: user.role,
+    userName: user.email?.split('@')[0] || 'Usuario',
+    onLogout: () => useAuth.getState().logout(),
+  });
 };
 
 export default ProtectedRoute;

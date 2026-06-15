@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Edit2, Check } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { Edit2, Check, Image as ImageIcon, User } from 'lucide-react';
 import s from './PerfilDomiciliario.module.css';
 import { Button } from '@/shared/ui/Button';
+import { Modal } from '@/shared/ui/Modal';
 
 export const DomiciliarioPerfil: React.FC = () => {
   const [nombre, setNombre] = useState('Juan Pérez');
@@ -9,6 +11,38 @@ export const DomiciliarioPerfil: React.FC = () => {
   const [ciudad, setCiudad] = useState('Bogotá');
   const [vehiculo, setVehiculo] = useState('moto');
   const [placa, setPlaca] = useState('ABC-123');
+  const [turnoActivo, setTurnoActivo] = useState(true);
+  const [formError, setFormError] = useState('');
+  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+  const [avatarName, setAvatarName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const validarPerfil = () => {
+    setFormError('');
+    if (!nombre.trim() || !telefono.trim() || !ciudad.trim()) {
+      setFormError('Nombre, teléfono y ciudad son obligatorios.');
+      return false;
+    }
+    if (!/^[\d\s-]{7,}$/.test(telefono.trim())) {
+      setFormError('Ingresa un teléfono válido.');
+      return false;
+    }
+    return true;
+  };
+
+  const guardarCambios = () => {
+    if (!validarPerfil()) return;
+    toast.success('Cambios guardados correctamente');
+  };
+
+  const finalizarTurno = () => {
+    if (!turnoActivo) {
+      toast.info('El turno ya está finalizado');
+      return;
+    }
+    setTurnoActivo(false);
+    toast.success('Turno finalizado correctamente');
+  };
 
   return (
     <div>
@@ -19,11 +53,11 @@ export const DomiciliarioPerfil: React.FC = () => {
         <div className={s.perfilCard}>
           <div className={s.avatar}>
             J
-            <button className={s.avatarEditBtn} title="Cambiar foto">
+            <button className={s.avatarEditBtn} title="Cambiar foto" type="button" onClick={() => setIsAvatarOpen(true)}>
               <Edit2 size={14} />
             </button>
           </div>
-          <div className={s.perfilName}>Juan Pérez</div>
+          <div className={s.perfilName}>{nombre}</div>
           <div className={s.perfilEmail}>juan.p@surtitelas.com</div>
           <div className={s.rolTag}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-info)' }} />
@@ -135,21 +169,62 @@ export const DomiciliarioPerfil: React.FC = () => {
             <div className={s.turnoInfo}>
               <div className={s.turnoLabel}>Estado del turno</div>
               <div className={s.turnoStatus}>
-                <span className={s.turnoPulse} />
-                Activo
+                <span className={s.turnoPulse} style={{ background: turnoActivo ? 'var(--color-success)' : 'var(--color-text-muted)' }} />
+                {turnoActivo ? 'Activo' : 'Finalizado'}
               </div>
             </div>
-            <Button variant="secondary" size="sm">Finalizar turno</Button>
+            <Button variant="secondary" size="sm" onClick={finalizarTurno}>{turnoActivo ? 'Finalizar turno' : 'Turno finalizado'}</Button>
           </div>
 
+          {formError && (
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+              {formError}
+            </div>
+          )}
+
           <div className={s.formActions}>
-            <Button onClick={() => alert('Cambios guardados')}>
+            <Button onClick={guardarCambios}>
               <Check size={16} />
               Guardar cambios
             </Button>
           </div>
         </div>
       </div>
+
+      <Modal open={isAvatarOpen} onClose={() => setIsAvatarOpen(false)} title="Cambiar foto de perfil" size="sm">
+        <div className="grid gap-4">
+          <div className="flex items-center gap-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-5">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[var(--color-info)] text-3xl font-bold text-white">
+              {nombre.charAt(0)}
+            </div>
+            <div>
+              <div className="font-semibold text-[var(--color-text-primary)]">Imagen actual</div>
+              <div className="text-sm text-[var(--color-text-secondary)]">{avatarName || 'No hay imagen cargada en esta sesión'}</div>
+            </div>
+          </div>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setAvatarName(file.name);
+              toast.success(`Foto seleccionada: ${file.name}`);
+            }
+            e.target.value = '';
+          }} />
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setIsAvatarOpen(false)}>Cancelar</Button>
+            <Button onClick={() => fileInputRef.current?.click()}>
+              <ImageIcon size={16} />
+              Seleccionar imagen
+            </Button>
+            {avatarName && (
+              <Button variant="success" onClick={() => { toast.success('Foto de perfil actualizada'); setIsAvatarOpen(false); }}>
+                <User size={16} />
+                Aplicar foto
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Search, Plus, Eye, Edit } from 'lucide-react';
+import { toast } from 'sonner';
+import { Plus, Edit, User, Users, BarChart3, Calendar } from 'lucide-react';
+import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './AdminAsesores.module.css';
-import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
+import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '../../../shared/ui/DataTable';
 
 interface Asesor {
   id: string;
@@ -32,6 +34,45 @@ export const AdminAsesores: React.FC = () => {
     a.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  const columns: DataTableColumn<Asesor>[] = [
+    { key: 'id', header: 'ID', sortable: true },
+    { key: 'nombre', header: 'Nombre', sortable: true },
+    { key: 'email', header: 'Email', sortable: true },
+    { key: 'clientes', header: 'Clientes', sortable: true, align: 'right' },
+    { key: 'estado', header: 'Estado', sortable: true },
+  ];
+
+  const detailPanel: DataTableDetailPanel<Asesor> = {
+    title: item => `Detalle: ${item.nombre}`,
+    size: 'lg',
+    header: item => ({
+      icon: <User size={18} />,
+      title: 'Asesor comercial',
+      code: item.id,
+      subtitle: item.email,
+      meta: `${item.clientes} clientes activos`,
+      status: item.estado,
+      badgeVariant: item.estado === 'Activo' ? 'success' : 'default',
+    }),
+    kpis: item => [
+      { label: 'Clientes', value: item.clientes, icon: <Users size={16} />, tone: 'primary' },
+      { label: 'Comisiones', value: item.comisiones, icon: <BarChart3 size={16} />, tone: 'success' },
+      { label: 'Estado', value: item.estado, icon: <Calendar size={16} />, tone: item.estado === 'Activo' ? 'success' : 'default' },
+    ],
+    render: (item) => (
+      <div className={s.detailPanel}>
+        <div className={s.detailRow}><span>Teléfono:</span> {item.tel}</div>
+        <div className={s.detailRow}><span>Comisiones:</span> {item.comisiones}</div>
+        <div className={s.detailRow}><span>Email:</span> {item.email}</div>
+        <div className={s.detailRow}><span>Clientes:</span> {item.clientes}</div>
+      </div>
+    ),
+  };
+
+  const actions: DataTableAction<Asesor>[] = [
+    { label: 'Editar', icon: <Edit size={14} />, onClick: (item) => { setSelectedAsesor(item); setModalOpen(true); toast.info('Editar asesor'); } },
+  ];
+
   return (
     <div>
       <div className={s.header}>
@@ -46,60 +87,29 @@ export const AdminAsesores: React.FC = () => {
       </div>
 
       <div className={s.toolbar}>
-        <div className={s.searchBox}>
-          <Search size={16} className={s.searchIcon} />
-          <input
-            type="text"
-            placeholder="Buscar asesores..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={s.searchInput}
-          />
-        </div>
+        <SearchInput
+          placeholder="Buscar asesores..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onSearch={(value) => setSearch(value)}
+          debounceMs={100}
+          minChars={0}
+        />
       </div>
 
       <div className={s.tableWrapper}>
-        <table className={s.table}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Email</th>
-              <th>Teléfono</th>
-              <th>Clientes</th>
-              <th>Comisiones</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAsesores.map(asesor => (
-              <tr key={asesor.id}>
-                <td className={s.tdMono}>{asesor.id}</td>
-                <td className={s.tdPrimary}>{asesor.nombre}</td>
-                <td>{asesor.email}</td>
-                <td>{asesor.tel}</td>
-                <td>{asesor.clientes}</td>
-                <td className={s.tdMoney}>{asesor.comisiones}</td>
-                <td>
-                  <Badge variant={asesor.estado === 'Activo' ? 'info' : 'default'}>
-                    {asesor.estado}
-                  </Badge>
-                </td>
-                <td>
-                  <div className={s.actions}>
-                    <button className={s.actionBtn} title="Ver">
-                      <Eye size={14} />
-                    </button>
-                    <button className={s.actionBtn} title="Editar" onClick={() => { setSelectedAsesor(asesor); setModalOpen(true); }}>
-                      <Edit size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          data={filteredAsesores}
+          columns={columns}
+          detailPanel={detailPanel}
+          actions={actions}
+          enableColumnFilters={false}
+          enableExport={false}
+          enableRowSelection={false}
+          enableSorting={true}
+          toolbarLeft={null}
+          maxVisibleColumns={5}
+        />
       </div>
 
       {modalOpen && (
@@ -152,3 +162,4 @@ export const AdminAsesores: React.FC = () => {
     </div>
   );
 };
+

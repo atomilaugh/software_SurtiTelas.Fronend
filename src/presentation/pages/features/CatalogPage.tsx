@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, SlidersHorizontal, X, Sparkles, Heart, ShoppingBag, Star } from 'lucide-react';
 import { FilterDrawer, type FilterState } from '@presentation/pages/components/FilterDrawer';
 import { ProductDetailModal } from '@presentation/components/ProductDetailModal';
+import { toast } from 'sonner';
 import '../styles/CatalogPage.css';
 
 interface Producto {
@@ -41,6 +42,22 @@ const PRODUCTOS_DEMO: Producto[] = [
 
 const formatPrice = (price: number) => `$${price.toLocaleString('es-CO')}`;
 
+const FAVORITES_STORAGE_KEY = 'surtitelas.favorites';
+
+const readFavoriteIds = () => {
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) as string[] : [];
+    return Array.isArray(parsed) ? parsed.filter(id => typeof id === 'string' && id.trim() !== '') : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeFavoriteIds = (favoriteIds: string[]) => {
+  window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
+};
+
 const CatalogPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,8 +70,10 @@ const CatalogPage: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [visibleProducts, setVisibleProducts] = useState(8);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
 
   useEffect(() => { const timer = setTimeout(() => setIsLoading(false), 800); return () => clearTimeout(timer); }, []);
+  useEffect(() => { setFavoriteIds(readFavoriteIds()); }, []);
   useEffect(() => { setVisibleProducts(8); }, [searchTerm, categoriaActiva, marcaActiva, filtrosAvanzados]);
 
   const categoriasUnicas = useMemo(() => { const cats = new Set(productos.map(p => p.categoria)); return ['Todas', ...Array.from(cats)]; }, [productos]);
@@ -78,6 +97,15 @@ const CatalogPage: React.FC = () => {
   const handleApplyFilters = (filters: FilterState) => setFiltrosAvanzados(filters);
   const handleResetFilters = () => { setCategoriaActiva('Todas'); setMarcaActiva('Todas'); setFiltrosAvanzados({ tallas: [], marcas: [], categoriasEspeciales: [] }); setSearchTerm(''); };
   const handleLoadMore = () => setVisibleProducts(prev => prev + 8);
+  const toggleFavorite = (producto: Producto) => {
+    setFavoriteIds(current => {
+      const exists = current.includes(producto.id);
+      const next = exists ? current.filter(id => id !== producto.id) : [...current, producto.id];
+      writeFavoriteIds(next);
+      toast.success(exists ? 'Producto eliminado de favoritos' : 'Producto agregado a favoritos');
+      return next;
+    });
+  };
 
   const countFiltrosActivos = () => { let count = 0; if (categoriaActiva !== 'Todas') count++; if (marcaActiva !== 'Todas') count++; count += filtrosAvanzados.tallas.length; count += filtrosAvanzados.marcas.length; count += filtrosAvanzados.categoriasEspeciales.length; return count; };
   const totalFiltrosActivos = countFiltrosActivos();
@@ -199,7 +227,7 @@ const CatalogPage: React.FC = () => {
                     {!producto.disponible && (<span className="badge-agotado">Agotado</span>)}
                   </div>
                   <div className="card-actions">
-                    <button className="action-btn wishlist-btn" aria-label="Agregar a favoritos" onClick={(e) => e.stopPropagation()}><Heart size={18} /></button>
+                    <button className={`action-btn wishlist-btn ${favoriteIds.includes(producto.id) ? 'active' : ''}`} aria-label={favoriteIds.includes(producto.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'} onClick={(e) => { e.stopPropagation(); toggleFavorite(producto); }}><Heart size={18} fill={favoriteIds.includes(producto.id) ? 'currentColor' : 'none'} /></button>
                     <button className="action-btn cart-btn" aria-label="Agregar al carrito" disabled={!producto.disponible} onClick={(e) => { e.stopPropagation(); handleAddToCart(producto); }}><ShoppingBag size={18} /></button>
                   </div>
                   <div className="card-overlay" />

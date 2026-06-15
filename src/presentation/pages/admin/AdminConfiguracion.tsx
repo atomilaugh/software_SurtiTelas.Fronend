@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import { Save, Shield, Database, Bell, Building } from 'lucide-react';
 import s from './AdminConfiguracion.module.css';
 
@@ -95,7 +96,7 @@ export const AdminConfiguracion: React.FC = () => {
       </div>
 
       <div className={s.actionsBar}>
-        <button className={s.saveBtn}>
+        <button className={s.saveBtn} onClick={() => toast.success('Configuración guardada correctamente')}>
           <Save size={16} />
           Guardar cambios
         </button>

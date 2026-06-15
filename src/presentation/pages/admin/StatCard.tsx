@@ -20,10 +20,10 @@ export const StatCard: React.FC<StatCardProps> = ({
   color = 'accent',
 }) => {
   const iconColorClass = {
-    accent: s.iconWrapAccent,
-    success: s.iconWrapSuccess,
-    info: s.iconWrapInfo,
-    warning: s.iconWrapWarning,
+    accent: s.statCardIconAccent,
+    success: s.statCardIconSuccess,
+    info: s.statCardIconInfo,
+    warning: s.statCardIconWarning,
   }[color];
 
   return (

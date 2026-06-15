@@ -1,29 +1,51 @@
-﻿import { useEffect, useRef, ReactNode } from 'react';
+﻿import { ReactNode, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/shared/utils';
 import { Button } from './Button';
+import styles from '@/styles/Modal.module.css';
 
-interface ModalProps {
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+export type ModalVariant = 'default' | 'premium' | 'form';
+
+export interface BaseModalProps {
   open: boolean;
   onClose: () => void;
   title?: string;
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+  size?: ModalSize;
+  variant?: ModalVariant;
+  icon?: ReactNode;
+  badge?: ReactNode;
+  meta?: ReactNode;
+  headerActions?: ReactNode;
   className?: string;
+  bodyClassName?: string;
+  footerClassName?: string;
+  closeOnOverlay?: boolean;
 }
 
-const sizeMap = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  '2xl': 'max-w-2xl',
-  full: 'max-w-5xl',
-};
 
-export const Modal = ({ open, onClose, title, description, children, footer, size = 'md', className }: ModalProps) => {
+export const BaseModal = ({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  size = 'md',
+  variant = 'premium',
+  icon,
+  badge,
+  meta,
+  headerActions,
+  className,
+  bodyClassName,
+  footerClassName,
+  closeOnOverlay = true,
+}: BaseModalProps) => {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,47 +55,70 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
   }, [open, onClose]);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
 
   if (!open) return null;
 
-  return (
+  const modal = (
     <div
       ref={overlayRef}
-      onClick={(e) => e.target === overlayRef.current && onClose()}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={(e) => closeOnOverlay && e.target === overlayRef.current && onClose()}
+      className={cn(styles.overlay, styles[`overlay--${variant}`])}
+      role="presentation"
     >
-      <div className={cn(
-        'relative w-full bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-zinc-800 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200',
-        sizeMap[size],
-        className
-      )}>
-        {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-slate-100 dark:border-zinc-800 shrink-0">
-          <div>
-            {title && <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>}
-            {description && <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">{description}</p>}
-          </div>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} className="shrink-0 ml-4">
-            <X size={16} />
-          </Button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">{children}</div>
-
-        {/* Footer */}
-        {footer && (
-          <div className="p-6 border-t border-slate-100 dark:border-zinc-800 shrink-0 flex items-center justify-end gap-3">
-            {footer}
-          </div>
+      <section
+        className={cn(
+          styles.modal,
+          styles[`modal--${variant}`],
+          styles[`modal--${size}`],
+          className
         )}
-      </div>
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || 'Modal'}
+      >
+        <header className={styles.modalHeader}>
+          <div className={styles.headerContent}>
+            {icon && <div className={styles.headerIcon}>{icon}</div>}
+            <div className={styles.headerText}>
+              <div className={styles.titleRow}>
+                <h2 className={styles.modalTitle}>{title}</h2>
+                {badge && <div className={styles.headerBadge}>{badge}</div>}
+              </div>
+              {(description || meta) && (
+                <p className={styles.modalDescription}>
+                  {description}
+                  {description && meta && <span className={styles.metaSeparator}>•</span>}
+                  {meta}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className={styles.headerActions}>
+            {headerActions}
+            <Button variant="ghost" size="icon-sm" onClick={onClose} className={styles.closeButton} aria-label="Cerrar">
+              <X size={16} />
+            </Button>
+          </div>
+        </header>
+
+        <div className={cn(styles.modalBody, bodyClassName)}>{children}</div>
+
+        {footer && (
+          <footer className={cn(styles.modalFooter, footerClassName)}>
+            {footer}
+          </footer>
+        )}
+      </section>
     </div>
   );
+
+  return createPortal(modal, document.body);
 };
 
-
-
+export const Modal = (props: BaseModalProps) => <BaseModal {...props} />;

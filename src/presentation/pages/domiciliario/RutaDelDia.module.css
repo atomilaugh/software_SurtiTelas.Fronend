@@ -65,13 +65,13 @@
 
 .rutaStopActive .rutaStopNumber {
   background: var(--color-info);
-  color: #fff;
+  color: var(--text-inverse);
   border-color: var(--color-info);
 }
 
 .rutaStopDone .rutaStopNumber {
   background: var(--color-success);
-  color: #fff;
+  color: var(--text-inverse);
   border-color: var(--color-success);
 }
 
@@ -231,7 +231,7 @@
 .mapPinLabel {
   font-size: 0.65rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--text-inverse);
   transform: rotate(45deg);
 }
 

@@ -9,6 +9,7 @@ import ErrorBoundary from '@/shared/components/ErrorBoundary';
 import { AdminLayout } from '@/presentation/pages/admin/AdminLayout';
 import { AdminDashboard } from '@/presentation/pages/admin/Dashboard';
 import { AdminClientes } from '@/presentation/pages/admin/Clientes';
+import { AdminCatalogo } from '@/presentation/pages/admin/AdminCatalogo';
 import { AdminPedidos } from '@/presentation/pages/admin/Pedidos';
 import { AdminProduccion } from '@/presentation/pages/admin/Produccion';
 import { AdminInventario } from '@/presentation/pages/admin/Inventario';
@@ -16,6 +17,24 @@ import { AdminAsesores } from '@/presentation/pages/admin/AdminAsesores';
 import { AdminReportes } from '@/presentation/pages/admin/AdminReportes';
 import { AdminConfiguracion } from '@/presentation/pages/admin/AdminConfiguracion';
 import { AdminDomicilios } from '@/presentation/pages/admin/AdminDomicilios';
+import { AdminRoles } from '@/presentation/pages/admin/Roles';
+import { AdminPermisos } from '@/presentation/pages/admin/Permisos';
+import { AdminGestionUsuarios } from '@/presentation/pages/admin/GestionUsuarios';
+import { AdminSeguridadUsuarios } from '@/presentation/pages/admin/SeguridadUsuarios';
+import { AdminProductosTerminados } from '@/presentation/pages/admin/ProductosTerminados';
+import { AdminInsumos } from '@/presentation/pages/admin/Insumos';
+import { AdminAlertasStock } from '@/presentation/pages/admin/AlertasStock';
+import { AdminStockDevuelto } from '@/presentation/pages/admin/StockDevuelto';
+import { AdminRegistroTalleres } from '@/presentation/pages/admin/RegistroTalleres';
+import { AdminControlPrendas } from '@/presentation/pages/admin/ControlPrendas';
+import { AdminAsignacionProduccion } from '@/presentation/pages/admin/AsignacionProduccion';
+import { AdminSeguimientoProduccion } from '@/presentation/pages/admin/SeguimientoProduccion';
+import { AdminRecibos } from '@/presentation/pages/admin/Recibos';
+import { AdminPagos } from '@/presentation/pages/admin/Pagos';
+import { AdminReportesVentas } from '@/presentation/pages/admin/ReportesVentas';
+import { AdminReportesUsuarios } from '@/presentation/pages/admin/ReportesUsuarios';
+import { AdminReportesProduccion } from '@/presentation/pages/admin/ReportesProduccion';
+import { AdminReportesInventario } from '@/presentation/pages/admin/ReportesInventario';
 import { AsesorLayout } from '@/presentation/pages/asesor/AsesorLayout';
 import { AsesorDashboard } from '@/presentation/pages/asesor/Dashboard';
 import { AsesorClientes } from '@/presentation/pages/asesor/MisClientes';
@@ -35,6 +54,9 @@ import { InicioCliente } from '@/presentation/pages/cliente/InicioCliente';
 import { CatalogoCliente } from '@/presentation/pages/cliente/Catalogo';
 import { MisPedidos } from '@/presentation/pages/cliente/MisPedidos';
 import { PerfilCliente } from '@/presentation/pages/cliente/PerfilCliente';
+import { OrderTracking } from '@/presentation/pages/cliente/OrderTracking';
+import { Recibos } from '@/presentation/pages/cliente/Recibos';
+import { Favoritos } from '@/presentation/pages/cliente/Favoritos';
 
 // PUBLIC
 import HomePage from '@/presentation/pages/public/HomePage';
@@ -79,6 +101,7 @@ const App: React.FC = () => (
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="clientes" element={<AdminClientes />} />
+            <Route path="catalogo" element={<AdminCatalogo />} />
             <Route path="pedidos" element={<AdminPedidos />} />
             <Route path="produccion" element={<AdminProduccion />} />
             <Route path="inventario" element={<AdminInventario />} />
@@ -86,6 +109,25 @@ const App: React.FC = () => (
             <Route path="asesores" element={<AdminAsesores />} />
             <Route path="reportes" element={<AdminReportes />} />
             <Route path="configuracion" element={<AdminConfiguracion />} />
+            <Route path="roles" element={<AdminRoles />} />
+            <Route path="permisos" element={<AdminPermisos />} />
+            <Route path="gestion-usuarios" element={<AdminGestionUsuarios />} />
+            <Route path="seguridad" element={<AdminSeguridadUsuarios />} />
+            <Route path="productos" element={<AdminProductosTerminados />} />
+            <Route path="insumos" element={<AdminInsumos />} />
+            <Route path="alertas-stock" element={<AdminAlertasStock />} />
+            <Route path="stock-devuelto" element={<AdminStockDevuelto />} />
+            <Route path="talleres" element={<AdminRegistroTalleres />} />
+            <Route path="prendas" element={<AdminControlPrendas />} />
+            <Route path="asignacion" element={<AdminAsignacionProduccion />} />
+            <Route path="seguimiento" element={<AdminSeguimientoProduccion />} />
+            <Route path="facturacion" element={<AdminRecibos />} />
+            <Route path="pagos" element={<AdminPagos />} />
+            <Route path="ventas-pedidos" element={<AdminPedidos />} />
+            <Route path="reportes-ventas" element={<AdminReportesVentas />} />
+            <Route path="reportes-usuarios" element={<AdminReportesUsuarios />} />
+            <Route path="reportes-produccion" element={<AdminReportesProduccion />} />
+            <Route path="reportes-inventario" element={<AdminReportesInventario />} />
           </Route>
 
           {/* ASESOR - Protected routes for asesor role */}
@@ -128,6 +170,10 @@ const App: React.FC = () => (
             <Route path="inicio" element={<InicioCliente />} />
             <Route path="catalogo" element={<CatalogoCliente />} />
             <Route path="pedidos" element={<MisPedidos />} />
+            <Route path="recibos" element={<Recibos />} />
+            <Route path="favoritos" element={<Favoritos />} />
+            <Route path="seguimiento" element={<OrderTracking />} />
+            <Route path="seguimiento/:orderId" element={<OrderTracking />} />
             <Route path="perfil" element={<PerfilCliente />} />
           </Route>
 

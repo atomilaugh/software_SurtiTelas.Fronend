@@ -975,22 +975,17 @@
 
   color: white;
 
-  background:
-    linear-gradient(
-      135deg,
-      var(--ch-primary),
-      var(--ch-primary-hover)
-    );
+  background: #111111;
 
   box-shadow:
-    0 18px 36px rgba(37,99,235,0.28);
+    0 18px 36px rgba(0, 0, 0, 0.15);
 }
 
 .ch-btn-primary:hover {
   transform: translateY(-2px);
 
   box-shadow:
-    0 24px 46px rgba(37,99,235,0.34);
+    0 24px 46px rgba(0, 0, 0, 0.2);
 }
 
 .ch-btn-primary:disabled {

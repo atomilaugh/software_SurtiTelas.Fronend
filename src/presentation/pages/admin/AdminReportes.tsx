@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Download, Calendar, BarChart3, TrendingUp, PieChart, LineChart } from 'lucide-react';
+import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './AdminReportes.module.css';
 import { StatCard } from './StatCard';
 import { Badge } from '../../../shared/ui/Badge';
@@ -88,16 +89,14 @@ export const AdminReportes: React.FC = () => {
       </div>
 
       <div className={s.toolbar}>
-        <div className={s.searchBox}>
-          <Search size={16} className={s.searchIcon} />
-          <input
-            type="text"
-            placeholder="Buscar reportes..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={s.searchInput}
-          />
-        </div>
+        <SearchInput
+          placeholder="Buscar reportes..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onSearch={(value) => setSearch(value)}
+          debounceMs={100}
+          minChars={0}
+        />
         <button className={s.filterBtn}>
           <Calendar size={14} />
           Filtrar por fecha
