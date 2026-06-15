@@ -4,25 +4,25 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/shared/utils';
 
 const btn = cva(
-  'inline-flex items-center justify-center gap-1.5 font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-45 select-none shrink-0',
+  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none shrink-0',
   {
     variants: {
       variant: {
-        primary:   'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:bg-[var(--btn-primary-bg-hover)] focus-visible:ring-[var(--border-focus)]',
-        secondary: 'bg-[var(--btn-secondary-bg)] text-[var(--btn-secondary-text)] hover:bg-[var(--btn-secondary-bg-hover)] border border-[var(--btn-secondary-border)] focus-visible:ring-[var(--border-focus)]',
-        outline:   'border border-[var(--btn-outline-border)] bg-[var(--btn-outline-bg)] text-[var(--btn-outline-text)] hover:bg-[var(--btn-outline-bg-hover)] hover:border-[var(--border-strong)] focus-visible:ring-[var(--border-focus)]',
-        ghost:     'bg-transparent text-[var(--btn-ghost-text)] hover:bg-[var(--btn-ghost-bg-hover)] hover:text-[var(--text-primary)]',
-        danger:    'bg-[var(--btn-danger-bg)] text-[var(--btn-danger-text)] hover:bg-[var(--btn-danger-bg-hover)] focus-visible:ring-[var(--btn-danger-bg)]',
-        success:   'bg-[var(--btn-success-bg)] text-[var(--btn-success-text)] hover:opacity-90 focus-visible:ring-[var(--btn-success-bg)]',
-        warning:   'bg-[var(--btn-warning-bg)] text-[var(--btn-warning-text)] hover:opacity-90 focus-visible:ring-[var(--btn-warning-bg)]',
+        primary:   'bg-[#000000] text-[#ffffff] hover:bg-[#222222] focus-visible:ring-[#000000]',
+        secondary: 'bg-transparent text-[#000000] border border-[#e0e0e0] hover:bg-[#f5f5f5]',
+        outline:   'border border-[#e0e0e0] bg-transparent text-[#000000] hover:bg-[#f5f5f5] hover:border-[#cccccc]',
+        ghost:     'bg-transparent text-[#444444] hover:bg-[#f5f5f5] hover:text-[#000000]',
+        danger:    'bg-[#dc2626] text-[#ffffff] hover:bg-[#b91c1c] focus-visible:ring-[#dc2626]',
+        success:   'bg-[#22c55e] text-[#ffffff] hover:bg-[#16a34a] focus-visible:ring-[#22c55e]',
+        warning:   'bg-[#f59e0b] text-[#ffffff] hover:bg-[#d97706] focus-visible:ring-[#f59e0b]',
       },
       size: {
-        xs:      'h-6 px-2.5 text-[11px] rounded-lg',
-        sm:      'h-7 px-3 text-[12px] rounded-lg',
-        md:      'h-8 px-3.5 text-[12.5px] rounded-xl',
-        lg:      'h-10 px-5 text-[13px] rounded-xl',
-        xl:      'h-12 px-6 text-[14px] rounded-2xl',
-        icon:    'h-8 w-8 rounded-xl',
+        xs:      'h-7 px-2.5 text-[11px] rounded-lg',
+        sm:      'h-8 px-3 text-[12px] rounded-lg',
+        md:      'h-9 px-3.5 text-[13px] rounded-xl',
+        lg:      'h-11 px-5 text-[14px] rounded-xl',
+        xl:      'h-12 px-6 text-[15px] rounded-2xl',
+        icon:    'h-9 w-9 rounded-xl',
         'icon-sm': 'h-7 w-7 rounded-lg',
         'icon-xs': 'h-6 w-6 rounded-md',
       },

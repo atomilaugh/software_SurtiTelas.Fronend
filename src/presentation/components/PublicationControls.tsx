@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, Edit3, RotateCcw } from 'lucide-react';
+import { Eye, EyeOff, Edit3 } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
 import { Badge } from '@/shared/ui/Badge';
 
@@ -8,7 +8,6 @@ export type PublicationStatus = 'Publicado' | 'Borrador' | 'Oculto';
 interface PublicationControlsProps {
   status: PublicationStatus;
   publicado: boolean;
-  userRole: 'admin' | 'asesor' | 'domiciliario' | 'cliente';
   onPublish: () => void;
   onUnpublish: () => void;
   onEdit?: () => void;
@@ -21,19 +20,18 @@ interface PublicationControlsProps {
 }
 
 export const PublicationControls: React.FC<PublicationControlsProps> = ({
-  status,
-  publicado,
-  userRole,
-  onPublish,
-  onUnpublish,
-  onEdit,
-  onPreview,
-  isPublishing,
-  isUnpublishing,
-  canPublish,
-  canUnpublish,
-  className,
-}) => {
+   status,
+   publicado,
+   onPublish,
+   onUnpublish,
+   onEdit,
+   onPreview,
+   isPublishing,
+   isUnpublishing,
+   canPublish,
+   canUnpublish,
+   className,
+ }) => {
   const statusConfig: Record<PublicationStatus, { variant: 'success' | 'warning' | 'danger'; icon: string }> = {
     Publicado: { variant: 'success', icon: '🟢' },
     Borrador: { variant: 'warning', icon: '🟡' },

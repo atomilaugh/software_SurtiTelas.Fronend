@@ -1,22 +1,17 @@
 import React from 'react';
 import {
   ResponsiveContainer,
-
   BarChart as ReBarChart,
   Bar,
-
   LineChart as ReLineChart,
   Line,
-
   PieChart as RePieChart,
   Pie,
   Cell,
-
   CartesianGrid,
   XAxis,
   YAxis,
-  Tooltip,
-  Legend,
+  Tooltip
 } from 'recharts';
 
 import s from './Chart.module.css';

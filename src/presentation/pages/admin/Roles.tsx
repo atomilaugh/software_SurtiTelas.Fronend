@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { Search, Plus, Edit, Shield, Check, Trash2, ToggleLeft } from 'lucide-react';
+import { Plus, Edit, Shield, Check, Trash2, ToggleLeft } from 'lucide-react';
 import s from './Roles.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Badge } from '@/shared/ui/Badge';

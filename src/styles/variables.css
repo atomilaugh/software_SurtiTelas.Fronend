@@ -1,16 +1,5 @@
-/* ================================================================
-   Design Tokens — SurtiCamisetas / SurtiTelas ERP
-   Unified Token Layer
-   ================================================================ */
-
-/* ================================================================
-   Design Tokens — SurtiTelas ERP
-   Unified Theme System (data-theme attribute on <html>/<body>)
-   ÚNICA FUENTE DE VERDAD para todos los temas
-   ================================================================ */
-
 :root {
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 
   --sidebar-width: 260px;
@@ -29,188 +18,78 @@
   --ease-in:     cubic-bezier(0.4, 0.0, 1.0, 1.0);
   --ease-inout:  cubic-bezier(0.4, 0.0, 0.2, 1.0);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1.0);
-  --t-fast:   120ms;
-  --t-base:   180ms;
-  --t-slow:   280ms;
-  --t-slower: 420ms;
 
   --shadow-xs:   0 1px 2px rgba(0,0,0,0.03);
   --shadow-sm:   0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
   --shadow-md:   0 3px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
   --shadow-lg:   0 8px 20px rgba(0,0,0,0.07), 0 3px 8px rgba(0,0,0,0.04);
   --shadow-xl:   0 16px 32px rgba(0,0,0,0.09), 0 6px 12px rgba(0,0,0,0.05);
-  --shadow-2xl:  0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.06);
-  --shadow-card: 0 0 0 1px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-inset: inset 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-elevated: var(--shadow-xl);
+  --shadow-2xl:  0 25px 50px -12px rgba(0,0,0,0.25);
 
-  --bg-canvas:    #f5f5f5;
-  --bg-base:      #f5f5f5;
+  --bg-canvas:    #ffffff;
+  --bg-base:      #fafafa;
   --bg-elevated:  #ffffff;
   --bg-overlay:   #ffffff;
-  --bg-subtle:    #f0f0f0;
-  --bg-muted:     #e8e8eb;
-  --bg-inset:     #ebebed;
+  --bg-subtle:    #f5f5f5;
+  --bg-muted:     #eeeeee;
 
-  --border-subtle:  rgba(0,0,0,0.055);
-  --border-default: rgba(0,0,0,0.085);
-  --border-strong:  rgba(0,0,0,0.14);
-  --border-focus:   #0f172a;
+  --border-subtle:  #e0e0e0;
+  --border-default: #d0d0d0;
+  --border-strong:  #cccccc;
 
-  --text-primary:    #0d0d0f;
-  --text-secondary:  #52525b;
-  --text-tertiary:   #a1a1aa;
-  --text-quaternary: #c4c4cc;
+  --text-primary:    #111111;
+  --text-secondary:  #444444;
+  --text-tertiary:   #666666;
+  --text-quaternary: #888888;
   --text-inverse:    #ffffff;
 
-  --color-bg-primary: #f5f5f5;
-  --color-bg-secondary: #f0f0f0;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #fafafa;
   --color-bg-surface: #ffffff;
-  --color-bg-elevated: #e8e8e8;
+  --color-bg-elevated: #f5f5f5;
   --color-bg-card: #ffffff;
   --color-border: #e0e0e0;
-  --color-border-subtle: #eee;
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #555555;
-  --color-text-muted: #888888;
+  --color-border-subtle: #f0f0f0;
+  --color-text-primary: #111111;
+  --color-text-secondary: #444444;
+  --color-text-muted: #666666;
 
-  --color-accent: #8B7355;
-  --color-accent-hover: #6B5B45;
-  --color-accent-dim: rgba(139, 115, 85, 0.12);
+  --color-accent: #000000;
+  --color-accent-hover: #222222;
+  --color-accent-dim: rgba(0, 0, 0, 0.05);
 
-  --color-success: #16a34a;
-  --color-success-hover: #22c55e;
-  --color-success-border: rgba(22, 163, 74, 0.3);
-  --color-success-dim: rgba(34, 197, 94, 0.15);
-
-  --color-warning: #d97706;
-  --color-warning-hover: #f59e0b;
-  --color-warning-border: rgba(217, 119, 6, 0.3);
-  --color-warning-dim: rgba(245, 158, 11, 0.15);
-
+  --color-success: #22c55e;
+  --color-success-hover: #16a34a;
   --color-error: #dc2626;
-  --color-error-hover: #ef4444;
-  --color-error-border: rgba(220, 38, 38, 0.3);
-  --color-error-dim: rgba(239, 68, 68, 0.15);
-
-  --color-info: #2563eb;
-  --color-info-hover: #3b82f6;
-  --color-info-border: rgba(37, 99, 235, 0.3);
-  --color-info-dim: rgba(59, 130, 246, 0.15);
-
-  --background: #f5f5f5;
-  --foreground: #0d0d0f;
-  --card: #ffffff;
-  --card-foreground: #0d0d0f;
-  --popover: #ffffff;
-  --popover-foreground: #0d0d0f;
-  --primary: #8B7355;
-  --primary-foreground: #ffffff;
-  --secondary: #e8e8eb;
-  --secondary-foreground: #0d0d0f;
-  --muted: #e8e8eb;
-  --muted-foreground: #52525b;
-  --accent: #f0f0f0;
-  --accent-foreground: #0d0d0f;
-  --destructive: #f87171;
-  --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: transparent;
-  --input-background: #ffffff;
-  --switch-background: #cccccc;
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --ring: #D4A574;
-  --chart-1: #D4A574;
-  --chart-2: #B8956A;
-  --chart-3: #8B7355;
-  --chart-4: #6B5B45;
-  --chart-5: #4a3f35;
-
-  --dropdown-bg: #ffffff;
-  --dropdown-border: #e0e0e0;
-  --dropdown-shadow: 0 8px 30px rgba(0,0,0,0.08);
-  --dropdown-item-text: #52525b;
-  --dropdown-item-hover-bg: #f0f0f0;
-  --dropdown-item-hover-text: #0d0d0f;
-  --dropdown-item-active-bg: #e8e8eb;
-  --dropdown-icon-color: #888888;
-  --dropdown-icon-hover-color: #52525b;
-  --dropdown-shortcut-bg: rgba(0,0,0,0.05);
-  --dropdown-shortcut-border: rgba(0,0,0,0.1);
-  --dropdown-shortcut-text: #888888;
-  --dropdown-divider: rgba(0,0,0,0.08);
-  --dropdown-danger-text: #f87171;
-  --dropdown-danger-hover-bg: rgba(248,113,113,0.1);
-  --dropdown-danger-hover-text: #b91c1c;
-  --dropdown-danger-icon: #f87171;
-  --dropdown-danger-icon-hover: #b91c1c;
-  --dropdown-danger-shortcut-bg: rgba(248,113,113,0.08);
-  --dropdown-danger-shortcut-border: rgba(248,113,113,0.2);
-  --dropdown-danger-shortcut-text: rgba(248,113,113,0.7);
+  --color-error-hover: #b91c1c;
 
   --modal-bg: #ffffff;
-  --modal-overlay: rgba(0, 0, 0, 0.35);
+  --modal-overlay: rgba(0, 0, 0, 0.65);
 
   --input-bg: #ffffff;
   --input-border: #e0e0e0;
-  --input-text: #1a1a1a;
+  --input-text: #111111;
   --input-placeholder: #888888;
 
-  --notif-bg: #ffffff;
-  --notif-border: #e0e0e0;
-  --notif-item-hover: #f0f0f0;
-  --notif-unread-bg: #f9f9f9;
-  --notif-text: #1a1a1a;
-  --notif-text-secondary: #555555;
-
-  --btn-primary-bg: var(--color-accent);
-  --btn-primary-bg-hover: var(--color-accent-hover);
+  --btn-primary-bg: #000000;
+  --btn-primary-bg-hover: #222222;
   --btn-primary-text: #ffffff;
-  --btn-primary-border: var(--color-accent);
 
   --btn-secondary-bg: transparent;
-  --btn-secondary-bg-hover: var(--bg-muted);
-  --btn-secondary-text: var(--text-primary);
-  --btn-secondary-border: var(--border-default);
+  --btn-secondary-bg-hover: #f5f5f5;
+  --btn-secondary-text: #000000;
+  --btn-secondary-border: #e0e0e0;
 
-  --btn-success-bg: var(--color-success);
-  --btn-success-bg-hover: #86efac;
-  --btn-success-text: #0a0a0c;
-
-  --btn-warning-bg: var(--color-warning);
-  --btn-warning-bg-hover: #fde04e;
-  --btn-warning-text: #0a0a0c;
-
-  --btn-danger-bg: var(--color-error);
-  --btn-danger-bg-hover: #fca5a5;
+  --btn-danger-bg: #dc2626;
+  --btn-danger-bg-hover: #b91c1c;
   --btn-danger-text: #ffffff;
-  --btn-danger-bg-outline: transparent;
-  --btn-danger-border: var(--color-error);
-  --btn-danger-text-outline: var(--color-error);
-  --btn-danger-hover-bg: rgba(248, 113, 113, 0.12);
 
-  --btn-outline-bg: transparent;
-  --btn-outline-bg-hover: var(--bg-muted);
-  --btn-outline-text: var(--text-secondary);
-  --btn-outline-border: var(--border-default);
+  --btn-success-bg: #22c55e;
+  --btn-success-bg-hover: #16a34a;
 
-  --btn-ghost-bg: transparent;
-  --btn-ghost-bg-hover: var(--bg-muted);
-  --btn-ghost-text: var(--text-secondary);
+  --btn-transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out), border-color 140ms var(--ease-out), transform 100ms var(--ease-out), opacity 140ms var(--ease-out);
 
-  --btn-icon-bg: transparent;
-  --btn-icon-hover-bg: var(--bg-muted);
-  --btn-icon-size: 36px;
-
-  --btn-table-action-bg: transparent;
-  --btn-table-action-hover-bg: var(--bg-muted);
-  --btn-table-action-text: var(--text-tertiary);
-  --btn-table-action-hover-text: var(--text-primary);
-
-  --btn-transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out), border-color 140ms var(--ease-out), transform 100ms var(--ease-out), box-shadow 140ms var(--ease-out), opacity 140ms var(--ease-out);
-
-  --shadow-modal: var(--shadow-xl);
+  --shadow-modal: 0 25px 50px -12px rgba(0,0,0,0.25);
 }
 
 [data-theme="dark"] {

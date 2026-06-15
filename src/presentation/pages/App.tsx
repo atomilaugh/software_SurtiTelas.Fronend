@@ -68,6 +68,7 @@ import AboutPage from '@/presentation/pages/public/AboutPage';
 // AUTH
 import LoginPage from '@/presentation/pages/auth/LoginPage';
 import RegisterPage from '@/presentation/pages/auth/RegisterPage';
+import ForgotPasswordPage from '@/presentation/pages/auth/ForgotPasswordPage';
 
 const ProtectedLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
@@ -91,6 +92,7 @@ const App: React.FC = () => (
           {/* AUTH */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/registro" element={<RegisterPage />} />
+          <Route path="/olvide-contrasena" element={<ForgotPasswordPage />} />
 
           {/* ADMIN - Protected routes for admin role */}
           <Route path="/admin" element={

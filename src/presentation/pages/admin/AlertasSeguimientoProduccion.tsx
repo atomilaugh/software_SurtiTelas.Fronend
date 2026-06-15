@@ -33,7 +33,7 @@ export const AdminAlertasSeguimientoProduccion: React.FC = () => {
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Pendiente' | 'Vista' | 'Resuelta'>('Todos');
   const [filtroTipo] = useState<string>('Todos');
   const [selectedAlerta, setSelectedAlerta] = useState<AlertaSeguimiento | null>(null);
-  const [showFilters] = useState(true);
+  const [_showFilters] = useState(true);
 
   const filteredAlertas = mockAlertas.filter(a =>
     (filtroEstado === 'Todos' || a.estado === filtroEstado) &&

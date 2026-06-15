@@ -84,9 +84,9 @@
 }
 
 .filterBtnActive {
-  background: var(--color-accent);
-  color: var(--text-inverse);
-  border-color: var(--color-accent);
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
 }
 
 .searchBox {

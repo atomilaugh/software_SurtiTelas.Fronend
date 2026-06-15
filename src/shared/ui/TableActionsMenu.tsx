@@ -99,7 +99,7 @@ export const TableActionsMenu = ({
     };
   }, [open, close, updatePosition]);
 
-  const primaryIndex = primaryAction ? 0 : -1;
+  const _primaryIndex = primaryAction ? 0 : -1;
   const regularActions = actions.filter((a) => !a.danger);
   const dangerActions = actions.filter((a) => a.danger);
 

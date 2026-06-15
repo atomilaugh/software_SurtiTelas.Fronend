@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, User, Phone, Building2, Check } from 'lucide-react';
+import { Mail, Eye, EyeOff, Phone, Building2, Check } from 'lucide-react';
 import { useAuth, TEST_ACCOUNTS } from '@/app/providers/AppProviders';
 import { toast } from 'sonner';
 import './AuthPage.css';
@@ -184,8 +184,8 @@ const AuthPage: React.FC = () => {
             <span className="mobileLogoText">Surtitelas</span>
           </div>
 
-          <div className="formHeader">
-            <p className="formWelcome">{tab === 'login' ? '👋 Bienvenido de nuevo' : '✨ Únete ahora'}</p>
+<div className="formHeader">
+            <p className="formWelcome">{tab === 'login' ? 'Bienvenido de nuevo' : 'Únete ahora'}</p>
             <h2 className="formTitle">{tab === 'login' ? 'Inicia sesión' : 'Crea tu cuenta'}</h2>
             <p className="formSubtitle">
               {tab === 'login' ? 'Accede al panel de gestión de tu empresa.' : 'Completa tu información y comienza en segundos.'}
@@ -259,7 +259,7 @@ const AuthPage: React.FC = () => {
                     <div className="checkboxBox" />
                     <span className="checkboxLabel">Recordar sesión</span>
                   </label>
-                  <a href="#" className="forgotLink">¿Olvidaste tu contraseña?</a>
+                  <a href="/olvide-contrasena" className="forgotLink">¿Olvidaste tu contraseña?</a>
                 </div>
 
                 <button className={`submitBtn ${loading ? 'submitBtn--loading' : ''}`} onClick={handleLogin} disabled={loading}>
@@ -269,12 +269,10 @@ const AuthPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="formFooter">
+<div className="formFooter">
                 ¿No tienes cuenta?{' '}
                 <button className="switchLink" onClick={() => switchTab('register')}>Regístrate gratis</button>
               </div>
-
-              {/* Test accounts */}
               <div className="auth-test-accounts">
                 <p className="testAccountsLabel">Credenciales de prueba:</p>
                 <div className="testAccountsGrid">

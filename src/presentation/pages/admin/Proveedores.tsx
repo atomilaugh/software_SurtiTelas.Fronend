@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Edit, Trash2, Star, Phone, MapPin, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Star, Phone, MapPin, Package } from 'lucide-react';
 import s from './Proveedores.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Badge } from '@/shared/ui/Badge';

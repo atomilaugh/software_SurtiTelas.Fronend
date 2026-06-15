@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, AlertTriangle, Clock, FileText, CreditCard, Download, DollarSign, ChevronDown, Eye, X } from 'lucide-react';
+import { Plus, CheckCircle, AlertTriangle, Clock, FileText, CreditCard, Download, DollarSign, ChevronDown, X } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Pagos.module.css';
 import { Badge } from '@/shared/ui/Badge';
@@ -111,7 +111,7 @@ export const AdminPagos: React.FC = () => {
     porVencer: mockFacturas.filter(f => f.estado === 'Parcial' || f.estado === 'Pendiente').length,
   };
 
-  const handleVerDetalle = (factura: Factura) => {
+  const _handleVerDetalle = (factura: Factura) => {
     setSelectedFactura(factura);
     setModalDetalleOpen(true);
   };

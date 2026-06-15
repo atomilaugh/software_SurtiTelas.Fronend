@@ -121,7 +121,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div className="formHeader">
-            <p className="formWelcome">👋 Bienvenido de nuevo</p>
+            <p className="formWelcome">Bienvenido de nuevo</p>
             <h2 className="formTitle">Inicia sesión</h2>
             <p className="formSubtitle">Accede al panel de gestión de tu empresa.</p>
           </div>
@@ -183,7 +183,7 @@ const LoginPage: React.FC = () => {
                 <div className="checkboxBox" />
                 <span className="checkboxLabel">Recordar sesión</span>
               </label>
-              <a href="#" className="forgotLink">¿Olvidaste tu contraseña?</a>
+              <a href="/olvide-contrasena" className="forgotLink">¿Olvidaste tu contraseña?</a>
             </div>
 
             <button className={`submitBtn ${loading ? 'submitBtn--loading' : ''}`} onClick={handleLogin} disabled={loading}>

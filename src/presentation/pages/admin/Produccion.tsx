@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { Search } from 'lucide-react';
 import s from './Produccion.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Button } from '@/shared/ui/Button';

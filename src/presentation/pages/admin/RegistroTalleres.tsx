@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { Search, Plus, Edit, Trash2, ToggleLeft, Factory, Phone } from 'lucide-react';
+import { Plus, Edit, Trash2, ToggleLeft } from 'lucide-react';
 import s from './RegistroTalleres.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Badge } from '@/shared/ui/Badge';
@@ -44,12 +44,12 @@ export const AdminRegistroTalleres: React.FC = () => {
     setSelectedTaller(null);
   };
 
-  const handleToggleEstado = (id: string, estadoActual: string) => {
+  const _handleToggleEstado = (id: string, estadoActual: string) => {
     const nuevoEstado = estadoActual === 'Activo' ? 'Inactivo' : 'Activo';
     toast.success(`Taller ${id} cambiado a estado: ${nuevoEstado}`);
   };
 
-  const handleEliminar = (id: string) => {
+  const _handleEliminar = (id: string) => {
     if (confirm(`¿Está seguro de eliminar el taller ${id}?`)) {
       toast.success(`Taller ${id} eliminado`);
     }
