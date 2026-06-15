@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -194,21 +193,22 @@ const SidebarNavItem = ({
 };
 
 export const Sidebar = ({
-  menu,
-  basePath,
-  logo,
-  brandName,
-  panelLabel,
-  user,
-  onLogout,
-  showCollapse = true,
-  roleBadge,
-  headerActions,
-  homeHref,
-  children,
-  className,
-  onToggleCollapse,
-}: SidebarProps) => {
+   menu,
+   basePath,
+   logo,
+   brandName,
+   panelLabel,
+   user,
+   onLogout,
+   showCollapse = true,
+   roleBadge,
+   headerActions,
+   homeHref,
+   children,
+   className,
+   onToggleCollapse,
+ }: SidebarProps) => {
+   void roleBadge;
   const location = useLocation();
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -231,7 +231,7 @@ export const Sidebar = ({
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   const [hoveredLogout, setHoveredLogout] = useState(false);
-  const [hoveredProfile, setHoveredProfile] = useState(false);
+  const [_hoveredProfile, _setHoveredProfile] = useState(false);
   const [hoveredHome, setHoveredHome] = useState(false);
 
   useEffect(() => {
@@ -294,7 +294,7 @@ export const Sidebar = ({
     [location.pathname, basePath]
   );
 
-  const userInitials = useMemo(() => {
+  const _userInitials = useMemo(() => {
     return user.initials || user.name.charAt(0).toUpperCase();
   }, [user.initials, user.name]);
 

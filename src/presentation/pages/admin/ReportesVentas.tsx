@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Download, ShoppingBag, Users, DollarSign, TrendingUp, ChevronDown } from 'lucide-react';
+import { Search, Download, ShoppingBag, Users, DollarSign, TrendingUp } from 'lucide-react';
 import s from './ReportesVentas.module.css';
-import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
 
@@ -174,12 +173,11 @@ export const AdminReportesVentas: React.FC = () => {
             <h3 className={s.chartTitle}>Pedidos y Clientes por Mes</h3>
           </div>
           <div className={s.metricsChart}>
-            {ventasMensuales.map((d, i) => {
+            {ventasMensuales.map((d) => {
               const maxPedidos = Math.max(...ventasMensuales.map(v => v.pedidos));
               const maxClientes = Math.max(...ventasMensuales.map(v => v.clientes));
-  const yAxisValues = [0, Math.round(maxVentas * 0.25 / 1000000), Math.round(maxVentas * 0.5 / 1000000), Math.round(maxVentas * 0.75 / 1000000), Math.round(maxVentas / 1000000)];
 
-  return (
+              return (
                 <div key={d.mes} className={s.metricGroup}>
                   <div className={s.metricBars}>
                     <div className={s.metricBarWrapper}>

@@ -1,6 +1,3 @@
-import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-
 const DASHBOARD_ROUTES = ['/admin', '/asesor', '/cliente', '/domiciliario'];
 
 export const isDashboardRoute = (pathname: string) =>

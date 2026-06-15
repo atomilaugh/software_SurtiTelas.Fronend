@@ -13,7 +13,7 @@ const getAvanceColor = (producido: number, total: number): string => {
   return '#ef4444';
 };
 
-const getEstadoBadge = (estado: string): 'default' | 'primary' | 'warning' | 'success' | 'danger' => {
+const _getEstadoBadge = (estado: string): 'default' | 'primary' | 'warning' | 'success' | 'danger' => {
   if (estado === 'Pendiente') return 'default';
   if (estado === 'Asignada') return 'warning';
   if (estado === 'En produccion') return 'primary';
@@ -21,7 +21,7 @@ const getEstadoBadge = (estado: string): 'default' | 'primary' | 'warning' | 'su
   return 'default';
 };
 
-const getDiasRestantes = (fecha: string): number => {
+const _getDiasRestantes = (fecha: string): number => {
   const today = new Date();
   const target = new Date(fecha);
   const diff = target.getTime() - today.getTime();
@@ -60,7 +60,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Pendiente' | 'Asignada' | 'En produccion' | 'Completada'>('Todos');
   const [filtroPrioridad, setFiltroPrioridad] = useState<'Todos' | 'Alta' | 'Media' | 'Baja'>('Todos');
-  const [modalOpen, setModalOpen] = useState(false);
+  const [_modalOpen, setModalOpen] = useState(false);
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
   const [nuevoAvance, setNuevoAvance] = useState('');
 

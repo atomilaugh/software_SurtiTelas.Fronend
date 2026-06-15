@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import type { SidebarItem, SidebarUser } from './Sidebar';

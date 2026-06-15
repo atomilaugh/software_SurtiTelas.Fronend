@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash2, Eye, EyeOff, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 import s from './AdminCatalogo.module.css';
@@ -179,8 +179,8 @@ export const AdminCatalogo: React.FC = () => {
       }
 
       resetForm();
-    } catch (err: any) {
-      toast.error(err?.message || 'Error al guardar producto');
+} catch (err: unknown) {
+       toast.error((err as { message?: string })?.message || 'Error al guardar producto');
     } finally {
       setSaving(false);
     }
@@ -191,7 +191,7 @@ export const AdminCatalogo: React.FC = () => {
     try {
       publishingRef.current[product.ref] = true;
       setTick(t => t + 1);
-      const resp: any = await productService.publish(product.ref);
+      const resp = await productService.publish(product.ref) as { success: boolean; data?: Producto; error?: string };
       if (resp?.success && resp?.data) {
         useAppStore.getState().updateProducto(product.ref, resp.data);
         toast.success(`"${resp.data.nombre}" publicado correctamente`);
@@ -209,7 +209,7 @@ export const AdminCatalogo: React.FC = () => {
   const handleUnpublish = async (product: Producto) => {
     if (!canUnpublish) return;
     try {
-      const resp: any = await productService.unpublish(product.ref);
+      const resp = await productService.unpublish(product.ref) as { success: boolean; data?: Producto; error?: string };
       if (resp?.success && resp?.data) {
         useAppStore.getState().updateProducto(product.ref, resp.data);
         toast.success(`"${resp.data.nombre}" ya no está visible en el catálogo`);

@@ -11,8 +11,8 @@
   --auth-border: #e0e0e0;
   --auth-border-s: #d0d0d0;
   --auth-text: #111111;
-  --auth-secondary: #555555;
-  --auth-muted: #888888;
+  --auth-secondary: #444444;
+  --auth-muted: #666666;
   --accent: #000000;
   --accent-hover: #222222;
   --success: #22c55e;
@@ -251,7 +251,7 @@
 /* Header */
 .formHeader { margin-bottom: 32px; }
 .formWelcome {
-  font-size: 0.75rem; font-weight: 600; color: var(--accent);
+  font-size: 0.75rem; font-weight: 600; color: #000000;
   text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 8px;
 }
 .formTitle {
@@ -270,11 +270,11 @@
 .tabBtn {
   flex: 1; padding: 9px 16px; border-radius: 9px; border: none;
   background: transparent; font-size: 0.875rem; font-weight: 500;
-  color: var(--auth-muted); cursor: pointer;
+  color: #666666; cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.tabBtn:hover { color: var(--auth-secondary); }
+.tabBtn:hover { color: #444444; }
 
 .tabBtn--active {
   background: var(--auth-elevated); color: var(--auth-text); font-weight: 600;
@@ -314,7 +314,7 @@
 .divider { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
 .dividerLine { flex: 1; height: 1px; background: var(--auth-border); }
 .dividerText {
-  font-size: 0.76rem; color: var(--auth-muted);
+  font-size: 0.76rem; color: #555555;
   white-space: nowrap; font-weight: 500; letter-spacing: 0.04em;
 }
 
@@ -328,7 +328,7 @@
 .fieldLabel {
   position: absolute; top: 50%; left: 14px;
   transform: translateY(-50%);
-  font-size: 0.875rem; color: var(--auth-muted);
+  font-size: 0.875rem; color: #666666;
   font-weight: 400; pointer-events: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   background: transparent; padding: 0 2px; z-index: 1;
@@ -423,10 +423,10 @@
 }
 
 .forgotLink {
-  font-size: 0.82rem; color: var(--accent);
+  font-size: 0.82rem; color: #000000;
   text-decoration: none; font-weight: 500; transition: color 0.2s ease;
 }
-.forgotLink:hover { color: var(--accent-hover); text-decoration: underline; }
+.forgotLink:hover { color: #222222; text-decoration: underline; }
 
 /* Submit Button */
 .submitBtn {
@@ -465,15 +465,15 @@
 /* Footer */
 .formFooter {
   text-align: center; margin-top: 20px;
-  font-size: 0.82rem; color: var(--auth-muted);
+  font-size: 0.82rem; color: #333333;
 }
 .switchLink {
-  color: var(--accent); font-weight: 600; cursor: pointer;
+  color: #000000; font-weight: 600; cursor: pointer;
   background: none; border: none; font-size: inherit;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   padding: 0; transition: color 0.2s ease;
 }
-.switchLink:hover { color: var(--accent-hover); }
+.switchLink:hover { color: #222222; }
 
 /* Role Selector */
 .roleSectionLabel {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Download, Calendar, BarChart3, TrendingUp, PieChart, LineChart } from 'lucide-react';
+import { Download, Calendar, BarChart3, TrendingUp, PieChart, LineChart } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './AdminReportes.module.css';
 import { StatCard } from './StatCard';

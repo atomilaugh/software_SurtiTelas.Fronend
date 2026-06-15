@@ -4,8 +4,6 @@ import s from './ReportesInventario.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
-import { DetailModal } from '@/shared/ui/DetailModal';
-import { Info } from 'lucide-react';
 
 interface ProductoReporte {
   id: string;
@@ -35,7 +33,7 @@ const mockProductos: ProductoReporte[] = [
 export const AdminReportesInventario: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('Todos');
-  const [filtroRotacion, setFiltroRotacion] = useState<string>('Todos');
+  const [filtroRotacion] = useState<string>('Todos');
   const [periodo, setPeriodo] = useState<string>('ultimo_mes');
 
   const categorias = Array.from(new Set(mockProductos.map(p => p.categoria)));

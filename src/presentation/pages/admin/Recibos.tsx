@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Download, FileText, Printer, Clock, CheckCircle, AlertTriangle, Plus, Edit, Send, DollarSign, ChevronDown, Calendar, Eye, X } from 'lucide-react';
+import { Download, FileText, Printer, Clock, CheckCircle, AlertTriangle, Plus, Edit, Send, DollarSign, ChevronDown, Calendar } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Recibos.module.css';
 import { Badge } from '@/shared/ui/Badge';
@@ -140,8 +140,8 @@ const mockRecibos: Recibo[] = [
 export const AdminRecibos: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Borrador' | 'Enviado' | 'Pagado' | 'Vencido' | 'Cancelado'>('Todos');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedRecibo, setSelectedRecibo] = useState<Recibo | null>(null);
+  const [_modalOpen, _setModalOpen] = useState(false);
+  const [_selectedRecibo, _setSelectedRecibo] = useState<Recibo | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredRecibos = useMemo(() => {
@@ -154,9 +154,9 @@ export const AdminRecibos: React.FC = () => {
     );
   }, [search, filtroEstado]);
 
-  const handleVerDetalle = (recibo: Recibo) => {
-    setSelectedRecibo(recibo);
-    setModalOpen(true);
+  const _handleVerDetalle = (recibo: Recibo) => {
+    _setSelectedRecibo(recibo);
+    _setModalOpen(true);
   };
 
   const getEstadoBadge = (estado: string) => {

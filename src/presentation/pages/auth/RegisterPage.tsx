@@ -146,7 +146,7 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div className="formHeader">
-            <p className="formWelcome">✨ Únete ahora</p>
+            <p className="formWelcome">Únete ahora</p>
             <h2 className="formTitle">Crea tu cuenta</h2>
             <p className="formSubtitle">Completa tu información y comienza en segundos.</p>
           </div>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Download, Factory, CheckCircle, Clock, Package, BarChart3, TrendingUp } from 'lucide-react';
 import s from './ReportesProduccion.module.css';
-import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
 

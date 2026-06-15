@@ -140,60 +140,6 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, centerValue, centerLabel 
   );
 };
 
-const UsuarioDetailPanel: React.FC<{ item: UsuarioRep }> = ({ item }) => (
-  <div className="flex flex-col gap-5">
-    <div className="flex items-center gap-4">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-indigo-500 text-white font-semibold text-lg">
-        {item.nombre.charAt(0).toUpperCase()}
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{item.nombre}</h3>
-        <p className="text-sm text-[var(--color-text-muted)]">{item.id}</p>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-1 gap-3">
-      <div className="flex items-center gap-3 p-3 bg-[var(--color-bg-elevated)] rounded-lg">
-        <Mail size={16} className="text-[var(--color-text-muted)]" />
-        <div className="flex-1">
-          <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Email</p>
-          <p className="text-sm font-medium text-[var(--color-text-primary)]">{item.email}</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 p-3 bg-[var(--color-bg-elevated)] rounded-lg">
-        <Calendar size={16} className="text-[var(--color-text-muted)]" />
-        <div className="flex-1">
-          <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Fecha Registro</p>
-          <p className="text-sm font-medium text-[var(--color-text-primary)]">{new Date(item.fechaRegistro).toLocaleDateString('es-CO')}</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 p-3 bg-[var(--color-bg-elevated)] rounded-lg">
-        <ShoppingBag size={16} className="text-[var(--color-text-muted)]" />
-        <div className="flex-1">
-          <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Pedidos</p>
-          <p className="text-sm font-medium text-[var(--color-text-primary)]">{item.pedidosRealizados} pedidos realizados</p>
-        </div>
-      </div>
-    </div>
-
-    <div className="flex items-center justify-between pt-2 border-t border-[var(--color-border)]">
-      <span className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Estado</span>
-      <Badge variant={item.estado === 'Activo' ? 'success' : item.estado === 'Pendiente' ? 'warning' : 'default'} dot>
-        {item.estado}
-      </Badge>
-    </div>
-
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Rol</span>
-      <Badge variant={item.rol === 'admin' ? 'warning' : item.rol === 'asesor' ? 'primary' : item.rol === 'domiciliario' ? 'purple' : 'success'}>
-        {item.rol}
-      </Badge>
-    </div>
-  </div>
-);
-
 export const AdminReportesUsuarios: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroRol, setFiltroRol] = useState<string>('Todos');

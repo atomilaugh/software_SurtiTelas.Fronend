@@ -42,7 +42,7 @@ const mockInfoEmpresa = {
 export const AdminContactoEmpresa: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Nuevo' | 'Leído' | 'Respondido' | 'Cerrado'>('Todos');
-  const [filtroTipo, setFiltroTipo] = useState<string>('Todos');
+  const [filtroTipo, _setFiltroTipo] = useState<string>('Todos');
   const [showNuevoMensaje, setShowNuevoMensaje] = useState(false);
   const [respuesta, setRespuesta] = useState('');
 
