@@ -366,6 +366,40 @@
 
 .fieldWrap--icon .fieldInput { padding-right: 44px; }
 
+/* Select styling */
+select.fieldInput {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23111111' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px !important;
+  cursor: pointer;
+}
+
+select.fieldInput:hover {
+  border-color: #888888;
+  background-color: #fafafa;
+}
+
+select.fieldInput:focus {
+  border-color: #111111;
+  background-color: #ffffff;
+}
+
+select.fieldInput option {
+  padding: 10px 14px;
+  background: #ffffff;
+  color: #111111;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+select.fieldInput option:checked {
+  background: #111111;
+  color: #ffffff;
+}
+
+.fieldWrap--icon select.fieldInput { padding-right: 44px !important; }
+
 .fieldIcon {
   position: absolute; right: 14px; top: 50%;
   transform: translateY(-50%); color: var(--auth-muted);

@@ -342,3 +342,30 @@ html.dark .header-glass {
   .icon-accent  { color: var(--accent); }
   .icon-destructive { color: var(--destructive); }
 }
+
+/* Responsive adjustments: mantiene diseño visual, mejora adaptación en pantallas pequeñas */
+@media (max-width: 1024px) {
+  .erp-table thead th { font-size: 10.5px; }
+  .nav-item { gap: 8px; padding: 6px 8px; font-size: 13px; }
+}
+
+@media (max-width: 768px) {
+  html { font-size: 13px; }
+  #root { padding-left: 12px; padding-right: 12px; }
+  .erp-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .erp-table thead, .erp-table tbody { display: table; width: 100%; }
+  .nav-item { white-space: normal; }
+  .badge-base { padding: 1px 6px; font-size: 10px; }
+  .icon-sm { width: 16px; height: 16px; }
+  .icon-md { width: 18px; height: 18px; }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 13px; }
+  .erp-input { height: 40px; padding: 0 10px; font-size: 13px; }
+  .header-glass { padding: 8px 10px; }
+  .nav-item { padding: 6px 8px; gap: 6px; font-size: 12.5px; }
+  /* Evitar transformaciones y animaciones que afectan experiencia táctil */
+  .card-interactive:hover { transform: none; }
+  .anim-fade-up, .anim-scale-in, .anim-slide-right { animation: none; }
+}

@@ -91,14 +91,14 @@ export const AuthRequiredModal: React.FC<AuthRequiredModalProps> = ({
             </div>
 
             <div className="auth-modal-actions">
-              <button type="button" className="auth-modal-action secondary" onClick={onContinueShopping}>
+              <button type="button" className="auth-modal-action secondary" onClick={onContinueShopping} aria-label="Continuar comprando">
                 Continuar comprando
               </button>
-              <button type="button" className="auth-modal-action ghost" onClick={handleRegister}>
+              <button type="button" className="auth-modal-action ghost" onClick={handleRegister} aria-label="Registrarme">
                 <UserPlus size={18} />
                 Registrarme
               </button>
-              <button type="button" className="auth-modal-action primary" onClick={handleLogin}>
+              <button type="button" className="auth-modal-action primary" onClick={handleLogin} aria-label="Iniciar sesión">
                 <LogIn size={18} />
                 Iniciar Sesión
               </button>

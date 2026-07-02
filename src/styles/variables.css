@@ -293,3 +293,24 @@
 
   --shadow-modal: var(--shadow-xl);
 }
+
+/* RESPONSIVE ADDITIONS */
+@media (max-width: 1023px) {
+  :root {
+    --sidebar-width: 240px;
+  }
+
+  [data-theme="dark"] {
+    --sidebar-width: 240px;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --sidebar-width: 85vw;
+  }
+
+  [data-theme="dark"] {
+    --sidebar-width: 85vw;
+  }
+}

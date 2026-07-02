@@ -36,7 +36,7 @@ export const CartDrawer: React.FC = () => {
                 </span>
               </div>
             </div>
-            <button className="cart-close-premium" onClick={closeDrawer}>
+            <button className="cart-close-premium" onClick={closeDrawer} aria-label="Cerrar carrito">
               <X size={20} />
             </button>
           </div>
@@ -91,6 +91,7 @@ export const CartDrawer: React.FC = () => {
                                 <button
                           className="cart-item-remove"
                           onClick={() => removeFromCart(item.cartId)}
+                          aria-label="Eliminar producto"
                         >
                           <X size={16} />
                         </button>
@@ -117,6 +118,7 @@ export const CartDrawer: React.FC = () => {
                             className="quantity-btn"
                             onClick={() => decreaseQuantity(item.cartId)}
                             disabled={item.quantity <= 1}
+                            aria-label="Disminuir cantidad"
                           >
                             <Minus size={14} />
                           </button>
@@ -125,6 +127,7 @@ export const CartDrawer: React.FC = () => {
                             className="quantity-btn"
                             onClick={() => increaseQuantity(item.cartId)}
                             disabled={item.quantity >= item.stock}
+                            aria-label="Aumentar cantidad"
                           >
                             <Plus size={14} />
                           </button>

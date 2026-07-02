@@ -392,18 +392,35 @@ body {
   .header-btn {
     padding: 0 10px;
   }
+
+  /* RESPONSIVE ADDITIONS */
+  .sidebar {
+    width: 240px;
+    max-width: 85vw;
+  }
+
+  /* RESPONSIVE ADDITIONS */
+  .main-content {
+    margin-left: 240px;
+  }
 }
 
 @media (max-width: 768px) {
+  /* RESPONSIVE ADDITIONS */
   .sidebar {
     transform: translateX(-100%);
-    width: var(--sidebar-width) !important;
+    width: 100vw !important;
+    max-width: none !important;
+    left: 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  /* RESPONSIVE ADDITIONS */
   .sidebar.mobile-open {
     transform: translateX(0);
   }
 
+  /* RESPONSIVE ADDITIONS */
   .main-content {
     margin-left: 0 !important;
   }
@@ -414,6 +431,11 @@ body {
 
   .search-input {
     width: 140px !important;
+  }
+
+  /* RESPONSIVE ADDITIONS */
+  .sidebar-footer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
 }
 

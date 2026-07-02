@@ -18,6 +18,8 @@ interface Direccion {
 
 interface ClienteForm {
   nombre: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
   nit: string;
   telefono: string;
   ciudad: string;
@@ -32,6 +34,8 @@ interface ClienteForm {
 const perfilData = {
   nombre: 'Juan Pablo Martínez',
   iniciales: 'JM',
+  tipoDocumento: 'CC',
+  numeroDocumento: '12345678',
   empresa: 'Almacén El Sol',
   nit: '900.123.456-7',
   email: 'juan.martinez@almacenelsol.com',
@@ -66,18 +70,20 @@ const emptyDireccion: Omit<Direccion, 'id'> = {
 };
 
 export const PerfilCliente: React.FC = () => {
-  const [form, setForm] = useState<ClienteForm>({
-    nombre: perfilData.nombre,
-    nit: perfilData.nit,
-    telefono: perfilData.telefono,
-    ciudad: perfilData.ciudad,
-    empresa: perfilData.empresa,
-    sector: perfilData.sector,
-    cargo: perfilData.cargo,
-    passwordActual: '',
-    passwordNueva: '',
-    passwordConfirm: '',
-  });
+   const [form, setForm] = useState<ClienteForm>({
+     nombre: perfilData.nombre,
+     tipoDocumento: perfilData.tipoDocumento,
+     numeroDocumento: perfilData.numeroDocumento,
+     nit: perfilData.nit,
+     telefono: perfilData.telefono,
+     ciudad: perfilData.ciudad,
+     empresa: perfilData.empresa,
+     sector: perfilData.sector,
+     cargo: perfilData.cargo,
+     passwordActual: '',
+     passwordNueva: '',
+     passwordConfirm: '',
+   });
   const [direcciones, setDirecciones] = useState<Direccion[]>(perfilData.direcciones);
   const [formError, setFormError] = useState('');
   const [direccionModal, setDireccionModal] = useState<{ open: boolean; mode: 'crear' | 'editar'; direccion?: Direccion }>({ open: false, mode: 'crear' });
@@ -128,8 +134,8 @@ export const PerfilCliente: React.FC = () => {
 
   const guardarCambios = () => {
     setFormError('');
-    if (!form.nombre.trim() || !form.nit.trim() || !form.telefono.trim() || !form.ciudad.trim()) {
-      setFormError('Nombre, NIT, teléfono y ciudad son obligatorios.');
+    if (!form.nombre.trim() || !form.tipoDocumento.trim() || !form.numeroDocumento.trim() || !form.nit.trim() || !form.telefono.trim() || !form.ciudad.trim()) {
+      setFormError('Nombre, tipo de documento, número de documento, NIT, teléfono y ciudad son obligatorios.');
       return;
     }
 
@@ -216,33 +222,49 @@ export const PerfilCliente: React.FC = () => {
               Datos personales
             </h2>
           </div>
-          <div className={s.perfilSectionBody}>
-            <div className={s.formGrid2}>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Nombre completo</label>
-                <input className={s.formInput} value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} />
-              </div>
-              <div className={s.formField}>
-                <label className={s.formLabel}>NIT / CC</label>
-                <input className={s.formInput} value={form.nit} onChange={e => setForm({ ...form, nit: e.target.value })} />
-              </div>
-            </div>
-            <div className={s.formGrid2}>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Teléfono</label>
-                <input className={s.formInput} value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />
-              </div>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Ciudad</label>
-                <input className={s.formInput} value={form.ciudad} onChange={e => setForm({ ...form, ciudad: e.target.value })} />
-              </div>
-            </div>
-            <div className={s.formField}>
-              <label className={s.formLabel}>Email</label>
-              <input className={s.formInputReadOnly} value={perfilData.email} readOnly />
-              <span className={s.readOnlyHint}>No se puede modificar el email</span>
-            </div>
-          </div>
+<div className={s.perfilSectionBody}>
+             <div className={s.formGrid2}>
+               <div className={s.formField}>
+                 <label className={s.formLabel}>Nombre completo</label>
+                 <input className={s.formInput} value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} />
+               </div>
+               <div className={s.formField}>
+                 <label className={s.formLabel}>NIT / CC</label>
+                 <input className={s.formInput} value={form.nit} onChange={e => setForm({ ...form, nit: e.target.value })} />
+               </div>
+             </div>
+             <div className={s.formGrid2}>
+               <div className={s.formField}>
+                 <label className={s.formLabel}>Teléfono</label>
+                 <input className={s.formInput} value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />
+               </div>
+               <div className={s.formField}>
+                 <label className={s.formLabel}>Tipo de documento</label>
+                 <select className={s.formInput} value={form.tipoDocumento} onChange={e => setForm({ ...form, tipoDocumento: e.target.value })}>
+                   <option value="">Selecciona tipo</option>
+                   <option value="CC">Cédula de Ciudadanía</option>
+                   <option value="NIT">NIT</option>
+                   <option value="Pasaporte">Pasaporte</option>
+                   <option value="CE">Cédula de Extranjería</option>
+                 </select>
+               </div>
+             </div>
+             <div className={s.formField}>
+               <label className={s.formLabel}>Número de documento</label>
+               <input className={s.formInput} value={form.numeroDocumento} onChange={e => setForm({ ...form, numeroDocumento: e.target.value })} placeholder="Ej: 1023456789" maxLength="20" />
+             </div>
+             <div className={s.formGrid2}>
+               <div className={s.formField}>
+                 <label className={s.formLabel}>Ciudad</label>
+                 <input className={s.formInput} value={form.ciudad} onChange={e => setForm({ ...form, ciudad: e.target.value })} />
+               </div>
+             </div>
+             <div className={s.formField}>
+               <label className={s.formLabel}>Email</label>
+               <input className={s.formInputReadOnly} value={perfilData.email} readOnly />
+               <span className={s.readOnlyHint}>No se puede modificar el email</span>
+             </div>
+           </div>
         </div>
 
         <div className={s.perfilSection}>

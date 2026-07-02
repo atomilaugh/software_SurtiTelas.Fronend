@@ -1089,4 +1089,36 @@
   }
 }
 
+/* ============================================================
+   RESPONSIVE ADDITIONS — Mobile & Tablet (< 768px)
+   ============================================================ */
+
+@media (max-width: 767px) {
+  .ch-body {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: 1fr;
+  }
+
+  .ch-container {
+    max-height: 90dvh;
+    max-height: min(90vh, 90dvh);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .ch-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .ch-container {
+    border-radius: 28px 28px 0 0;
+  }
+
+  .ch-summary-card {
+    position: relative;
+    top: auto;
+  }
+}
+
 

@@ -182,6 +182,7 @@ export const ProductDetailModal: React.FC<Props> = ({
           <button
             className="pd-close-premium"
             onClick={handleClose}
+            aria-label="Cerrar modal"
           >
             <X size={18} />
           </button>
@@ -206,6 +207,8 @@ export const ProductDetailModal: React.FC<Props> = ({
                   onClick={() =>
                     setIsWishlisted(!isWishlisted)
                   }
+                  aria-pressed={isWishlisted}
+                  aria-label={isWishlisted ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                 >
                   <Heart
                     size={18}
@@ -217,7 +220,7 @@ export const ProductDetailModal: React.FC<Props> = ({
                   />
                 </button>
 
-                <button className="pd-icon-btn">
+                <button className="pd-icon-btn" aria-label="Compartir producto">
                   <Share2 size={18} />
                 </button>
 
@@ -226,6 +229,7 @@ export const ProductDetailModal: React.FC<Props> = ({
               <button
                 className="pd-nav-btn pd-nav-left"
                 onClick={prevImage}
+                aria-label="Imagen anterior"
               >
                 <ChevronLeft size={20} />
               </button>
@@ -233,6 +237,7 @@ export const ProductDetailModal: React.FC<Props> = ({
               <button
                 className="pd-nav-btn pd-nav-right"
                 onClick={nextImage}
+                aria-label="Imagen siguiente"
               >
                 <ChevronRight size={20} />
               </button>
@@ -271,6 +276,7 @@ export const ProductDetailModal: React.FC<Props> = ({
                       onClick={() =>
                         setCurrentImageIndex(index)
                       }
+                      aria-label={`Ver imagen ${index + 1}`}
                     >
                       <img
                         src={image}

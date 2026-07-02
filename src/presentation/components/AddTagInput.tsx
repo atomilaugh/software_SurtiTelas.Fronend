@@ -34,11 +34,11 @@ export const AddTagInput: React.FC<AddTagInputProps> = ({ tags, onTagsChange, pl
   };
 
   return (
-    <div className={s.tagInputWrapper} onClick={() => inputRef.current?.focus()}>
+    <div className={s.tagInputWrapper} onClick={() => inputRef.current?.focus()} role="application">
       {tags.map(tag => (
         <span key={tag} className={s.tagChip}>
           {tag}
-          <button type="button" className={s.tagRemoveBtn} onClick={() => removeTag(tag)}>
+          <button type="button" className={s.tagRemoveBtn} onClick={() => removeTag(tag)} aria-label={`Eliminar etiqueta ${tag}`}>
             <X size={10} />
           </button>
         </span>
