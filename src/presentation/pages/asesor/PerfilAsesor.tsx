@@ -2,8 +2,10 @@ import React, { useRef, useState } from 'react';
 import { Edit2, Lock, Check, Image as ImageIcon, User } from 'lucide-react';
 import { toast } from 'sonner';
 import styles from './PerfilAsesor.module.css';
+import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
+import { Tooltip } from '@/shared/components/Tooltip';
 
 export const AsesorPerfil: React.FC = () => {
   const [nombre, setNombre] = useState('Camila Torres');
@@ -60,15 +62,14 @@ export const AsesorPerfil: React.FC = () => {
         <div className={styles.perfilCard}>
           <div className={styles.avatar}>
             C
-            <button className={styles.avatarEditBtn} title="Cambiar foto" type="button" onClick={() => setIsAvatarOpen(true)}>
+            <Tooltip title="Cambiar foto"><button className={styles.avatarEditBtn} type="button" onClick={() => setIsAvatarOpen(true)}>
               <Edit2 size={14} />
-            </button>
+            </button></Tooltip>
           </div>
           <div className={styles.perfilName}>{nombre}</div>
           <div className={styles.perfilEmail}>camila.t@surtitelas.com</div>
           <div className={styles.rolTag}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-accent)' }} />
-            Asesor de Ventas
+            <Badge variant="success" dot>Asesor de Ventas</Badge>
           </div>
           <div className={styles.perfilStats}>
             <div className={styles.perfilStat}>

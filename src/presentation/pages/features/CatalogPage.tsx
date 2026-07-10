@@ -5,6 +5,7 @@ import { FilterDrawer, type FilterState } from '@presentation/pages/components/F
 import { ProductDetailModal } from '@presentation/components/ProductDetailModal';
 import { toast } from 'sonner';
 import '../styles/CatalogPage.css';
+import { Tooltip } from '@/shared/components/Tooltip';
 
 interface Producto {
   id: string;
@@ -193,10 +194,10 @@ const CatalogPage: React.FC = () => {
           <div className="controls-left"><span className="results-count">{productosFiltrados.length} producto{productosFiltrados.length !== 1 ? 's' : ''} encontrado{productosFiltrados.length !== 1 ? 's' : ''}</span></div>
           <div className="controls-right">
             <button className="mobile-filter-btn" onClick={() => setFiltrosAbierto(true)}><SlidersHorizontal size={18} /><span>Filtros {totalFiltrosActivos > 0 && `(${totalFiltrosActivos})`}</span></button>
-            <button className="nav-to-cart-btn" onClick={() => navigate('/carrito')} title="Ver carrito">
+            <Tooltip title="Ver carrito"><button className="nav-to-cart-btn" onClick={() => navigate('/carrito')}>
               <ShoppingBag size={18} />
               <span>Ver carrito</span>
-            </button>
+            </button></Tooltip>
           </div>
         </div>
       </section>

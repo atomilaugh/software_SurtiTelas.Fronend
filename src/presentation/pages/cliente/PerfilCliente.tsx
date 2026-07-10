@@ -84,6 +84,20 @@ export const PerfilCliente: React.FC = () => {
   const [direccionDraft, setDireccionDraft] = useState<Omit<Direccion, 'id'>>(emptyDireccion);
   const [deleteDireccion, setDeleteDireccion] = useState<Direccion | null>(null);
   const [asesorModalOpen, setAsesorModalOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [avatarDraft, setAvatarDraft] = useState('');
+
+  const abrirEditarAvatar = () => {
+    setAvatarDraft(avatarUrl);
+    setAvatarModalOpen(true);
+  };
+
+  const guardarAvatar = () => {
+    setAvatarUrl(avatarDraft.trim());
+    setAvatarModalOpen(false);
+    toast.success('Foto de perfil actualizada');
+  };
 
   const abrirCrearDireccion = () => {
     setDireccionDraft(emptyDireccion);
@@ -157,8 +171,8 @@ export const PerfilCliente: React.FC = () => {
     <div className={s.perfilLayout}>
       <div className={s.perfilCard}>
         <div className={s.avatar}>
-          {perfilData.iniciales}
-          <button className={s.avatarEditBtn} type="button">
+          {avatarUrl ? <img src={avatarUrl} alt="Avatar" className={s.avatarImg} /> : perfilData.iniciales}
+          <button className={s.avatarEditBtn} type="button" onClick={abrirEditarAvatar} aria-label="Cambiar foto de perfil">
             <Edit2 size={14} />
           </button>
         </div>
@@ -409,6 +423,36 @@ export const PerfilCliente: React.FC = () => {
             ],
           },
         ]}
+      />
+
+      <DetailModal
+        children={null}
+        open={avatarModalOpen}
+        onClose={() => setAvatarModalOpen(false)}
+        title="Cambiar foto de perfil"
+        subtitle="Pega la URL de una imagen"
+        sections={[
+          {
+            title: 'Imagen',
+            children: (
+              <div className="flex flex-col gap-3">
+                <input
+                  className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]"
+                  placeholder="https://..."
+                  value={avatarDraft}
+                  onChange={e => setAvatarDraft(e.target.value)}
+                />
+                {avatarDraft && <img src={avatarDraft} alt="Vista previa" className="h-24 w-24 rounded-full object-cover border border-[var(--color-border)]" />}
+              </div>
+            ),
+          },
+        ]}
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setAvatarModalOpen(false)}>Cancelar</Button>
+            <Button onClick={guardarAvatar}>Guardar foto</Button>
+          </div>
+        }
       />
 
       <ConfirmationModal

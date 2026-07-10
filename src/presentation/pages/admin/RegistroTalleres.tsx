@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, ToggleLeft } from 'lucide-react';
 import s from './RegistroTalleres.module.css';
@@ -20,7 +20,7 @@ interface Taller {
   estado: 'Activo' | 'Inactivo';
 }
 
-const mockTalleres: Taller[] = [
+const mockTalleresInicial: Taller[] = [
   { id: 'T-001', nombre: 'Taller Textil El Progreso', contacto: 'Roberto Sánchez', telefono: '310 234 5678', email: 'progreso@textil.com', direccion: 'Cra 45 # 120-35', ciudad: 'Bogotá', capacidad: 100, ocupacion: 75, estado: 'Activo' },
   { id: 'T-002', nombre: 'Confección Martínez', contacto: 'Laura Martínez', telefono: '311 345 6789', email: 'martinez@confeccion.com', direccion: 'Cl 30 # 45-60', ciudad: 'Medellín', capacidad: 80, ocupacion: 60, estado: 'Activo' },
   { id: 'T-003', nombre: 'Taller San José', contacto: 'Carlos Pérez', telefono: '312 456 7890', email: 'sanjose@taller.com', direccion: 'Av 7 # 23-45', ciudad: 'Cali', capacidad: 120, ocupacion: 90, estado: 'Activo' },
@@ -32,8 +32,11 @@ export const AdminRegistroTalleres: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTaller, setSelectedTaller] = useState<Taller | null>(null);
+  const [items, setItems] = useState<Taller[]>(mockTalleresInicial);
 
-  const filteredTalleres = mockTalleres.filter(t =>
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const filteredTalleres = items.filter(t =>
     t.nombre.toLowerCase().includes(search.toLowerCase()) ||
     t.contacto.toLowerCase().includes(search.toLowerCase()) ||
     t.ciudad.toLowerCase().includes(search.toLowerCase())
@@ -42,6 +45,38 @@ export const AdminRegistroTalleres: React.FC = () => {
   const handleCloseModal = () => {
     setModalOpen(false);
     setSelectedTaller(null);
+  };
+
+  const handleSubmitTaller = () => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const nombre = String(fd.get('nombre') ?? '').trim();
+    const contacto = String(fd.get('contacto') ?? '').trim();
+    const telefono = String(fd.get('telefono') ?? '').trim();
+    const email = String(fd.get('email') ?? '').trim();
+    const direccion = String(fd.get('direccion') ?? '').trim();
+    const ciudad = String(fd.get('ciudad') ?? '').trim();
+    const capacidad = Number(fd.get('capacidad') ?? 0) || 0;
+    if (selectedTaller) {
+      setItems(prev => prev.map(it => it.id === selectedTaller.id ? { ...it, nombre, contacto, telefono, email, direccion, ciudad, capacidad } : it));
+      toast.success('Taller actualizado');
+    } else {
+      const nuevo: Taller = {
+        id: `T-${String(items.length + 1).padStart(3, '0')}`,
+        nombre,
+        contacto,
+        telefono,
+        email,
+        direccion,
+        ciudad,
+        capacidad,
+        ocupacion: 0,
+        estado: 'Activo',
+      };
+      setItems(prev => [nuevo, ...prev]);
+      toast.success('Taller creado');
+    }
+    handleCloseModal();
   };
 
   const _handleToggleEstado = (id: string, estadoActual: string) => {
@@ -136,48 +171,48 @@ actions={(t) => [
               <button className={s.closeBtn} onClick={handleCloseModal}>×</button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form}>
+              <form className={s.form} ref={formRef}>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Nombre del Taller</label>
-                    <input type="text" className={s.input} defaultValue={selectedTaller?.nombre} />
+                    <input type="text" className={s.input} name="nombre" defaultValue={selectedTaller?.nombre} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Contacto</label>
-                    <input type="text" className={s.input} defaultValue={selectedTaller?.contacto} />
+                    <input type="text" className={s.input} name="contacto" defaultValue={selectedTaller?.contacto} />
                   </div>
                 </div>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Teléfono</label>
-                    <input type="tel" className={s.input} defaultValue={selectedTaller?.telefono} />
+                    <input type="tel" className={s.input} name="telefono" defaultValue={selectedTaller?.telefono} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Email</label>
-                    <input type="email" className={s.input} defaultValue={selectedTaller?.email} />
+                    <input type="email" className={s.input} name="email" defaultValue={selectedTaller?.email} />
                   </div>
                 </div>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Dirección</label>
-                    <input type="text" className={s.input} defaultValue={selectedTaller?.direccion} />
+                    <input type="text" className={s.input} name="direccion" defaultValue={selectedTaller?.direccion} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Ciudad</label>
-                    <input type="text" className={s.input} defaultValue={selectedTaller?.ciudad} />
+                    <input type="text" className={s.input} name="ciudad" defaultValue={selectedTaller?.ciudad} />
                   </div>
                 </div>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Capacidad</label>
-                    <input type="number" className={s.input} defaultValue={selectedTaller?.capacidad} />
+                    <input type="number" className={s.input} name="capacidad" defaultValue={selectedTaller?.capacidad} />
                   </div>
                 </div>
                 <div className={s.formActions}>
                   <Button variant="secondary" onClick={handleCloseModal}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleCloseModal}>
+                  <Button onClick={handleSubmitTaller}>
                     {selectedTaller ? 'Guardar cambios' : 'Crear taller'}
                   </Button>
                 </div>

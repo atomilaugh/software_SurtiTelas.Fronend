@@ -4,6 +4,7 @@ import s from './Comisiones.module.css';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { InfoModal } from '@/shared/ui/InfoModal';
 import { Badge } from '@/shared/ui/Badge';
+import { Tooltip } from '@/shared/components/Tooltip';
 
 interface Comision {
   mes: string;
@@ -104,9 +105,7 @@ export const AsesorComisiones: React.FC = () => {
                   <td>{item.porcentaje}</td>
                   <td className={s.tdMono}>{item.comision}</td>
                   <td>
-                    <span className={`${s.liquidadoBadge} ${item.estado === 'Pagado' ? s.liquidadoBadgePagado : s.liquidadoBadgePendiente}`}>
-                      {item.estado}
-                    </span>
+                    <Badge variant={item.estado === 'Pagado' ? 'success' : 'warning'}>{item.estado}</Badge>
                   </td>
                   <td>
                     {item.comprobante ? (
@@ -119,9 +118,9 @@ export const AsesorComisiones: React.FC = () => {
                     )}
                   </td>
                   <td>
-                    <button type="button" className={s.actionBtn} title="Ver detalle" onClick={() => openDetail(item)}>
+                    <Tooltip title="Ver detalle"><button type="button" className={s.actionBtn} onClick={() => openDetail(item)}>
                       <Eye size={14} />
-                    </button>
+                    </button></Tooltip>
                   </td>
                 </tr>
               ))}

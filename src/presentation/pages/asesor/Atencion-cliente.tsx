@@ -7,6 +7,7 @@ import { Modal } from '@/shared/ui/Modal';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { useAppStore, useClientes, usePedidos } from '@/core/stores';
 import { Badge } from '@/shared/ui/Badge';
+import { Tooltip } from '@/shared/components/Tooltip';
 import type { Pedido } from '@/core/types';
 
 interface Mensaje {
@@ -17,6 +18,18 @@ interface Mensaje {
 }
 
 const asesorActual = 'Camila Torres';
+
+const descargarArchivo = (nombre: string, contenido: string) => {
+  const blob = new Blob([contenido], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nombre;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 export const AtencionCliente: React.FC = () => {
   const clientesStore = useClientes();
@@ -157,9 +170,9 @@ export const AtencionCliente: React.FC = () => {
           </div>
 
           <form className={s.chatInputArea} onSubmit={enviarMensaje}>
-            <button type="button" className={s.attachBtn} title="Adjuntar catálogo o cotización" onClick={handleAttach}>
+            <Tooltip title="Adjuntar catálogo o cotización"><button type="button" className={s.attachBtn} onClick={handleAttach}>
               <Paperclip size={20} />
-            </button>
+            </button></Tooltip>
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
             <input
               type="text"
@@ -246,15 +259,15 @@ export const AtencionCliente: React.FC = () => {
               <FileText size={18} className={s.widgetIcon} />
             </div>
             <div className={s.resourceList}>
-              <div className={s.resourceItem}>
+              <div className={s.resourceItem} style={{ cursor: 'pointer' }} onClick={() => descargarArchivo('Catálogo Telas Verano 2026.pdf', 'Catálogo de Telas Verano 2026 - SurtiTelas\n\nContenido de muestra para demostración.')}>
                 <div className={s.resourceIcon}><FileText size={16} /></div>
                 <span className={s.resourceName}>Catálogo Telas Verano 2026.pdf</span>
-                <Download size={14} className={s.downloadIcon} onClick={() => toast.info('Descargando Catálogo Telas Verano 2026.pdf')} />
+                <Download size={14} className={s.downloadIcon} />
               </div>
-              <div className={s.resourceItem}>
+              <div className={s.resourceItem} style={{ cursor: 'pointer' }} onClick={() => descargarArchivo('Listado_Precios_Mayoristas.pdf', 'Listado de Precios Mayoristas - SurtiTelas\n\nContenido de muestra para demostración.')}>
                 <div className={s.resourceIcon}><FileText size={16} /></div>
                 <span className={s.resourceName}>Listado_Precios_Mayoristas.pdf</span>
-                <Download size={14} className={s.downloadIcon} onClick={() => toast.info('Descargando Listado_Precios_Mayoristas.pdf')} />
+                <Download size={14} className={s.downloadIcon} />
               </div>
             </div>
           </div>

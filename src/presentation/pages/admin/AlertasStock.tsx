@@ -19,8 +19,9 @@ type AlertaStock = typeof mockAlertas[number];
 export const AdminAlertasStock: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtro, setFiltro] = useState<'Todos' | 'Pendiente' | 'Resuelta' | 'Critico'>('Todos');
+  const [alertas, setAlertas] = useState<AlertaStock[]>(mockAlertas);
 
-  const filteredAlertas = mockAlertas.filter(a =>
+  const filteredAlertas = alertas.filter(a =>
     (filtro === 'Todos' || a.estado === filtro) &&
     (a.insumo.toLowerCase().includes(search.toLowerCase()) ||
      a.codigo.toLowerCase().includes(search.toLowerCase()))
@@ -109,8 +110,8 @@ export const AdminAlertasStock: React.FC = () => {
   };
 
   const actions: DataTableAction<AlertaStock>[] = [
-    { label: 'Resolver', icon: <CheckCircle size={14} />, onClick: () => toast.success('Alerta resuelta'), disabled: (a: AlertaStock) => a.estado === 'Resuelta' },
-    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: () => { if (confirm('¿Eliminar alerta?')) toast.success('Alerta eliminada'); } },
+    { label: 'Resolver', icon: <CheckCircle size={14} />, onClick: (a) => { setAlertas(prev => prev.filter(al => al.id !== a.id)); toast.success('Alerta resuelta'); }, disabled: (a) => a.estado === 'Resuelta' },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (a) => { if (confirm('¿Eliminar alerta?')) { setAlertas(prev => prev.filter(al => al.id !== a.id)); toast.success('Alerta eliminada'); } } },
   ];
 
   return (
@@ -124,14 +125,14 @@ export const AdminAlertasStock: React.FC = () => {
           <div className={s.statCard}>
             <AlertTriangle size={20} className={s.statIcon} />
             <div>
-              <div className={s.statValue}>{mockAlertas.filter(a => a.estado === 'Pendiente').length}</div>
+              <div className={s.statValue}>{alertas.filter(a => a.estado === 'Pendiente').length}</div>
               <div className={s.statLabel}>Pendientes</div>
             </div>
           </div>
           <div className={s.statCard}>
             <Bell size={20} className={s.statIcon} />
             <div>
-              <div className={s.statValue}>{mockAlertas.filter(a => a.estado === 'Critico').length}</div>
+              <div className={s.statValue}>{alertas.filter(a => a.estado === 'Critico').length}</div>
               <div className={s.statLabel}>Críticos</div>
             </div>
           </div>

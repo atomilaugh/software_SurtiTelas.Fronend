@@ -193,7 +193,7 @@ export const AdminAlertasSeguimientoProduccion: React.FC = () => {
             </div>
           )},
           { key: 'prioridad', header: 'Prioridad', width: '100px', render: (a) => (
-            <span className={`${s.prioridadBadge} ${getPrioridadColor(a.prioridad)}`}>{a.prioridad}</span>
+            <Badge variant={a.prioridad === 'Alta' ? 'danger' : a.prioridad === 'Media' ? 'warning' : 'success'}>{a.prioridad}</Badge>
           )},
           { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
             { value: 'Pendiente', label: 'Pendiente' },

@@ -175,7 +175,7 @@ export const AdminAlertasAsignacionProduccion: React.FC = () => {
             <div className={s.descripcionCell} title={a.descripcion}>{a.descripcion}</div>
           )},
           { key: 'prioridad', header: 'Prioridad', width: '100px', render: (a) => (
-            <span className={`${s.prioridadBadge} ${getPrioridadColor(a.prioridad)}`}>{a.prioridad}</span>
+            <Badge variant={a.prioridad === 'Alta' ? 'danger' : a.prioridad === 'Media' ? 'warning' : 'success'}>{a.prioridad}</Badge>
           )},
           { key: 'fechaAlerta', header: 'Fecha', width: '110px', render: (a) => (
             <div className={s.fechaCell}>

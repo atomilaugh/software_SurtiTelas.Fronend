@@ -40,22 +40,22 @@ export const ConfirmationModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-[var(--modal-overlay)] p-4 backdrop-blur-md"
       role="presentation"
     >
       <section
-        className="w-full max-w-md animate-in fade-in zoom-in-95 slide-in-from-bottom-2 rounded-[24px] border border-[#e0e0e0] bg-[#ffffff] p-6 shadow-2xl"
+        className="w-full max-w-md animate-in fade-in zoom-in-95 slide-in-from-bottom-2 rounded-[24px] border border-[var(--color-border)] bg-[var(--modal-bg)] p-6 shadow-[var(--shadow-modal)]"
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
         <div className="mb-5 flex items-start gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#e0e0e0] bg-[#f5f5f5] text-[#000000]">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)]">
             <Icon size={20} />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-[#111111]">{title}</h2>
-            {description && <p className="mt-1 text-sm leading-6 text-[#444444]">{description}</p>}
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">{title}</h2>
+            {description && <p className="mt-1 text-sm leading-6 text-[var(--color-text-secondary)]">{description}</p>}
           </div>
         </div>
 

@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Clock, Factory, TrendingUp } from 'lucide-react';
+import { toast } from 'sonner';
 import s from './SeguimientoProduccion.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { Modal } from '@/shared/ui/Modal';
 
 const getAvanceColor = (producido: number, total: number): string => {
   const pct = (producido / total) * 100;
@@ -45,7 +47,7 @@ interface OrdenProduccion {
   avance: number;
 }
 
-const mockOrdenes: OrdenProduccion[] = [
+const ordenesIniciales: OrdenProduccion[] = [
   { id: 'OP-001', numeroOrden: 'ORD-2024-001', prenda: 'Camisa manga larga', referencia: 'REF-1001', cantidad: 200, cantidadProducida: 180, fechaInicio: '2024-06-01', fechaPrometida: '2024-06-15', estado: 'En produccion', tallerAsignado: 'Taller Textil El Progreso', prioridad: 'Alta', cliente: 'Cliente A', observaciones: 'Avance normal', avance: 90 },
   { id: 'OP-002', numeroOrden: 'ORD-2024-002', prenda: 'Pantalón jean', referencia: 'REF-1002', cantidad: 150, cantidadProducida: 150, fechaInicio: '2024-05-28', fechaPrometida: '2024-06-18', estado: 'Completada', tallerAsignado: 'Confección Martínez', prioridad: 'Media', cliente: 'Cliente B', observaciones: 'Entregado completo', avance: 100 },
   { id: 'OP-003', numeroOrden: 'ORD-2024-003', prenda: 'Blusa estampada', referencia: 'REF-1003', cantidad: 300, cantidadProducida: 75, fechaInicio: '2024-06-05', fechaPrometida: '2024-06-14', estado: 'En produccion', tallerAsignado: 'Taller Textil El Progreso', prioridad: 'Alta', cliente: 'Cliente C', observaciones: '25% completado', avance: 25 },
@@ -60,12 +62,13 @@ export const AdminSeguimientoProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Pendiente' | 'Asignada' | 'En produccion' | 'Completada'>('Todos');
   const [filtroPrioridad, setFiltroPrioridad] = useState<'Todos' | 'Alta' | 'Media' | 'Baja'>('Todos');
-  const [_modalOpen, setModalOpen] = useState(false);
+  const [ordenes, setOrdenes] = useState<OrdenProduccion[]>(ordenesIniciales);
+  const [modalOpen, setModalOpen] = useState(false);
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
   const [nuevoAvance, setNuevoAvance] = useState('');
 
   const filteredOrdenes = useMemo(() => {
-    return mockOrdenes.filter(o =>
+    return ordenes.filter(o =>
       (filtroEstado === 'Todos' || o.estado === filtroEstado) &&
       (filtroPrioridad === 'Todos' || o.prioridad === filtroPrioridad) &&
       (o.numeroOrden.toLowerCase().includes(search.toLowerCase()) ||
@@ -73,7 +76,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
        o.referencia.toLowerCase().includes(search.toLowerCase()) ||
        o.cliente.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [search, filtroEstado, filtroPrioridad]);
+  }, [ordenes, search, filtroEstado, filtroPrioridad]);
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -92,27 +95,41 @@ export const AdminSeguimientoProduccion: React.FC = () => {
     return diff;
   };
 
+  const abrirModal = (orden: OrdenProduccion) => {
+    setSelectedOrden(orden);
+    setNuevoAvance(String(orden.cantidadProducida));
+    setModalOpen(true);
+  };
+
   const handleActualizarAvance = () => {
-    if (selectedOrden && nuevoAvance) {
-      const avance = Number(nuevoAvance);
-      if (avance >= (selectedOrden?.cantidad || 0)) {
-        alert(`Orden ${selectedOrden?.numeroOrden} completada. Producción: ${avance}/${selectedOrden?.cantidad}`);
-      } else {
-        alert(`Avance actualizado para ${selectedOrden?.numeroOrden}: ${avance}/${selectedOrden?.cantidad} unidades (${Math.round((avance / (selectedOrden?.cantidad || 1)) * 100)}%)`);
+    if (!selectedOrden || !nuevoAvance) return;
+    const producidas = Number(nuevoAvance);
+    setOrdenes(prev => prev.map(o => {
+      if (o.id !== selectedOrden.id) return o;
+      if (producidas >= o.cantidad) {
+        return { ...o, cantidadProducida: o.cantidad, avance: 100, estado: 'Completada' as const };
       }
-    }
+      return { ...o, cantidadProducida: producidas, avance: Math.round((producidas / o.cantidad) * 100), estado: 'En produccion' as const };
+    }));
+    toast.success(`Avance actualizado para ${selectedOrden.numeroOrden}`);
+    setModalOpen(false);
+    setSelectedOrden(null);
   };
 
   const handleCompletarOrden = (orden: OrdenProduccion) => {
-    alert(`Orden ${orden.numeroOrden} marcada como entregada al cliente ${orden.cliente}`);
+    setOrdenes(prev => prev.map(o => o.id === orden.id
+      ? { ...o, cantidadProducida: o.cantidad, avance: 100, estado: 'Completada' as const }
+      : o
+    ));
+    toast.success(`Orden ${orden.numeroOrden} marcada como entregada`);
   };
 
   const stats = {
-    pendientes: mockOrdenes.filter(o => o.estado === 'Pendiente').length,
-    asignadas: mockOrdenes.filter(o => o.estado === 'Asignada').length,
-    enProduccion: mockOrdenes.filter(o => o.estado === 'En produccion').length,
-    completadas: mockOrdenes.filter(o => o.estado === 'Completada').length,
-    retrasadas: mockOrdenes.filter(o => {
+    pendientes: ordenes.filter(o => o.estado === 'Pendiente').length,
+    asignadas: ordenes.filter(o => o.estado === 'Asignada').length,
+    enProduccion: ordenes.filter(o => o.estado === 'En produccion').length,
+    completadas: ordenes.filter(o => o.estado === 'Completada').length,
+    retrasadas: ordenes.filter(o => {
       if (o.estado === 'Completada' || o.estado === 'Pendiente') return false;
       return getDiasRestantes(o.fechaPrometida) < 0;
     }).length,
@@ -202,8 +219,8 @@ export const AdminSeguimientoProduccion: React.FC = () => {
         enableExport
         exportFileName="seguimiento_produccion"
         actions={(o) => [
-          ...(o.estado === 'En produccion' ? [{ label: 'Actualizar avance', icon: <Clock size={14} />, onClick: () => { setSelectedOrden(o); setNuevoAvance(String(o.cantidadProducida)); setModalOpen(true); } }] : []),
-          ...(o.estado === 'Asignada' ? [{ label: 'Iniciar producción', icon: <Factory size={14} />, onClick: () => { setSelectedOrden(o); setNuevoAvance(String(o.cantidadProducida)); setModalOpen(true); } }] : []),
+          ...(o.estado === 'En produccion' ? [{ label: 'Actualizar avance', icon: <Clock size={14} />, onClick: () => abrirModal(o) }] : []),
+          ...(o.estado === 'Asignada' ? [{ label: 'Iniciar producción', icon: <Factory size={14} />, onClick: () => abrirModal(o) }] : []),
         ]}
         columns={[
           { key: 'orden', header: 'Orden', width: '180px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar orden...', render: (o) => (
@@ -279,6 +296,41 @@ export const AdminSeguimientoProduccion: React.FC = () => {
           ),
         }}
       />
+
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={selectedOrden ? `Actualizar Avance - ${selectedOrden.numeroOrden}` : 'Actualizar Avance'}
+        size="md"
+        variant="form"
+      >
+        {selectedOrden && (
+          <div className={s.detailModalContent}>
+            <div className={s.ordenInfo}>
+              <div className={s.infoRow}><span className={s.infoLabel}>Prenda:</span><span className={s.infoValue}>{selectedOrden.prenda}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Cliente:</span><span className={s.infoValue}>{selectedOrden.cliente}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Taller:</span><span className={s.infoValue}>{selectedOrden.tallerAsignado || 'Sin asignar'}</span></div>
+            </div>
+            <div className={s.avanceSection}>
+              <label className={s.label}>Unidades Producidas</label>
+              <div className={s.avanceInputRow}>
+                <input type="number" className={s.avanceInput} value={nuevoAvance} onChange={e => setNuevoAvance(e.target.value)} min={0} max={selectedOrden.cantidad} />
+                <span className={s.avanceTotal}>/ {selectedOrden.cantidad} unidades</span>
+              </div>
+              <div className={s.avancePreview}>
+                <div className={s.avanceBarLarge}>
+                  <div className={s.avanceFillLarge} style={{ width: `${Math.min(((Number(nuevoAvance) || 0) / selectedOrden.cantidad) * 100, 100)}%`, background: getAvanceColor(Number(nuevoAvance) || 0, selectedOrden.cantidad) }} />
+                </div>
+                <span className={s.avancePorcentaje}>{Math.round(((Number(nuevoAvance) || 0) / selectedOrden.cantidad) * 100)}%</span>
+              </div>
+            </div>
+            <div className={s.formActions}>
+              <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
+              <Button onClick={handleActualizarAvance}>Actualizar avance</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

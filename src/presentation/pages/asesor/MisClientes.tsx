@@ -6,6 +6,7 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import { Tooltip } from '@/shared/components/Tooltip';
 import { useClientes, usePedidos } from '@/core/stores';
 import type { Cliente } from '@/core/types';
 
@@ -189,15 +190,15 @@ export const AsesorClientes: React.FC = () => {
                   </td>
                   <td>
                     <div className={s.actions}>
-                      <button className={s.actionBtn} title="Ver" onClick={() => openDetail(cliente)}>
+                      <Tooltip title="Ver"><button className={s.actionBtn} onClick={() => openDetail(cliente)}>
                         <Eye size={14} />
-                      </button>
-                      <button className={s.actionBtn} title="Editar" onClick={() => openEdit(cliente)}>
+                      </button></Tooltip>
+                      <Tooltip title="Editar"><button className={s.actionBtn} onClick={() => openEdit(cliente)}>
                         <Edit size={14} />
-                      </button>
-                      <button className={s.actionBtn} title="Eliminar" onClick={() => openDelete(cliente)}>
+                      </button></Tooltip>
+                      <Tooltip title="Eliminar"><button className={s.actionBtn} onClick={() => openDelete(cliente)}>
                         <Trash2 size={14} />
-                      </button>
+                      </button></Tooltip>
                     </div>
                   </td>
                 </tr>

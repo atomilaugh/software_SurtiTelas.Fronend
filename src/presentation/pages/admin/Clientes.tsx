@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { toast } from 'sonner';
 import { Plus, Edit } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Clientes.module.css';
@@ -21,7 +22,7 @@ interface Cliente {
   isTrustedCustomer?: boolean;
 }
 
-const mockClientes: Cliente[] = [
+const mockClientesInicial: Cliente[] = [
   { id: 'CL-001', nombre: 'Almacén El Sol', ciudad: 'Bogotá', tel: '310 234 5678', asesor: 'Camila Torres', pedidos: 34, estado: 'Activo', email: 'contacto@alsol.com', isTrustedCustomer: true },
   { id: 'CL-002', nombre: 'Boutique Moda+', ciudad: 'Medellín', tel: '311 345 6789', asesor: 'Luis Herrera', pedidos: 18, estado: 'Activo', email: 'info@modaplus.co', isTrustedCustomer: false },
   { id: 'CL-003', nombre: 'Textiles Andina', ciudad: 'Cali', tel: '312 456 7890', asesor: 'Camila Torres', pedidos: 52, estado: 'Activo', email: 'ventas@andina.com', isTrustedCustomer: true },
@@ -38,8 +39,11 @@ export const AdminClientes: React.FC = () => {
   const [search, setSearch] = useState('');
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [items, setItems] = useState<Cliente[]>(mockClientesInicial);
 
-  const filteredClientes = mockClientes.filter(c =>
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const filteredClientes = items.filter(c =>
     c.nombre.toLowerCase().includes(search.toLowerCase()) ||
     c.ciudad.toLowerCase().includes(search.toLowerCase())
   );
@@ -52,6 +56,36 @@ export const AdminClientes: React.FC = () => {
   const handleCloseFormModal = () => {
     setFormModalOpen(false);
     setSelectedCliente(null);
+  };
+
+  const handleSubmitCliente = () => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const nombre = String(fd.get('nombre') ?? '').trim();
+    const ciudad = String(fd.get('ciudad') ?? '').trim();
+    const tel = String(fd.get('tel') ?? '').trim();
+    const email = String(fd.get('email') ?? '').trim();
+    const asesor = String(fd.get('asesor') ?? '').trim();
+    const isTrustedCustomer = fd.get('isTrustedCustomer') === 'on';
+    if (selectedCliente) {
+      setItems(prev => prev.map(it => it.id === selectedCliente.id ? { ...it, nombre, ciudad, tel, email, asesor, isTrustedCustomer } : it));
+      toast.success('Cliente actualizado');
+    } else {
+      const nuevo: Cliente = {
+        id: `CL-${String(items.length + 1).padStart(3, '0')}`,
+        nombre,
+        ciudad,
+        tel,
+        asesor,
+        pedidos: 0,
+        estado: 'Activo',
+        email,
+        isTrustedCustomer,
+      };
+      setItems(prev => [nuevo, ...prev]);
+      toast.success('Cliente creado');
+    }
+    handleCloseFormModal();
   };
 
   return (
@@ -155,11 +189,11 @@ export const AdminClientes: React.FC = () => {
         title={selectedCliente ? 'Editar Cliente' : 'Nuevo Cliente'}
         size="lg"
       >
-        <form className={s.form}>
+        <form className={s.form} ref={formRef}>
           <div className={s.formRow}>
             <div className={s.field}>
               <label className={s.label}>Nombre</label>
-              <input type="text" className={s.input} defaultValue={selectedCliente?.nombre} />
+              <input type="text" className={s.input} name="nombre" defaultValue={selectedCliente?.nombre} />
             </div>
             <div className={s.field}>
               <label className={s.label}>NIT/CC</label>
@@ -169,21 +203,21 @@ export const AdminClientes: React.FC = () => {
           <div className={s.formRow}>
             <div className={s.field}>
               <label className={s.label}>Ciudad</label>
-              <input type="text" className={s.input} defaultValue={selectedCliente?.ciudad} />
+              <input type="text" className={s.input} name="ciudad" defaultValue={selectedCliente?.ciudad} />
             </div>
             <div className={s.field}>
               <label className={s.label}>Teléfono</label>
-              <input type="text" className={s.input} defaultValue={selectedCliente?.tel} />
+              <input type="text" className={s.input} name="tel" defaultValue={selectedCliente?.tel} />
             </div>
           </div>
           <div className={s.formRow}>
             <div className={s.field}>
               <label className={s.label}>Email</label>
-              <input type="email" className={s.input} placeholder="email@ejemplo.com" />
+              <input type="email" className={s.input} name="email" placeholder="email@ejemplo.com" />
             </div>
             <div className={s.field}>
               <label className={s.label}>Asesor asignado</label>
-              <select className={s.select}>
+              <select className={s.select} name="asesor">
                 <option>Camila Torres</option>
                 <option>Luis Herrera</option>
                 <option>Pedro Gómez</option>
@@ -201,6 +235,7 @@ export const AdminClientes: React.FC = () => {
                 type="checkbox"
                 id="trusted-customer"
                 className={s.checkbox}
+                name="isTrustedCustomer"
                 defaultChecked={selectedCliente?.isTrustedCustomer ?? false}
               />
               <label htmlFor="trusted-customer" className={s.checkboxLabel}>
@@ -212,7 +247,7 @@ export const AdminClientes: React.FC = () => {
             <Button variant="secondary" onClick={handleCloseFormModal}>
               Cancelar
             </Button>
-            <Button onClick={handleCloseFormModal}>
+            <Button onClick={handleSubmitCliente}>
               {selectedCliente ? 'Guardar cambios' : 'Crear cliente'}
             </Button>
           </div>

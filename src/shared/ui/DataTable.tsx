@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import {
   ArrowUp,
   ArrowDown,
@@ -21,6 +21,7 @@ import { cn } from '@/shared/utils';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { TableActionsMenu, TableAction } from '@/shared/ui/TableActionsMenu';
+import { useDelegatedTooltips } from '@/shared/components/Tooltip';
 import { DropdownMenu } from '@/shared/ui/DropdownMenu';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { DetailModal, type DetailModalHeader, type KpiCard, type ObservationBlock } from '@/shared/ui/DetailModal';
@@ -96,7 +97,7 @@ const TABLE_EMPTY_TEXT = 'Sin registros por mostrar';
 const ACTION_COLUMN_KEYS = new Set(['acciones', 'actions', 'action']);
 
 const JumpButton = ({ disabled, onClick, title, children }: { disabled?: boolean; onClick?: () => void; title?: string; children?: ReactNode }) => (
-  <Button variant="ghost" size="icon-xs" onClick={onClick} disabled={disabled} title={title} className={s.jumpButton}>
+  <Button variant="ghost" size="icon-xs" onClick={onClick} disabled={disabled} data-bs-toggle="tooltip" data-bs-title={title} className={s.jumpButton}>
     {children}
   </Button>
 );
@@ -207,6 +208,8 @@ export function DataTable<T extends { id?: string | number }>({
   modalSize,
   maxVisibleColumns = 5,
 }: DataTableProps<T>) {
+  const tableRef = useRef<HTMLDivElement>(null);
+  useDelegatedTooltips(tableRef);
   const displayColumns = useMemo(() => columns.filter(column => !isActionColumn(column.key)), [columns]);
   const visibleColumns = useMemo(() => {
     const cols = displayColumns.slice(0, maxVisibleColumns);
@@ -473,7 +476,7 @@ export function DataTable<T extends { id?: string | number }>({
   };
 
   return (
-    <div className={cn(s.card, className)}>
+    <div className={cn(s.card, className)} ref={tableRef}>
       <div className={s.toolbar}>
         <div className={s.toolbarLeft}>
           {toolbarLeft ?? (
@@ -597,7 +600,7 @@ export function DataTable<T extends { id?: string | number }>({
                })}
                 {hiddenColumnsCount > 0 && (
                   <th className={cn(s.headerCell, s.actionHeader)}>
-                    <span className={s.hiddenColsIndicator} title={`${hiddenColumnsCount} columnas ocultas disponibles en el detalle`}>
+                    <span className={s.hiddenColsIndicator} data-bs-toggle="tooltip" data-bs-title={`${hiddenColumnsCount} columnas ocultas disponibles en el detalle`}>
                       +{hiddenColumnsCount}
                     </span>
                   </th>
@@ -655,8 +658,9 @@ export function DataTable<T extends { id?: string | number }>({
                            column.align === 'center' && s.alignCenter,
                            columnIndex === 0 && s.primaryCell
                          )}
-                         style={{ width: column.width, minWidth: column.minWidth, maxWidth: column.maxWidth }}
-                         title={typeof rawValue === 'string' ? rawValue : typeof firstValue === 'string' && columnIndex === 0 ? String(firstValue) : undefined}
+                          style={{ width: column.width, minWidth: column.minWidth, maxWidth: column.maxWidth }}
+                          data-bs-toggle={columnIndex === 0 ? 'tooltip' : undefined}
+                          data-bs-title={columnIndex === 0 ? (typeof rawValue === 'string' ? rawValue : typeof firstValue === 'string' ? String(firstValue) : undefined) : undefined}
                        >
                          {content ?? <span className={s.mutedValue}>—</span>}
                        </td>
@@ -666,9 +670,10 @@ export function DataTable<T extends { id?: string | number }>({
                       <td className={cn(s.bodyCell, s.hiddenColsCell)} onClick={event => event.stopPropagation()}>
                         <button
                           type="button"
-                          className={s.detailInlineBtn}
-                          onClick={() => { setSelectedDetailItem(item); setShowDetailPanel(true); }}
-                          title={`${hiddenColumnsCount} columnas adicionales`}
+                           className={s.detailInlineBtn}
+                           onClick={() => { setSelectedDetailItem(item); setShowDetailPanel(true); }}
+                           data-bs-toggle="tooltip"
+                           data-bs-title={`${hiddenColumnsCount} columnas adicionales`}
                         >
                           <Eye size={14} />
                           <span className={s.detailInlineText}>Ver más</span>
@@ -682,10 +687,9 @@ export function DataTable<T extends { id?: string | number }>({
                            trigger={
                              <button
                                type="button"
-                               className={s.actionButton}
-                               aria-label="Abrir menú de acciones"
-                               title="Acciones"
-                             >
+                                className={s.actionButton}
+                                aria-label="Abrir menú de acciones"
+                              >
                                <MoreHorizontal size={16} strokeWidth={2} />
                              </button>
                            }

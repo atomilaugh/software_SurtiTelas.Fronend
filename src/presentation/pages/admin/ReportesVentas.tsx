@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Download, ShoppingBag, Users, DollarSign, TrendingUp } from 'lucide-react';
+import { Search, Download, ShoppingBag, Users, DollarSign, TrendingUp, ChevronDown } from 'lucide-react';
 import s from './ReportesVentas.module.css';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
@@ -85,11 +85,14 @@ export const AdminReportesVentas: React.FC = () => {
           <p className={s.pageSubtitle}>Análisis de ventas</p>
         </div>
         <div className={s.headerActions}>
-          <select className={s.periodoSelect} defaultValue="ultimos_6_meses">
-            <option value="ultimos_6_meses">Últimos 6 meses</option>
-            <option value="ultimo_ano">Último año</option>
-            <option value="todo">Todo el historial</option>
-          </select>
+          <div className={s.periodoSelect}>
+            <select className={s.select} defaultValue="ultimos_6_meses">
+              <option value="ultimos_6_meses">Últimos 6 meses</option>
+              <option value="ultimo_ano">Último año</option>
+              <option value="todo">Todo el historial</option>
+            </select>
+            <ChevronDown size={16} className={s.selectIcon} />
+          </div>
           <Button variant="secondary" leftIcon={<Download size={16} />}>
             Exportar
           </Button>

@@ -2,6 +2,8 @@
 
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @import './styles/variables.css';
 
 /* Base Reset */
@@ -155,9 +157,9 @@ body {
 .erp-input:hover  { border-color: var(--border-strong); }
 .erp-input:focus  {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(15,23,42,0.07);
+  box-shadow: 0 0 0 3px var(--border-focus);
 }
-html.dark .erp-input:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.07); }
+[data-theme="dark"] .erp-input:focus { box-shadow: 0 0 0 3px var(--border-focus); }
 
 /* Badge */
 .badge-base {
@@ -232,7 +234,7 @@ html.dark .erp-input:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.07); }
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--border-subtle);
 }
-html.dark .header-glass {
+[data-theme="dark"] .header-glass {
   background: rgba(10,10,12,0.88);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -341,4 +343,18 @@ html.dark .header-glass {
   .icon-muted   { color: var(--muted-foreground); }
   .icon-accent  { color: var(--accent); }
   .icon-destructive { color: var(--destructive); }
+}
+
+/* ------------------------------------------------------------------
+   Dashboard scope: apply canvas/background and text color only inside
+   elements marked with data-dashboard-theme so public pages stay intact
+   ------------------------------------------------------------------ */
+[data-dashboard-theme] {
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+[data-dashboard-theme] .pageContent {
+  background: transparent;
 }

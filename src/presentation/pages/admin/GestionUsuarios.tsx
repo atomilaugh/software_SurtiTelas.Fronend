@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Plus, Edit, Trash2, ToggleLeft, User, ShieldCheck, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import s from './GestionUsuarios.module.css';
@@ -16,7 +16,7 @@ interface Usuario {
   fechaRegistro: string;
 }
 
-const mockUsuarios: Usuario[] = [
+const mockUsuariosInicial: Usuario[] = [
   { id: 'U-001', nombre: 'Carlos Martínez', email: 'carlos.martinez@surtitelas.com', telefono: '310 123 4567', rol: 'Administrador', estado: 'Activo', fechaRegistro: '2024-01-15' },
   { id: 'U-002', nombre: 'Ana López', email: 'ana.lopez@surtitelas.com', telefono: '311 234 5678', rol: 'Asesor', estado: 'Activo', fechaRegistro: '2024-02-20' },
   { id: 'U-003', nombre: 'Luis Pérez', email: 'luis.perez@surtitelas.com', telefono: '312 345 6789', rol: 'Almacén', estado: 'Activo', fechaRegistro: '2024-03-10' },
@@ -29,18 +29,47 @@ export const AdminGestionUsuarios: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
+  const [items, setItems] = useState<Usuario[]>(mockUsuariosInicial);
+
+  const formRef = useRef<HTMLFormElement>(null);
 
   const filteredUsuarios = useMemo(() => {
-    return mockUsuarios.filter(u =>
+    return items.filter(u =>
       u.nombre.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       u.rol.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, items]);
 
   const handleCloseModal = () => {
     setModalOpen(false);
     setSelectedUsuario(null);
+  };
+
+  const handleSubmitUsuario = () => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const nombre = String(fd.get('nombre') ?? '').trim();
+    const email = String(fd.get('email') ?? '').trim();
+    const telefono = String(fd.get('telefono') ?? '').trim();
+    const rol = String(fd.get('rol') ?? '').trim();
+    if (selectedUsuario) {
+      setItems(prev => prev.map(it => it.id === selectedUsuario.id ? { ...it, nombre, email, telefono, rol } : it));
+      toast.success('Usuario actualizado');
+    } else {
+      const nuevo: Usuario = {
+        id: `U-${String(items.length + 1).padStart(3, '0')}`,
+        nombre,
+        email,
+        telefono,
+        rol,
+        estado: 'Activo',
+        fechaRegistro: new Date().toISOString().slice(0, 10),
+      };
+      setItems(prev => [nuevo, ...prev]);
+      toast.success('Usuario creado');
+    }
+    handleCloseModal();
   };
 
   const columns: DataTableColumn<Usuario>[] = [
@@ -132,15 +161,15 @@ export const AdminGestionUsuarios: React.FC = () => {
               <button className={s.closeBtn} onClick={handleCloseModal}>×</button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form}>
+              <form className={s.form} ref={formRef}>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Nombre completo</label>
-                    <input type="text" className={s.input} defaultValue={selectedUsuario?.nombre} />
+                    <input type="text" className={s.input} name="nombre" defaultValue={selectedUsuario?.nombre} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Rol</label>
-                    <select className={s.select} defaultValue={selectedUsuario?.rol}>
+                    <select className={s.select} name="rol" defaultValue={selectedUsuario?.rol}>
                       <option>Administrador</option>
                       <option>Asesor</option>
                       <option>Almacén</option>
@@ -152,18 +181,18 @@ export const AdminGestionUsuarios: React.FC = () => {
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Email</label>
-                    <input type="email" className={s.input} defaultValue={selectedUsuario?.email} />
+                    <input type="email" className={s.input} name="email" defaultValue={selectedUsuario?.email} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Teléfono</label>
-                    <input type="tel" className={s.input} defaultValue={selectedUsuario?.telefono} />
+                    <input type="tel" className={s.input} name="telefono" defaultValue={selectedUsuario?.telefono} />
                   </div>
                 </div>
                 <div className={s.formActions}>
                   <Button variant="secondary" onClick={handleCloseModal}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleCloseModal}>
+                  <Button onClick={handleSubmitUsuario}>
                     {selectedUsuario ? 'Guardar cambios' : 'Crear usuario'}
                   </Button>
                 </div>

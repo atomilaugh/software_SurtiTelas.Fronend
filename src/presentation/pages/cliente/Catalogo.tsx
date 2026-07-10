@@ -7,6 +7,9 @@ import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { Badge } from '@/shared/ui/Badge';
+import { Tooltip } from '@/shared/components/Tooltip';
+import { usePedidos } from '@/core/stores';
+import { useAuth } from '@/core/stores/authStore';
 
 interface Mensaje {
   id: number;
@@ -28,8 +31,22 @@ const pedidosActivos: PedidoActivo[] = [
   { id: '#PED-8810', estado: 'Completado', fecha: '01 Jun, 2026', total: '$860.000', items: '9 artículos' },
 ];
 
+const descargarArchivo = (nombre: string, contenido: string) => {
+  const blob = new Blob([contenido], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nombre;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export const CatalogoCliente: React.FC = () => {
   const navigate = useNavigate();
+  const { createPedido } = usePedidos();
+  const { user } = useAuth();
   const [isPedidoModalOpen, setIsPedidoModalOpen] = useState(false);
   const [pedidoData, setPedidoData] = useState({ detalle: '', urgencia: 'Estándar' });
   const [nuevoMensaje, setNuevoMensaje] = useState('');
@@ -84,7 +101,19 @@ export const CatalogoCliente: React.FC = () => {
       toast.error('Describe tu requerimiento');
       return;
     }
-    toast.success(`Pedido creado: ${pedidoData.detalle.substring(0, 50)}...`);
+    const fecha = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+    createPedido({
+      cliente: user?.name || 'Cliente',
+      asesor: 'Por asignar',
+      fecha,
+      items: 1,
+      total: 'Por cotizar',
+      estado: 'Nuevo',
+      prioridad: pedidoData.urgencia as 'Estándar' | 'Prioritario',
+      observaciones: pedidoData.detalle,
+      itemsList: [{ nombre: pedidoData.detalle, precio: 0, cantidad: 1 }],
+    });
+    toast.success('Pedido enviado a tu asesor para cotización');
     setIsPedidoModalOpen(false);
     setPedidoData({ detalle: '', urgencia: 'Estándar' });
   };
@@ -133,10 +162,10 @@ export const CatalogoCliente: React.FC = () => {
             <div ref={mensajesEndRef} />
           </div>
 
-          <form className={s.chatInputArea} onSubmit={enviarMensaje}>
-            <button type="button" className={s.attachBtn} title="Adjuntar archivo" onClick={handleAttach}>
-              <Paperclip size={20} />
-            </button>
+            <form className={s.chatInputArea} onSubmit={enviarMensaje}>
+              <Tooltip title="Adjuntar archivo"><button type="button" className={s.attachBtn} onClick={handleAttach}>
+                <Paperclip size={20} />
+              </button></Tooltip>
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
             <input
               type="text"
@@ -202,12 +231,28 @@ export const CatalogoCliente: React.FC = () => {
               <FileText size={18} className={s.widgetIcon} />
             </div>
             <div className={s.resourceList}>
-              <a href="#" className={s.resourceItem} onClick={(e) => { e.preventDefault(); toast.info('Descargando Catálogo Telas Verano 2026.pdf') }}>
+              <a
+                href="#"
+                className={s.resourceItem}
+                onClick={(e) => {
+                  e.preventDefault();
+                  descargarArchivo('Catálogo Telas Verano 2026.pdf', 'Catálogo de Telas Verano 2026 - SurtiTelas\n\nContenido de muestra para demostración.');
+                  toast.success('Catálogo Telas Verano 2026.pdf descargado');
+                }}
+              >
                 <div className={s.resourceIcon}><FileText size={16} /></div>
                 <span className={s.resourceName}>Catálogo Telas Verano 2026.pdf</span>
                 <Download size={14} className={s.downloadIcon} />
               </a>
-              <a href="#" className={s.resourceItem} onClick={(e) => { e.preventDefault(); toast.info('Descargando Ficha Técnica de Lavado.pdf') }}>
+              <a
+                href="#"
+                className={s.resourceItem}
+                onClick={(e) => {
+                  e.preventDefault();
+                  descargarArchivo('Ficha Técnica de Lavado.pdf', 'Ficha Técnica de Lavado - SurtiTelas\n\n• Lavar a máquina máx 30°C\n• No usar blanqueador\n• Secar a la sombra');
+                  toast.success('Ficha Técnica de Lavado.pdf descargado');
+                }}
+              >
                 <div className={s.resourceIcon}><FileText size={16} /></div>
                 <span className={s.resourceName}>Ficha Técnica de Lavado.pdf</span>
                 <Download size={14} className={s.downloadIcon} />

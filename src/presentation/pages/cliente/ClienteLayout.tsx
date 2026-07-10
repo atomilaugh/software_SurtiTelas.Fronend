@@ -33,6 +33,15 @@ export const ClienteLayout: React.FC = () => {
   }, [isCollapsed]);
 
   const handleLogout = async () => {
+    try {
+      window.localStorage.removeItem('dashboard-theme');
+      document.querySelectorAll<HTMLElement>('[data-dashboard-theme]').forEach(el => el.removeAttribute('data-theme'));
+      document.documentElement.removeAttribute('data-theme');
+      document.body?.removeAttribute('data-theme');
+    } catch (e) {
+      // ignore
+    }
+
     await logout();
     navigate('/login');
   };
@@ -46,7 +55,7 @@ export const ClienteLayout: React.FC = () => {
   };
 
   return (
-    <div className={cn(s.appLayout, isCollapsed && s.collapsed)}>
+    <div data-dashboard-theme className={cn(s.appLayout, isCollapsed && s.collapsed)}>
       <Sidebar
         menu={clienteMenu}
         basePath="/cliente"

@@ -3,7 +3,15 @@ import { useNavigate, Link } from "react-router-dom";
 import { ShoppingCart, User } from "lucide-react";
 import logoImg from "@assets/images/logos/surtitelas-logo.jpg";
 import { useCart, useAuth } from "@/app/providers/AppProviders";
+import { Tooltip } from "@/shared/components/Tooltip";
 import "./Navbar.css";
+
+const USER_TOOLTIP: Record<string, string> = {
+  admin: "Panel Admin",
+  asesor: "Panel Asesor",
+  domiciliario: "Panel Domiciliario",
+  cliente: "Mi Cuenta",
+};
 
 const Navbar: React.FC = () => {
   const { totalItems } = useCart();
@@ -95,23 +103,11 @@ const Navbar: React.FC = () => {
         {/* ACTIONS */}
         <div className="header-actions">
           {/* USER */}
-          <button
-            className="icon-btn"
-            title={
-              role === "admin"
-                ? "Panel Admin"
-                : role === "asesor"
-                ? "Panel Asesor"
-                : role === "domiciliario"
-                ? "Panel Domiciliario"
-                : role === "cliente"
-                ? "Mi Cuenta"
-                : "Iniciar sesión"
-            }
-            onClick={handleUserClick}
-          >
-            <User size={22} />
-          </button>
+          <Tooltip title={role ? USER_TOOLTIP[role] ?? "Mi Cuenta" : "Iniciar sesión"}>
+            <button className="icon-btn" onClick={handleUserClick}>
+              <User size={22} />
+            </button>
+          </Tooltip>
 
           {/* LOGOUT */}
           {user && (
@@ -121,12 +117,14 @@ const Navbar: React.FC = () => {
           )}
 
           {/* CART */}
-          <button className="cart-wrapper-pro" onClick={goToCart}>
-            <ShoppingCart size={24} color="#1a1a1a" />
-            {totalItems > 0 && (
-              <span className="cart-badge-dynamic">{totalItems}</span>
-            )}
-          </button>
+          <Tooltip title="Carrito de compras">
+            <button className="cart-wrapper-pro" onClick={goToCart}>
+              <ShoppingCart size={24} color="#1a1a1a" />
+              {totalItems > 0 && (
+                <span className="cart-badge-dynamic">{totalItems}</span>
+              )}
+            </button>
+          </Tooltip>
         </div>
       </div>
     </header>

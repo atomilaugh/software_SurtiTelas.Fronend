@@ -1,4 +1,5 @@
 ﻿import React from 'react';
+import { Tooltip } from "@/shared/components/Tooltip";
 import {
   MessageCircle,
   MapPin,
@@ -60,44 +61,41 @@ const Footer: React.FC = () => {
 
           {/* Redes sociales */}
           <div className="footer-social-icons">
+            <Tooltip title="WhatsApp">
+              <a
+                href="https://wa.me/573245148316"
+                className="social-icon-btn"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="WhatsApp"
+              >
+                <MessageCircle size={22} />
+              </a>
+            </Tooltip>
 
-                      {/* WhatsApp */}
+            <Tooltip title="Instagram">
+              <a
+                href="https://www.instagram.com/_surticamisetas_?igsh=MXR4MnEwNHB2aThqag=="
+                className="social-icon-btn"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Instagram"
+              >
+                <FaInstagram size={22} />
+              </a>
+            </Tooltip>
 
-            <a
-
-              href="https://wa.me/573245148316"
-              className="social-icon-btn"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="WhatsApp"
-            >
-              <MessageCircle size={22} />
-            </a>
-
-
-
-            {/* Instagram */}
-            <a
-              href="https://www.instagram.com/_surticamisetas_?igsh=MXR4MnEwNHB2aThqag=="
-              className="social-icon-btn"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Instagram"
-            >
-              <FaInstagram size={22} />
-            </a>
-
-            {/* TikTok */}
-            <a
-              href="https://www.tiktok.com/@surti_camisetas"
-              className="social-icon-btn"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="TikTok"
-            >
-              <FaTiktok size={22} />
-            </a>
-
+            <Tooltip title="TikTok">
+              <a
+                href="https://www.tiktok.com/@surti_camisetas"
+                className="social-icon-btn"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="TikTok"
+              >
+                <FaTiktok size={22} />
+              </a>
+            </Tooltip>
           </div>
         </div>
 
@@ -184,15 +182,17 @@ const Footer: React.FC = () => {
       </div>
 
       {/* Botón flotante WhatsApp */}
-      <a
-        href="https://wa.me/573218267514"
-        className="whatsapp-float-btn"
-        target="_blank"
-        rel="noreferrer"
-        aria-label="WhatsApp"
-      >
-        <MessageCircle size={32} fill="currentColor" />
-      </a>
+      <Tooltip title="WhatsApp">
+        <a
+          href="https://wa.me/573218267514"
+          className="whatsapp-float-btn"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="WhatsApp"
+        >
+          <MessageCircle size={32} fill="currentColor" />
+        </a>
+      </Tooltip>
     </footer>
   );
 };

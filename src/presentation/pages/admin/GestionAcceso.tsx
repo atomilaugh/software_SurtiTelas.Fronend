@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, ToggleLeft } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
@@ -17,7 +17,7 @@ interface Acceso {
   estado: 'Activo' | 'Expirado' | 'Pendiente';
 }
 
-const mockAccesos: Acceso[] = [
+const mockAccesosInicial: Acceso[] = [
   { id: 'A-001', usuario: 'Carlos Martínez', rol: 'Administrador', modulo: 'Usuarios', permiso: 'Gestión completa', fechaAsignacion: '2024-01-15', expira: null, estado: 'Activo' },
   { id: 'A-002', usuario: 'Ana López', rol: 'Asesor', modulo: 'Pedidos', permiso: 'Crear y editar', fechaAsignacion: '2024-02-20', expira: '2024-12-31', estado: 'Activo' },
   { id: 'A-003', usuario: 'María González', rol: 'Producción', modulo: 'Talleres', permiso: 'Asignación', fechaAsignacion: '2024-03-10', expira: null, estado: 'Activo' },
@@ -29,18 +29,50 @@ export const AdminGestionAcceso: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedAcceso, setSelectedAcceso] = useState<Acceso | null>(null);
+  const [items, setItems] = useState<Acceso[]>(mockAccesosInicial);
+
+  const formRef = useRef<HTMLFormElement>(null);
 
   const filteredAccesos = useMemo(() => {
-    return mockAccesos.filter(a =>
+    return items.filter(a =>
       a.usuario.toLowerCase().includes(search.toLowerCase()) ||
       a.rol.toLowerCase().includes(search.toLowerCase()) ||
       a.modulo.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, items]);
 
   const handleCloseModal = () => {
     setModalOpen(false);
     setSelectedAcceso(null);
+  };
+
+  const handleSubmitAcceso = () => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const usuario = String(fd.get('usuario') ?? '').trim();
+    const rol = String(fd.get('rol') ?? '').trim();
+    const modulo = String(fd.get('modulo') ?? '').trim();
+    const permiso = String(fd.get('permiso') ?? '').trim();
+    const expiraRaw = String(fd.get('expira') ?? '').trim();
+    const expira = expiraRaw === '' ? null : expiraRaw;
+    if (selectedAcceso) {
+      setItems(prev => prev.map(it => it.id === selectedAcceso.id ? { ...it, usuario, rol, modulo, permiso, expira } : it));
+      toast.success('Acceso actualizado');
+    } else {
+      const nuevo: Acceso = {
+        id: `A-${String(items.length + 1).padStart(3, '0')}`,
+        usuario,
+        rol,
+        modulo,
+        permiso,
+        fechaAsignacion: new Date().toISOString().slice(0, 10),
+        expira,
+        estado: 'Activo',
+      };
+      setItems(prev => [nuevo, ...prev]);
+      toast.success('Acceso creado');
+    }
+    handleCloseModal();
   };
 
   const columns: DataTableColumn<Acceso>[] = [
@@ -118,11 +150,11 @@ export const AdminGestionAcceso: React.FC = () => {
               <button className={s.closeBtn} onClick={handleCloseModal}>×</button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form}>
+              <form className={s.form} ref={formRef}>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Usuario</label>
-                    <select className={s.select} defaultValue={selectedAcceso?.usuario}>
+                    <select className={s.select} name="usuario" defaultValue={selectedAcceso?.usuario}>
                       <option>Carlos Martínez</option>
                       <option>Ana López</option>
                       <option>Luis Pérez</option>
@@ -131,7 +163,7 @@ export const AdminGestionAcceso: React.FC = () => {
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Rol</label>
-                    <select className={s.select} defaultValue={selectedAcceso?.rol}>
+                    <select className={s.select} name="rol" defaultValue={selectedAcceso?.rol}>
                       <option>Administrador</option>
                       <option>Asesor</option>
                       <option>Almacén</option>
@@ -143,7 +175,7 @@ export const AdminGestionAcceso: React.FC = () => {
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Módulo</label>
-                    <select className={s.select} defaultValue={selectedAcceso?.modulo}>
+                    <select className={s.select} name="modulo" defaultValue={selectedAcceso?.modulo}>
                       <option>Usuarios</option>
                       <option>Inventario</option>
                       <option>Pedidos</option>
@@ -153,7 +185,7 @@ export const AdminGestionAcceso: React.FC = () => {
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Tipo de Permiso</label>
-                    <select className={s.select} defaultValue={selectedAcceso?.permiso}>
+                    <select className={s.select} name="permiso" defaultValue={selectedAcceso?.permiso}>
                       <option>Gestión completa</option>
                       <option>Crear y editar</option>
                       <option>Solo lectura</option>
@@ -163,13 +195,13 @@ export const AdminGestionAcceso: React.FC = () => {
                 </div>
                 <div className={s.field}>
                   <label className={s.label}>Fecha de expiración</label>
-                  <input type="date" className={s.input} defaultValue={selectedAcceso?.expira || ''} />
+                  <input type="date" className={s.input} name="expira" defaultValue={selectedAcceso?.expira || ''} />
                 </div>
                 <div className={s.formActions}>
                   <Button variant="secondary" onClick={handleCloseModal}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleCloseModal}>
+                  <Button onClick={handleSubmitAcceso}>
                     {selectedAcceso ? 'Guardar cambios' : 'Crear acceso'}
                   </Button>
                 </div>

@@ -6,6 +6,7 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import { Tooltip } from '@/shared/components/Tooltip';
 import { usePedidos } from '@/core/stores';
 import type { Pedido } from '@/core/types';
 
@@ -220,10 +221,10 @@ export const AsesorPedidos: React.FC = () => {
                   </td>
                   <td>
                     <div className={s.actions}>
-                      <button className={s.actionBtn} title="Ver detalle" onClick={() => openDetail(pedido)}>Ver</button>
-                      <button className={s.actionBtn} title="Editar" onClick={() => openEdit(pedido)}>Editar</button>
-                      <button className={s.actionBtn} title="Cambiar estado" onClick={() => openStatus(pedido)}>Estado</button>
-                      <button className={s.actionBtn} title="Eliminar" onClick={() => openDelete(pedido)}>Eliminar</button>
+                      <Tooltip title="Ver detalle"><button className={s.actionBtn} onClick={() => openDetail(pedido)}>Ver</button></Tooltip>
+                      <Tooltip title="Editar"><button className={s.actionBtn} onClick={() => openEdit(pedido)}>Editar</button></Tooltip>
+                      <Tooltip title="Cambiar estado"><button className={s.actionBtn} onClick={() => openStatus(pedido)}>Estado</button></Tooltip>
+                      <Tooltip title="Eliminar"><button className={s.actionBtn} onClick={() => openDelete(pedido)}>Eliminar</button></Tooltip>
                     </div>
                   </td>
                 </tr>

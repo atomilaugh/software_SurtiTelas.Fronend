@@ -107,9 +107,9 @@
 }
 
 .filterBtnActive {
-  background: #000000;
-  color: #ffffff;
-  border-color: #000000;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-color: var(--btn-primary-border);
   font-weight: 500;
 }
 

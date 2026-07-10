@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Settings2, Users, UserCog, Shield, Package, PackageOpen, Boxes, AlertTriangle, Archive, Factory, Workflow, ClipboardList, ShoppingCart, Receipt, UserSearch, BarChart3, TrendingUp, Users2, LineChart, Store } from 'lucide-react';
+import { LayoutDashboard, Settings2, Users, UserCog, Shield, Package, PackageOpen, Boxes, AlertTriangle, Archive, Factory, Workflow, ClipboardList, ShoppingCart, Receipt, UserSearch, BarChart3, TrendingUp, Users2, LineChart, Store, Truck, UserCheck, DollarSign, KeyRound } from 'lucide-react';
 import s from '../../../styles/admin/AdminLayout.module.css';
 import { Sidebar, SidebarItem } from '@/shared/layouts/Sidebar';
 import { useAuth } from '@/app/providers/AppProviders';
@@ -27,6 +27,8 @@ const adminMenu: SidebarItem[] = [
     subItems: [
       { icon: UserSearch, label: 'Gestión de Usuarios', key: 'gestion-usuarios' },
       { icon: Shield, label: 'Seguridad', key: 'seguridad' },
+      { icon: UserCheck, label: 'Asesores', key: 'asesores' },
+      { icon: KeyRound, label: 'Gestión de Acceso', key: 'gestion-acceso' },
     ],
   },
   {
@@ -36,6 +38,7 @@ const adminMenu: SidebarItem[] = [
     subItems: [
       { icon: PackageOpen, label: 'Productos Terminados', key: 'productos' },
       { icon: Boxes, label: 'Insumos', key: 'insumos' },
+      { icon: Package, label: 'Proveedores', key: 'proveedores' },
       { icon: AlertTriangle, label: 'Alertas de Stock', key: 'alertas-stock' },
       { icon: Archive, label: 'Stock Devuelto', key: 'stock-devuelto' },
     ],
@@ -52,12 +55,18 @@ const adminMenu: SidebarItem[] = [
     ],
   },
   {
+    icon: Truck,
+    label: 'Logística y Domicilios',
+    key: 'domicilios',
+  },
+  {
     icon: ShoppingCart,
     label: 'Ventas y Pedidos',
     key: 'ventas-pedidos',
     subItems: [
       { icon: ShoppingCart, label: 'Pedidos', key: 'pedidos' },
       { icon: Receipt, label: 'Recibos', key: 'facturacion' },
+      { icon: DollarSign, label: 'Pagos', key: 'pagos' },
       { icon: Users2, label: 'Clientes', key: 'clientes' },
     ],
   },
@@ -89,6 +98,16 @@ export const AdminLayout: React.FC = () => {
   }, [isCollapsed]);
 
   const handleLogout = async () => {
+    // Clean theme state scoped to dashboards so public pages remain unaffected
+    try {
+      window.localStorage.removeItem('dashboard-theme');
+      document.querySelectorAll<HTMLElement>('[data-dashboard-theme]').forEach(el => el.removeAttribute('data-theme'));
+      document.documentElement.removeAttribute('data-theme');
+      document.body?.removeAttribute('data-theme');
+    } catch (e) {
+      // ignore
+    }
+
     await logout();
     navigate('/login');
   };
@@ -124,7 +143,7 @@ export const AdminLayout: React.FC = () => {
   };
 
   return (
-    <div className={cn(s.appLayout, isCollapsed && s.collapsed)}>
+    <div data-dashboard-theme className={cn(s.appLayout, isCollapsed && s.collapsed)}>
       <Sidebar
         menu={adminMenu}
         basePath="/admin"

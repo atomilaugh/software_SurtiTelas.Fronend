@@ -11,6 +11,7 @@ import { Modal } from '@/shared/ui/Modal';
 import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
 import { AddTagInput } from '@/presentation/components/AddTagInput';
 import { ProductPreviewModal } from '@/presentation/components/ProductPreviewModal';
+import { ProductDetailModal } from '@/presentation/components/ProductDetailModal';
 import { useProductos, useAppStore } from '@/core/stores';
 import { useAuth } from '@/core/stores/authStore';
 import { productService } from '@/services/productService';
@@ -32,6 +33,8 @@ export const AdminCatalogo: React.FC = () => {
   const [previewProduct, setPreviewProduct] = useState<Producto | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Producto | null>(null);
+  const [detailProduct, setDetailProduct] = useState<Producto | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const publishingRef = React.useRef<Record<string, boolean>>({} as Record<string, boolean>);
   const [, setTick] = useState(0);
@@ -59,6 +62,7 @@ export const AdminCatalogo: React.FC = () => {
   const [oferta, setOferta] = useState(false);
   const [nuevo, setNuevo] = useState(false);
   const [masVendido, setMasVendido] = useState(false);
+  const [tela, setTela] = useState('');
 
   const filtered = useMemo(() => {
     return productos.filter(p =>
@@ -88,6 +92,7 @@ export const AdminCatalogo: React.FC = () => {
     setOferta(false);
     setNuevo(false);
     setMasVendido(false);
+    setTela('');
     setEditingRef(null);
     setFormError(null);
     setIsCreateOpen(false);
@@ -115,6 +120,7 @@ export const AdminCatalogo: React.FC = () => {
     setOferta(product.oferta || false);
     setNuevo(product.nuevo || false);
     setMasVendido(product.masVendido || false);
+    setTela(product.tela || '');
     setFormError(null);
     setIsEditOpen(true);
   };
@@ -160,7 +166,7 @@ export const AdminCatalogo: React.FC = () => {
         oferta,
         nuevo,
         masVendido,
-        tela: '',
+        tela,
         colores,
         tallas,
       };
@@ -224,6 +230,11 @@ export const AdminCatalogo: React.FC = () => {
   const handleOpenPreview = (product: Producto) => {
     setPreviewProduct(product);
     setPreviewOpen(true);
+  };
+
+  const handleOpenDetail = (product: Producto) => {
+    setDetailProduct(product);
+    setIsModalOpen(true);
   };
 
   const columns: DataTableColumn<Producto>[] = [
@@ -299,18 +310,23 @@ export const AdminCatalogo: React.FC = () => {
       align: 'center',
       render: (item: Producto) => {
         const status = publishStatus(item);
-        const config: { [K in PublicationStatus]: { variant: 'success' | 'warning' | 'danger'; icon: string } } = {
-          Publicado: { variant: 'success', icon: '🟢' },
-          Borrador: { variant: 'warning', icon: '🟡' },
-          Oculto: { variant: 'danger', icon: '🔴' },
+        const config: { [K in PublicationStatus]: { variant: 'success' | 'warning' | 'danger' } } = {
+          Publicado: { variant: 'success' },
+          Borrador: { variant: 'warning' },
+          Oculto: { variant: 'danger' },
         };
         const cfg = config[status];
-        return <Badge variant={cfg.variant} dot>{cfg.icon} {status}</Badge>;
+        return <Badge variant={cfg.variant} dot>{status}</Badge>;
       },
     },
   ];
 
   const actions: DataTableAction<Producto>[] = [
+    {
+      label: 'Ver más',
+      icon: <Eye size={14} />,
+      onClick: (item: Producto) => handleOpenDetail(item),
+    },
     {
       label: 'Vista previa',
       icon: <Eye size={14} />,
@@ -431,10 +447,10 @@ export const AdminCatalogo: React.FC = () => {
           </div>
 
           <div className={s.formRow}>
-            <div className={s.formGroup}>
-              <label>Tipo de Tela</label>
-              <input type="text" value="" onChange={() => {}} disabled placeholder="Solo lectura" style={{ opacity: 0.6 }} />
-            </div>
+              <div className={s.formGroup}>
+                <label>Tipo de Tela</label>
+                <input type="text" value={tela} onChange={(e) => setTela(e.target.value)} placeholder="Ej: Algodón, Poliéster" />
+              </div>
             <div className={s.formGroup}>
               <label>Marca</label>
               <input type="text" value={marca} onChange={e => setMarca(e.target.value)} placeholder="Marca" />
@@ -547,6 +563,23 @@ export const AdminCatalogo: React.FC = () => {
       />
 
       <ProductPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} product={previewProduct} />
+
+      {detailProduct && (
+        <ProductDetailModal
+          product={{
+            id: detailProduct.ref,
+            nombre: detailProduct.nombre,
+            precio: detailProduct.precio,
+            imagen: detailProduct.imagenPrincipal || detailProduct.imagenes?.[0],
+            categoria: detailProduct.categoria,
+            descripcion: detailProduct.descripcion || detailProduct.descripcionCorta,
+            tallas: detailProduct.tallas,
+            colores: detailProduct.colores,
+          }}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

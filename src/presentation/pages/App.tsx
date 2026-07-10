@@ -23,6 +23,8 @@ import { AdminGestionUsuarios } from '@/presentation/pages/admin/GestionUsuarios
 import { AdminSeguridadUsuarios } from '@/presentation/pages/admin/SeguridadUsuarios';
 import { AdminProductosTerminados } from '@/presentation/pages/admin/ProductosTerminados';
 import { AdminInsumos } from '@/presentation/pages/admin/Insumos';
+import { AdminProveedores } from '@/presentation/pages/admin/Proveedores';
+import { AdminGestionAcceso } from '@/presentation/pages/admin/GestionAcceso';
 import { AdminAlertasStock } from '@/presentation/pages/admin/AlertasStock';
 import { AdminStockDevuelto } from '@/presentation/pages/admin/StockDevuelto';
 import { AdminRegistroTalleres } from '@/presentation/pages/admin/RegistroTalleres';
@@ -64,6 +66,7 @@ import CatalogPage from '@/presentation/pages/features/CatalogPage';
 import CartPage from '@/presentation/pages/features/CartPage';
 import ContactPage from '@/presentation/pages/features/ContactPage';
 import AboutPage from '@/presentation/pages/public/AboutPage';
+import TooltipsDemo from '@/presentation/pages/public/TooltipsDemo';
 
 // AUTH
 import LoginPage from '@/presentation/pages/auth/LoginPage';
@@ -88,6 +91,7 @@ const App: React.FC = () => (
           <Route path="/carrito" element={<Layout><CartPage /></Layout>} />
           <Route path="/contacto" element={<Layout><ContactPage /></Layout>} />
           <Route path="/nosotros" element={<Layout><AboutPage /></Layout>} />
+          <Route path="/tooltips" element={<Layout><TooltipsDemo /></Layout>} />
 
           {/* AUTH */}
           <Route path="/login" element={<LoginPage />} />
@@ -117,6 +121,8 @@ const App: React.FC = () => (
             <Route path="seguridad" element={<AdminSeguridadUsuarios />} />
             <Route path="productos" element={<AdminProductosTerminados />} />
             <Route path="insumos" element={<AdminInsumos />} />
+            <Route path="proveedores" element={<AdminProveedores />} />
+            <Route path="gestion-acceso" element={<AdminGestionAcceso />} />
             <Route path="alertas-stock" element={<AdminAlertasStock />} />
             <Route path="stock-devuelto" element={<AdminStockDevuelto />} />
             <Route path="talleres" element={<AdminRegistroTalleres />} />

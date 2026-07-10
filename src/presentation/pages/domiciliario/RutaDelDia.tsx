@@ -59,6 +59,19 @@ export const RutaDelDia: React.FC = () => {
     setStatusEntrega(null);
   };
 
+  const optimizarRuta = () => {
+    setEntregas(prev => {
+      const orden: Record<Entrega['estado'], number> = { 'Pendiente': 0, 'En camino': 1, 'Fallido': 2, 'Entregado': 3 };
+      return [...prev].sort((a, b) => orden[a.estado] - orden[b.estado] || a.horaEstimada.localeCompare(b.horaEstimada));
+    });
+    toast.success('Ruta optimizada: pendientes primero, entregados al final');
+  };
+
+  const irAEntrega = (entrega: Entrega) => {
+    const query = encodeURIComponent(`${entrega.direccion}, ${entrega.barrio}`);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank', 'noopener');
+  };
+
   return (
     <div>
       <h1 className={s.pageTitle}>Ruta del Día</h1>
@@ -98,7 +111,7 @@ export const RutaDelDia: React.FC = () => {
         <div className={s.mapPanel}>
           <div className={s.mapHeader}>
             <div className={s.mapTitle}>Mapa de ruta</div>
-            <Button size="sm" variant="secondary" onClick={() => toast.info('Ruta optimizada con las entregas pendientes')}>Optimizar ruta</Button>
+            <Button size="sm" variant="secondary" onClick={optimizarRuta}>Optimizar ruta</Button>
           </div>
           <div className={s.mapPlaceholder}>
             <div className={s.mapGrid} />
@@ -123,7 +136,7 @@ export const RutaDelDia: React.FC = () => {
                   <div className={s.mapDetailAddress}>{selectedEntrega.direccion}, {selectedEntrega.barrio}</div>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => toast.info(`Navegando a ${selectedEntrega.direccion}, ${selectedEntrega.barrio}`)}>
+                  <Button size="sm" onClick={() => irAEntrega(selectedEntrega)}>
                     <Navigation size={14} />
                     Ir a entrega
                   </Button>

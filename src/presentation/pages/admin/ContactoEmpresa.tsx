@@ -77,7 +77,7 @@ export const AdminContactoEmpresa: React.FC = () => {
     }
   };
 
-  const getPrioridadColor = (prioridad: string) => {
+  const _getPrioridadColor = (prioridad: string) => {
     switch (prioridad) {
       case 'Alta': return s.prioridadAlta;
       case 'Media': return s.prioridadMedia;
@@ -296,7 +296,7 @@ export const AdminContactoEmpresa: React.FC = () => {
             </div>
           )},
           { key: 'prioridad', header: 'Prioridad', width: '100px', sortable: true, render: (m) => (
-            <span className={`${s.prioridadBadge} ${getPrioridadColor(m.prioridad)}`}>{m.prioridad}</span>
+            <Badge variant={m.prioridad === 'Alta' ? 'danger' : m.prioridad === 'Media' ? 'warning' : 'success'}>{m.prioridad}</Badge>
           )},
           { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
             { value: 'Nuevo', label: 'Nuevo' },

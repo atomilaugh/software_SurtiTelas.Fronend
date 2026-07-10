@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Moon, Download, Sun, Package, ShoppingCart, AlertTriangle, MessageSquare } from 'lucide-react';
 import s from './TopHeader.module.css';
 import { cn } from '@/shared/utils';
+import { Tooltip } from '@/shared/components/Tooltip';
 
 interface Notification {
   id: string;
@@ -25,6 +26,7 @@ interface TopHeaderProps {
   onToggleTheme: () => void;
   onExport?: () => void;
   onNotificationClick?: (path: string) => void;
+  notifications?: Notification[];
   darkMode?: boolean;
 }
 
@@ -50,6 +52,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onToggleTheme,
   onExport,
   onNotificationClick,
+  notifications = mockNotifications,
   darkMode = false,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -82,13 +85,15 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       <div className={s.headerRight}>
         <div className={s.notificationWrapper} ref={dropdownRef}>
-          <button
-            className={s.iconBtn}
-            onClick={() => setShowNotifications(!showNotifications)}
-            aria-label="Notificaciones"
-          >
-            <Bell size={20} />
-          </button>
+          <Tooltip title="Notificaciones">
+            <button
+              className={s.iconBtn}
+              onClick={() => setShowNotifications(!showNotifications)}
+              aria-label="Notificaciones"
+            >
+              <Bell size={20} />
+            </button>
+          </Tooltip>
           {notificationCount > 0 && (
             <span className={s.badge}>{notificationCount}</span>
           )}
@@ -99,7 +104,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 <span className={s.notificationsCount}>{notificationCount} nuevas</span>
               </div>
               <div className={s.notificationsList}>
-                {mockNotifications.map((notification) => (
+                {notifications.map((notification) => (
                   <div
                     key={notification.id}
                     className={cn(s.notificationItem, !notification.read && s.unread)}
@@ -118,7 +123,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     {!notification.read && <div className={s.unreadDot} />}
                   </div>
                 ))}
-                {mockNotifications.length === 0 && (
+                {notifications.length === 0 && (
                   <div className={s.emptyNotifications}>
                     <Bell size={32} className={s.emptyIcon} />
                     <p>No hay notificaciones nuevas</p>
@@ -129,19 +134,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           )}
         </div>
 
-        <button
-          className={s.iconBtn}
-          onClick={onToggleTheme}
-          aria-label="Cambiar tema"
-        >
-          {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        <Tooltip title="Cambiar tema">
+          <button
+            className={s.iconBtn}
+            onClick={onToggleTheme}
+            aria-label="Cambiar tema"
+          >
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </Tooltip>
 
         {showExport && (
-          <button className={s.exportBtn} onClick={onExport}>
-            <Download size={16} />
-            <span>Exportar</span>
-          </button>
+          <Tooltip title="Exportar">
+            <button className={s.exportBtn} onClick={onExport}>
+              <Download size={16} />
+              <span>Exportar</span>
+            </button>
+          </Tooltip>
         )}
 
         <div className={s.userProfile}>

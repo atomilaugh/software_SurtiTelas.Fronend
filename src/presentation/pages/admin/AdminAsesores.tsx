@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, Edit, User, Users, BarChart3, Calendar } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
@@ -16,7 +16,7 @@ interface Asesor {
   estado: 'Activo' | 'Inactivo';
 }
 
-const mockAsesores: Asesor[] = [
+const mockAsesoresInicial: Asesor[] = [
   { id: 'AS-001', nombre: 'Camila Torres', email: 'camila@surtitelas.com', tel: '310 234 5678', clientes: 24, comisiones: '$4.2M', estado: 'Activo' },
   { id: 'AS-002', nombre: 'Luis Herrera', email: 'luis@surtitelas.com', tel: '311 345 6789', clientes: 18, comisiones: '$2.8M', estado: 'Activo' },
   { id: 'AS-003', nombre: 'Pedro Gómez', email: 'pedro@surtitelas.com', tel: '312 456 7890', clientes: 12, comisiones: '$1.9M', estado: 'Activo' },
@@ -28,11 +28,41 @@ export const AdminAsesores: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedAsesor, setSelectedAsesor] = useState<Asesor | null>(null);
+  const [items, setItems] = useState<Asesor[]>(mockAsesoresInicial);
 
-  const filteredAsesores = mockAsesores.filter(a =>
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const filteredAsesores = items.filter(a =>
     a.nombre.toLowerCase().includes(search.toLowerCase()) ||
     a.email.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleSubmitAsesor = () => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const nombre = String(fd.get('nombre') ?? '').trim();
+    const email = String(fd.get('email') ?? '').trim();
+    const tel = String(fd.get('tel') ?? '').trim();
+    const estado = (String(fd.get('estado') ?? 'Activo') || 'Activo') as Asesor['estado'];
+    if (selectedAsesor) {
+      setItems(prev => prev.map(it => it.id === selectedAsesor.id ? { ...it, nombre, email, tel, estado } : it));
+      toast.success('Asesor actualizado');
+    } else {
+      const nuevo: Asesor = {
+        id: `AS-${String(items.length + 1).padStart(3, '0')}`,
+        nombre,
+        email,
+        tel,
+        clientes: 0,
+        comisiones: '$0',
+        estado,
+      };
+      setItems(prev => [nuevo, ...prev]);
+      toast.success('Asesor creado');
+    }
+    setModalOpen(false);
+    setSelectedAsesor(null);
+  };
 
   const columns: DataTableColumn<Asesor>[] = [
     { key: 'id', header: 'ID', sortable: true },
@@ -122,25 +152,25 @@ export const AdminAsesores: React.FC = () => {
               <button className={s.closeBtn} onClick={() => { setModalOpen(false); setSelectedAsesor(null); }}>×</button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form}>
+              <form className={s.form} ref={formRef}>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Nombre</label>
-                    <input type="text" className={s.input} defaultValue={selectedAsesor?.nombre} />
+                    <input type="text" className={s.input} name="nombre" defaultValue={selectedAsesor?.nombre} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Email</label>
-                    <input type="email" className={s.input} defaultValue={selectedAsesor?.email} />
+                    <input type="email" className={s.input} name="email" defaultValue={selectedAsesor?.email} />
                   </div>
                 </div>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Teléfono</label>
-                    <input type="text" className={s.input} defaultValue={selectedAsesor?.tel} />
+                    <input type="text" className={s.input} name="tel" defaultValue={selectedAsesor?.tel} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Estado</label>
-                    <select className={s.select} defaultValue={selectedAsesor?.estado}>
+                    <select className={s.select} name="estado" defaultValue={selectedAsesor?.estado}>
                       <option>Activo</option>
                       <option>Inactivo</option>
                     </select>
@@ -150,7 +180,7 @@ export const AdminAsesores: React.FC = () => {
                   <Button variant="secondary" onClick={() => { setModalOpen(false); setSelectedAsesor(null); }}>
                     Cancelar
                   </Button>
-                  <Button onClick={() => { setModalOpen(false); setSelectedAsesor(null); }}>
+                  <Button onClick={handleSubmitAsesor}>
                     {selectedAsesor ? 'Guardar cambios' : 'Crear asesor'}
                   </Button>
                 </div>

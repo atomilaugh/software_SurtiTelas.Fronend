@@ -2,8 +2,10 @@ import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Edit2, Check, Image as ImageIcon, User } from 'lucide-react';
 import s from './PerfilDomiciliario.module.css';
+import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
+import { Tooltip } from '@/shared/components/Tooltip';
 
 export const DomiciliarioPerfil: React.FC = () => {
   const [nombre, setNombre] = useState('Juan Pérez');
@@ -53,15 +55,14 @@ export const DomiciliarioPerfil: React.FC = () => {
         <div className={s.perfilCard}>
           <div className={s.avatar}>
             J
-            <button className={s.avatarEditBtn} title="Cambiar foto" type="button" onClick={() => setIsAvatarOpen(true)}>
+            <Tooltip title="Cambiar foto"><button className={s.avatarEditBtn} type="button" onClick={() => setIsAvatarOpen(true)}>
               <Edit2 size={14} />
-            </button>
+            </button></Tooltip>
           </div>
           <div className={s.perfilName}>{nombre}</div>
           <div className={s.perfilEmail}>juan.p@surtitelas.com</div>
           <div className={s.rolTag}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-info)' }} />
-            Domiciliario
+            <Badge variant="success" dot>Domiciliario</Badge>
           </div>
           <div className={s.perfilStats}>
             <div className={s.perfilStat}>

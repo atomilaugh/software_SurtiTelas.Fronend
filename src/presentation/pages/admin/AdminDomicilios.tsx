@@ -25,8 +25,9 @@ const mockDomiciliarios: Domiciliario[] = [
 
 export const AdminDomicilios: React.FC = () => {
   const [search, setSearch] = useState('');
+  const [domiciliarios, setDomiciliarios] = useState<Domiciliario[]>(mockDomiciliarios);
 
-  const filteredDomiciliarios = mockDomiciliarios.filter(d =>
+  const filteredDomiciliarios = domiciliarios.filter(d =>
     d.nombre.toLowerCase().includes(search.toLowerCase()) ||
     d.zona.toLowerCase().includes(search.toLowerCase())
   );
@@ -66,7 +67,10 @@ export const AdminDomicilios: React.FC = () => {
   };
 
   const actions: DataTableAction<Domiciliario>[] = [
-    { label: 'Editar', icon: <Edit size={14} />, onClick: () => toast.info('Editar domiciliario') },
+    { label: 'Editar', icon: <Edit size={14} />, onClick: (item) => {
+      setDomiciliarios(prev => prev.map(d => d.id === item.id ? { ...d, estado: d.estado === 'Activo' ? 'Inactivo' : 'Activo' } : d));
+      toast.info(`Domiciliario "${item.nombre}" ${item.estado === 'Activo' ? 'desactivado' : 'activado'}`);
+    } },
   ];
 
   return (

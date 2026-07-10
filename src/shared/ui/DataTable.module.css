@@ -638,9 +638,9 @@
 }
 
 .pageButtonActive {
-  border-color: #000000 !important;
-  background: #000000 !important;
-  color: #ffffff !important;
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent) !important;
+  color: var(--color-bg-primary) !important;
 }
 
 @media (max-width: 760px) {

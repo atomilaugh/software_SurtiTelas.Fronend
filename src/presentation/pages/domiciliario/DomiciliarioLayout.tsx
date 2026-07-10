@@ -31,6 +31,15 @@ export const DomiciliarioLayout: React.FC = () => {
   }, [isCollapsed]);
 
   const handleLogout = async () => {
+    try {
+      window.localStorage.removeItem('dashboard-theme');
+      document.querySelectorAll<HTMLElement>('[data-dashboard-theme]').forEach(el => el.removeAttribute('data-theme'));
+      document.documentElement.removeAttribute('data-theme');
+      document.body?.removeAttribute('data-theme');
+    } catch (e) {
+      // ignore
+    }
+
     await logout();
     navigate('/login');
   };
@@ -44,7 +53,7 @@ export const DomiciliarioLayout: React.FC = () => {
   };
 
   return (
-    <div className={cn(s.appLayout, isCollapsed && s.collapsed)}>
+    <div data-dashboard-theme className={cn(s.appLayout, isCollapsed && s.collapsed)}>
       <Sidebar
         menu={domiciliarioMenu}
         basePath="/domiciliario"
@@ -69,6 +78,11 @@ export const DomiciliarioLayout: React.FC = () => {
           onSearch={() => {}}
           onToggleTheme={toggleTheme}
           onNotificationClick={handleNotificationClick}
+          notifications={[
+            { id: '1', title: 'Nueva entrega', message: 'Tienes una nueva entrega asignada', time: 'Hace 5 min', type: 'order', read: false, path: '/domiciliario/entregas' },
+            { id: '2', title: 'Entrega retrasada', message: 'Una entrega presenta retraso', time: 'Hace 1 hora', type: 'stock', read: false, path: '/domiciliario/ruta' },
+            { id: '3', title: 'Mensaje', message: 'Tienes un nuevo mensaje de soporte', time: 'Hace 2 horas', type: 'message', read: true, path: '/domiciliario/dashboard' },
+          ]}
           darkMode={darkMode}
         />
         <main className={s.pageContent}><Outlet /></main>

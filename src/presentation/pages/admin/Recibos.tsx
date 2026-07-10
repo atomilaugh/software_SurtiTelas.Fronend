@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Download, FileText, Printer, Clock, CheckCircle, AlertTriangle, Plus, Edit, Send, DollarSign, ChevronDown, Calendar } from 'lucide-react';
+import { Download, FileText, Printer, Clock, CheckCircle, AlertTriangle, Plus, Edit, Send, DollarSign, ChevronDown, Calendar, Save, Trash2 } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Recibos.module.css';
+import f from '@/styles/Form.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { Modal } from '@/shared/ui/Modal';
 
 interface Recibo {
   id: string;
@@ -31,7 +33,7 @@ interface ItemRecibo {
   total: number;
 }
 
-const mockRecibos: Recibo[] = [
+const recibosIniciales: Recibo[] = [
   {
     id: 'REC-001',
     numeroRecibo: 'R001-2024',
@@ -137,26 +139,150 @@ const mockRecibos: Recibo[] = [
   },
 ];
 
+interface ItemForm {
+  id: string;
+  descripcion: string;
+  cantidad: string;
+  precioUnitario: string;
+}
+
+const metodosPago: NonNullable<Recibo['metodoPago']>[] = ['Efectivo', 'Transferencia', 'Tarjeta', 'Credito'];
+
 export const AdminRecibos: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Borrador' | 'Enviado' | 'Pagado' | 'Vencido' | 'Cancelado'>('Todos');
-  const [_modalOpen, _setModalOpen] = useState(false);
-  const [_selectedRecibo, _setSelectedRecibo] = useState<Recibo | null>(null);
+  const [recibos, setRecibos] = useState<Recibo[]>(recibosIniciales);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [cliente, setCliente] = useState('');
+  const [nitCliente, setNitCliente] = useState('');
+  const [vendedor, setVendedor] = useState('');
+  const [fechaEmision, setFechaEmision] = useState(new Date().toISOString().slice(0, 10));
+  const [fechaVencimiento, setFechaVencimiento] = useState('');
+  const [metodoPago, setMetodoPago] = useState<'' | NonNullable<Recibo['metodoPago']>>('');
+  const [items, setItems] = useState<ItemForm[]>([
+    { id: 'I1', descripcion: '', cantidad: '', precioUnitario: '' },
+  ]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const hoy = new Date().toISOString().slice(0, 10);
 
   const filteredRecibos = useMemo(() => {
-    return mockRecibos.filter(r =>
+    return recibos.filter(r =>
       (filtroEstado === 'Todos' || r.estado === filtroEstado) &&
       (r.numeroRecibo.toLowerCase().includes(search.toLowerCase()) ||
        r.cliente.toLowerCase().includes(search.toLowerCase()) ||
        r.nitCliente.toLowerCase().includes(search.toLowerCase()) ||
        r.vendedor.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [search, filtroEstado]);
+  }, [recibos, search, filtroEstado]);
 
-  const _handleVerDetalle = (recibo: Recibo) => {
-    _setSelectedRecibo(recibo);
-    _setModalOpen(true);
+  const subtotal = items.reduce((sum, it) => sum + (Number(it.cantidad) || 0) * (Number(it.precioUnitario) || 0), 0);
+  const iva = Math.round(subtotal * 0.19);
+  const total = subtotal + iva;
+
+  const resetForm = () => {
+    setCliente('');
+    setNitCliente('');
+    setVendedor('');
+    setFechaEmision(hoy);
+    setFechaVencimiento('');
+    setMetodoPago('');
+    setItems([{ id: 'I1', descripcion: '', cantidad: '', precioUnitario: '' }]);
+    setFormError(null);
+  };
+
+  const openModal = (recibo?: Recibo) => {
+    if (recibo) {
+      setCliente(recibo.cliente);
+      setNitCliente(recibo.nitCliente);
+      setVendedor(recibo.vendedor);
+      setFechaEmision(recibo.fechaEmision);
+      setFechaVencimiento(recibo.fechaVencimiento);
+      setMetodoPago(recibo.metodoPago || '');
+      setItems(recibo.items.map(it => ({ id: it.id, descripcion: it.descripcion, cantidad: String(it.cantidad), precioUnitario: String(it.precioUnitario) })));
+      setEditingId(recibo.id);
+    } else {
+      resetForm();
+      setEditingId(null);
+    }
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSaving(false);
+    setFormError(null);
+    setEditingId(null);
+  };
+
+  const updateItem = (id: string, field: keyof ItemForm, value: string) => {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
+  };
+
+  const addItem = () => {
+    setItems(prev => [...prev, { id: `I${prev.length + 1}-${Date.now()}`, descripcion: '', cantidad: '', precioUnitario: '' }]);
+  };
+
+  const removeItem = (id: string) => {
+    setItems(prev => prev.length > 1 ? prev.filter(it => it.id !== id) : prev);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    if (!cliente.trim()) { setFormError('El cliente es obligatorio'); return; }
+    if (!nitCliente.trim()) { setFormError('El NIT del cliente es obligatorio'); return; }
+    const itemsValidos = items.filter(it => it.descripcion.trim() && Number(it.cantidad) > 0 && Number(it.precioUnitario) > 0);
+    if (itemsValidos.length === 0) { setFormError('Debes agregar al menos un artículo válido'); return; }
+    setSaving(true);
+    const itemsRecibo: ItemRecibo[] = itemsValidos.map((it, idx) => {
+      const cantidad = Number(it.cantidad);
+      const precioUnitario = Number(it.precioUnitario);
+      return {
+        id: it.id || `I${idx + 1}`,
+        descripcion: it.descripcion.trim(),
+        cantidad,
+        precioUnitario,
+        total: cantidad * precioUnitario,
+      };
+    });
+    if (editingId) {
+      setRecibos(prev => prev.map(r => r.id === editingId ? {
+        ...r,
+        cliente: cliente.trim(),
+        nitCliente: nitCliente.trim(),
+        vendedor: vendedor.trim() || 'Sin asignar',
+        fechaEmision,
+        fechaVencimiento: fechaVencimiento || fechaEmision,
+        items: itemsRecibo,
+        metodoPago: metodoPago || undefined,
+      } : r));
+      toast.success('Recibo actualizado correctamente');
+    } else {
+      const secuencia = String(recibos.length + 1).padStart(3, '0');
+      const nuevo: Recibo = {
+        id: `REC-${secuencia}`,
+        numeroRecibo: `R${secuencia}-${new Date().getFullYear()}`,
+        cliente: cliente.trim(),
+        nitCliente: nitCliente.trim(),
+        fechaEmision,
+        fechaVencimiento: fechaVencimiento || fechaEmision,
+        subtotal,
+        iva,
+        total,
+        estado: 'Borrador',
+        metodoPago: metodoPago || undefined,
+        vendedor: vendedor.trim() || 'Sin asignar',
+        items: itemsRecibo,
+      };
+      setRecibos(prev => [nuevo, ...prev]);
+      toast.success(`Recibo ${nuevo.numeroRecibo} creado`);
+    }
+    closeModal();
   };
 
   const getEstadoBadge = (estado: string) => {
@@ -175,11 +301,11 @@ export const AdminRecibos: React.FC = () => {
   };
 
   const stats = {
-    totalRecibos: mockRecibos.filter(r => r.estado !== 'Cancelado').reduce((sum, r) => sum + r.total, 0),
-    pendientes: mockRecibos.filter(r => r.estado === 'Enviado').length,
-    pagados: mockRecibos.filter(r => r.estado === 'Pagado').length,
-    vencidos: mockRecibos.filter(r => r.estado === 'Vencido').length,
-    pendientesMonto: mockRecibos.filter(r => r.estado === 'Enviado' || r.estado === 'Vencido').reduce((sum, r) => sum + r.total, 0),
+    totalRecibos: recibos.filter(r => r.estado !== 'Cancelado').reduce((sum, r) => sum + r.total, 0),
+    pendientes: recibos.filter(r => r.estado === 'Enviado').length,
+    pagados: recibos.filter(r => r.estado === 'Pagado').length,
+    vencidos: recibos.filter(r => r.estado === 'Vencido').length,
+    pendientesMonto: recibos.filter(r => r.estado === 'Enviado' || r.estado === 'Vencido').reduce((sum, r) => sum + r.total, 0),
   };
 
   return (
@@ -193,7 +319,7 @@ export const AdminRecibos: React.FC = () => {
           <Button variant="secondary" leftIcon={<Download size={16} />} onClick={() => toast.success('Exportando recibos...')}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={16} />} onClick={() => toast.info('Formulario de nuevo recibo')}>
+          <Button leftIcon={<Plus size={16} />} onClick={() => openModal()}>
             Nuevo Recibo
           </Button>
         </div>
@@ -305,9 +431,9 @@ export const AdminRecibos: React.FC = () => {
             )},
           ]}
           actions={(r) => [
-            ...(r.estado === 'Borrador' || r.estado === 'Enviado' ? [{ label: 'Editar', icon: <Edit size={14} />, onClick: () => toast.info(`Editando ${r.numeroRecibo}`) }] : []),
-            ...(r.estado === 'Borrador' ? [{ label: 'Enviar', icon: <Send size={14} />, onClick: () => toast.success(`Recibo ${r.numeroRecibo} enviado`) }] : []),
-            ...(r.estado === 'Enviado' ? [{ label: 'Marcar pagado', icon: <CheckCircle size={14} />, onClick: () => toast.success(`Recibo ${r.numeroRecibo} marcado como pagado`) }] : []),
+            ...(r.estado === 'Borrador' || r.estado === 'Enviado' ? [{ label: 'Editar', icon: <Edit size={14} />, onClick: () => openModal(r) }] : []),
+            ...(r.estado === 'Borrador' ? [{ label: 'Enviar', icon: <Send size={14} />, onClick: () => { setRecibos(prev => prev.map(rc => rc.id === r.id ? { ...rc, estado: 'Enviado' } : rc)); toast.success(`Recibo ${r.numeroRecibo} enviado`); } }] : []),
+            ...(r.estado === 'Enviado' ? [{ label: 'Marcar pagado', icon: <CheckCircle size={14} />, onClick: () => { setRecibos(prev => prev.map(rc => rc.id === r.id ? { ...rc, estado: 'Pagado' } : rc)); toast.success(`Recibo ${r.numeroRecibo} marcado como pagado`); } }] : []),
           ]}
           detailPanel={{
             title: (r) => `Recibo ${r.numeroRecibo}`,
@@ -339,15 +465,115 @@ export const AdminRecibos: React.FC = () => {
                     <div className={`${s.totalRow} ${s.totalRowFinal}`}><span>Total:</span><span>{formatCurrency(r.total)}</span></div>
                   </div>
                 </div>
-                <div className={s.modalActions}>
-                  <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-                   <Button variant="secondary" leftIcon={<Printer size={16} />} onClick={() => toast.info(`Imprimiendo ${r.numeroRecibo}`)}>Imprimir</Button>
-                </div>
+                 <div className={s.modalActions}>
+                   <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+                    <Button variant="secondary" leftIcon={<Printer size={16} />} onClick={() => { window.print(); toast.info(`Imprimiendo ${r.numeroRecibo}`); }}>Imprimir</Button>
+                 </div>
               </div>
             ),
           }}
         />
-      </div>
+
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title="Crear Nuevo Recibo"
+        description="Registra un recibo con sus artículos y totals"
+        size="xl"
+        variant="form"
+      >
+        <form onSubmit={handleSubmit} className={f.form}>
+          {formError && <div className={f.formError}>{formError}</div>}
+
+          <div className={f.formRow}>
+            <div className={f.field}>
+              <label className={f.label}>Cliente *</label>
+              <input className={f.input} value={cliente} onChange={e => setCliente(e.target.value)} placeholder="Ej: Tienda La Esquina" />
+            </div>
+            <div className={f.field}>
+              <label className={f.label}>NIT *</label>
+              <input className={f.input} value={nitCliente} onChange={e => setNitCliente(e.target.value)} placeholder="Ej: 900123456-1" />
+            </div>
+          </div>
+
+          <div className={f.formRow}>
+            <div className={f.field}>
+              <label className={f.label}>Vendedor</label>
+              <input className={f.input} value={vendedor} onChange={e => setVendedor(e.target.value)} placeholder="Ej: Juan Pérez" />
+            </div>
+            <div className={f.field}>
+              <label className={f.label}>Método de pago</label>
+              <select className={f.select} value={metodoPago} onChange={e => setMetodoPago(e.target.value as NonNullable<Recibo['metodoPago']>)}>
+                <option value="">Sin especificar</option>
+                {metodosPago.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className={f.formRow}>
+            <div className={f.field}>
+              <label className={f.label}>Fecha de emisión *</label>
+              <input className={f.input} type="date" value={fechaEmision} onChange={e => setFechaEmision(e.target.value)} />
+            </div>
+            <div className={f.field}>
+              <label className={f.label}>Fecha de vencimiento</label>
+              <input className={f.input} type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
+            </div>
+          </div>
+
+          <div className={f.field}>
+            <label className={f.label}>Artículos del recibo</label>
+            <table className={f.itemsTable}>
+              <thead>
+                <tr>
+                  <th>Descripción</th>
+                  <th className={f.centerCol}>Cant.</th>
+                  <th className={f.rightCol}>Precio unit.</th>
+                  <th className={f.rightCol}>Total</th>
+                  <th style={{ width: 40 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(it => {
+                  const tot = (Number(it.cantidad) || 0) * (Number(it.precioUnitario) || 0);
+                  return (
+                    <tr key={it.id}>
+                      <td><input className={f.input} value={it.descripcion} onChange={e => updateItem(it.id, 'descripcion', e.target.value)} placeholder="Descripción del artículo" /></td>
+                      <td className={f.centerCol}><input className={f.input} type="number" min="1" value={it.cantidad} onChange={e => updateItem(it.id, 'cantidad', e.target.value)} /></td>
+                      <td className={f.rightCol}><input className={f.input} type="number" min="0" value={it.precioUnitario} onChange={e => updateItem(it.id, 'precioUnitario', e.target.value)} /></td>
+                      <td className={f.rightCol} style={{ fontWeight: 600 }}>{formatCurrency(tot)}</td>
+                      <td>
+                        <button type="button" className={f.removeRowBtn} onClick={() => removeItem(it.id)} aria-label="Eliminar artículo" disabled={items.length === 1}>
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <button type="button" className={f.addRowBtn} onClick={addItem}>
+              <Plus size={14} /> Agregar artículo
+            </button>
+          </div>
+
+          <div className={f.totalsBox}>
+            <div className={f.totalRow}><span>Subtotal:</span><span>{formatCurrency(subtotal)}</span></div>
+            <div className={f.totalRow}><span>IVA (19%):</span><span>{formatCurrency(iva)}</span></div>
+            <div className={`${f.totalRow} ${f.totalRowFinal}`}><span>Total:</span><span>{formatCurrency(total)}</span></div>
+          </div>
+
+          <div className={f.formActions}>
+            <Button type="button" variant="secondary" onClick={closeModal} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={saving} leftIcon={<Save size={16} />}>
+              Crear recibo
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
   );
 };
 

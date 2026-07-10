@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, ToggleLeft, Shield, User, Truck } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Permisos.module.css';
 import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
+import { useDelegatedTooltips } from '@/shared/components/Tooltip';
 
 interface Permiso {
   id: string;
@@ -24,7 +25,7 @@ const rolLabels: Record<string, string> = {
   cliente: 'Cliente',
 };
 
-const mockPermisos: Permiso[] = [
+const mockPermisosInicial: Permiso[] = [
   { id: 'P-001', nombre: 'Gestión de usuarios', descripcion: 'Crear, editar y eliminar usuarios', modulo: 'Usuarios', tipo: 'Administrador', roles: 2, estado: 'Activo', rolesAsignados: ['admin'] },
   { id: 'P-002', nombre: 'Ver usuarios', descripcion: 'Visualizar lista de usuarios', modulo: 'Usuarios', tipo: 'Lectura', roles: 4, estado: 'Activo', rolesAsignados: ['admin', 'asesor', 'domiciliario'] },
   { id: 'P-003', nombre: 'Gestión de insumos', descripcion: 'Crear y editar insumos', modulo: 'Inventario', tipo: 'Escritura', roles: 2, estado: 'Activo', rolesAsignados: ['admin', 'asesor'] },
@@ -37,8 +38,13 @@ export const AdminPermisos: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPermiso, setSelectedPermiso] = useState<Permiso | null>(null);
+  const [items, setItems] = useState<Permiso[]>(mockPermisosInicial);
 
-  const filteredPermisos = mockPermisos.filter(p =>
+  const tableRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  useDelegatedTooltips(tableRef, { placement: 'top' });
+
+  const filteredPermisos = items.filter(p =>
     p.nombre.toLowerCase().includes(search.toLowerCase()) ||
     p.descripcion.toLowerCase().includes(search.toLowerCase()) ||
     p.modulo.toLowerCase().includes(search.toLowerCase())
@@ -47,6 +53,34 @@ export const AdminPermisos: React.FC = () => {
   const handleCloseModal = () => {
     setModalOpen(false);
     setSelectedPermiso(null);
+  };
+
+  const handleSubmitPermiso = () => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const nombre = String(fd.get('nombre') ?? '').trim();
+    const descripcion = String(fd.get('descripcion') ?? '').trim();
+    const modulo = String(fd.get('modulo') ?? '').trim();
+    const tipo = (String(fd.get('tipo') ?? '') || 'Lectura') as Permiso['tipo'];
+    const rolesAsignados = fd.getAll('roles') as string[];
+    if (selectedPermiso) {
+      setItems(prev => prev.map(it => it.id === selectedPermiso.id ? { ...it, nombre, descripcion, modulo, tipo, rolesAsignados } : it));
+      toast.success('Permiso actualizado');
+    } else {
+      const nuevo: Permiso = {
+        id: `P-${String(items.length + 1).padStart(3, '0')}`,
+        nombre,
+        descripcion,
+        modulo,
+        tipo,
+        roles: rolesAsignados.length,
+        estado: 'Activo',
+        rolesAsignados,
+      };
+      setItems(prev => [nuevo, ...prev]);
+      toast.success('Permiso creado');
+    }
+    handleCloseModal();
   };
 
   return (
@@ -73,7 +107,7 @@ export const AdminPermisos: React.FC = () => {
         />
       </div>
 
-      <div className={s.tableWrapper}>
+      <div className={s.tableWrapper} ref={tableRef}>
         <table className={s.table}>
           <thead>
             <tr>
@@ -118,15 +152,15 @@ export const AdminPermisos: React.FC = () => {
                 </td>
                 <td>
                   <div className={s.actions}>
-                    <button className={s.actionBtn} title="Editar" onClick={() => { setSelectedPermiso(permiso); setModalOpen(true); }}>
-                      <Edit size={14} />
-                    </button>
-                    <button className={`${s.actionBtn} ${s.actionBtnToggle}`} title={permiso.estado === 'Activo' ? 'Desactivar' : 'Activar'} onClick={() => toast.info('Permiso actualizado')}>
-                      <ToggleLeft size={14} />
-                    </button>
-                    <button className={`${s.actionBtn} ${s.actionBtnDanger}`} title="Eliminar" onClick={() => { if (confirm(`¿Eliminar permiso?`)) toast.success('Permiso eliminado'); }}>
-                      <Trash2 size={14} />
-                    </button>
+                    <button className={s.actionBtn} data-bs-toggle="tooltip" data-bs-title="Editar" onClick={() => { setSelectedPermiso(permiso); setModalOpen(true); }}>
+                       <Edit size={14} />
+                     </button>
+                     <button className={`${s.actionBtn} ${s.actionBtnToggle}`} data-bs-toggle="tooltip" data-bs-title={permiso.estado === 'Activo' ? 'Desactivar' : 'Activar'} onClick={() => toast.info('Permiso actualizado')}>
+                       <ToggleLeft size={14} />
+                     </button>
+                     <button className={`${s.actionBtn} ${s.actionBtnDanger}`} data-bs-toggle="tooltip" data-bs-title="Eliminar" onClick={() => { if (confirm(`¿Eliminar permiso?`)) toast.success('Permiso eliminado'); }}>
+                       <Trash2 size={14} />
+                     </button>
                   </div>
                 </td>
               </tr>
@@ -145,15 +179,15 @@ export const AdminPermisos: React.FC = () => {
               <button className={s.closeBtn} onClick={handleCloseModal}>×</button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form}>
+              <form className={s.form} ref={formRef}>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Nombre del Permiso</label>
-                    <input type="text" className={s.input} defaultValue={selectedPermiso?.nombre} />
+                    <input type="text" className={s.input} name="nombre" defaultValue={selectedPermiso?.nombre} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Módulo</label>
-                    <select className={s.select} defaultValue={selectedPermiso?.modulo}>
+                    <select className={s.select} name="modulo" defaultValue={selectedPermiso?.modulo}>
                       <option>Usuarios</option>
                       <option>Inventario</option>
                       <option>Reportes</option>
@@ -164,14 +198,14 @@ export const AdminPermisos: React.FC = () => {
                 </div>
                 <div className={s.field}>
                   <label className={s.label}>Descripción</label>
-                  <textarea className={s.textarea} placeholder="Descripción del permiso..." defaultValue={selectedPermiso?.descripcion} />
+                  <textarea className={s.textarea} placeholder="Descripción del permiso..." name="descripcion" defaultValue={selectedPermiso?.descripcion} />
                 </div>
                 <div className={s.field}>
                   <label className={s.label}>Tipo de permiso</label>
                   <div className={s.tipoOptions}>
                     {['Lectura', 'Escritura', 'Administrador'].map(tipo => (
                       <label key={tipo} className={s.tipoRadio}>
-                        <input type="radio" name="tipo" defaultChecked={selectedPermiso?.tipo === tipo} />
+                        <input type="radio" name="tipo" value={tipo} defaultChecked={selectedPermiso?.tipo === tipo} />
                         <span>{tipo}</span>
                       </label>
                     ))}
@@ -182,10 +216,12 @@ export const AdminPermisos: React.FC = () => {
                   <div className={s.rolesCheckboxGroup}>
                     {(['admin', 'asesor', 'domiciliario', 'cliente'] as const).map(rol => (
                       <label key={rol} className={s.rolesCheckbox}>
-                        <input
-                          type="checkbox"
-                          defaultChecked={selectedPermiso?.rolesAsignados.includes(rol)}
-                        />
+                          <input
+                            type="checkbox"
+                            name="roles"
+                            value={rol}
+                            defaultChecked={selectedPermiso?.rolesAsignados.includes(rol)}
+                          />
                         <span className={s.rolesLabel}>
                           {rol === 'admin' && <Shield size={14} />}
                           {rol === 'asesor' && <User size={14} />}
@@ -201,7 +237,7 @@ export const AdminPermisos: React.FC = () => {
                   <Button variant="secondary" onClick={handleCloseModal}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleCloseModal}>
+                  <Button onClick={handleSubmitPermiso}>
                     {selectedPermiso ? 'Guardar cambios' : 'Crear permiso'}
                   </Button>
                 </div>

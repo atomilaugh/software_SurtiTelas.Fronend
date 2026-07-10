@@ -90,9 +90,38 @@
   --btn-transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out), border-color 140ms var(--ease-out), transform 100ms var(--ease-out), opacity 140ms var(--ease-out);
 
   --shadow-modal: 0 25px 50px -12px rgba(0,0,0,0.25);
+
+  --tooltip-bg: #111111;
+  --tooltip-color: #ffffff;
+  --tooltip-border: rgba(255, 255, 255, 0.08);
+
+  /* Sidebar (light theme defaults) */
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #111827;
+  --sidebar-text-secondary: #6b7280;
+  --sidebar-border: rgba(0, 0, 0, 0.06);
+  --sidebar-hover-bg: #f5f5f5;
+  --sidebar-active-bg: #f0f0f0;
+  --sidebar-accent: #8b5cf6;
+  --sidebar-accent-text: #ffffff;
+
+  --border-focus: #111111;
+
+  /* Header / Top bar (light defaults) */
+  --header-bg: #ffffff;
+  --header-border: #e5e7eb;
+  --header-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  --header-text: #111827;
+  --header-icon-bg: #ffffff;
+  --header-icon-border: #e5e7eb;
+  --header-icon-color: #4b5563;
+
+  color-scheme: light;
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
+
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 
@@ -233,6 +262,15 @@
   --modal-bg: #1a1a1a;
   --modal-overlay: rgba(0, 0, 0, 0.7);
 
+  /* Header / Top bar - dark overrides */
+  --header-bg: #000000;
+  --header-border: #334155;
+  --header-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --header-text: #e2e8f0;
+  --header-icon-bg: #111111;
+  --header-icon-border: #333333;
+  --header-icon-color: #a1a1aa;
+
   --input-bg: #1a1a1a;
   --input-border: #2a2a2e;
   --input-text: #f4f4f5;
@@ -244,10 +282,9 @@
   --notif-unread-bg: #1f1f22;
   --notif-text: #f4f4f5;
   --notif-text-secondary: #a1a1aa;
-
   --btn-primary-bg: var(--color-accent);
   --btn-primary-bg-hover: var(--color-accent-hover);
-  --btn-primary-text: var(--text-inverse);
+  --btn-primary-text: var(--color-bg-primary);
   --btn-primary-border: var(--color-accent);
 
   --btn-secondary-bg: transparent;
@@ -265,7 +302,7 @@
 
   --btn-danger-bg: var(--color-error);
   --btn-danger-bg-hover: #fca5a5;
-  --btn-danger-text: var(--text-inverse);
+  --btn-danger-text: var(--color-bg-primary);
   --btn-danger-bg-outline: transparent;
   --btn-danger-border: var(--color-error);
   --btn-danger-text-outline: var(--color-error);
@@ -292,4 +329,8 @@
   --btn-transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out), border-color 140ms var(--ease-out), transform 100ms var(--ease-out), box-shadow 140ms var(--ease-out), opacity 140ms var(--ease-out);
 
   --shadow-modal: var(--shadow-xl);
+
+  --tooltip-bg: #f4f4f5;
+  --tooltip-color: #0a0a0c;
+  --tooltip-border: rgba(255, 255, 255, 0.08);
 }

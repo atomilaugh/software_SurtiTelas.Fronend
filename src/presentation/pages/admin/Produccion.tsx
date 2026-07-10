@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import s from './Produccion.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Button } from '@/shared/ui/Button';
@@ -17,7 +18,7 @@ interface OrdenProduccion {
   estado: 'Pendiente' | 'En proceso' | 'Terminado';
 }
 
-const mockOrdenes: OrdenProduccion[] = [
+const mockOrdenesInicial: OrdenProduccion[] = [
   { id: 'OP-001', pedido: '#PD-2401', operario: 'Juan Pérez', referencia: 'CAM-001', cantidad: 50, fechaInicio: '05 Jun', fechaEstimada: '10 Jun', avance: 65, estado: 'En proceso' },
   { id: 'OP-002', pedido: '#PD-2400', operario: 'María López', referencia: 'CAM-002', cantidad: 30, fechaInicio: '04 Jun', fechaEstimada: '09 Jun', avance: 100, estado: 'Terminado' },
   { id: 'OP-003', pedido: '#PD-2399', operario: 'Carlos Ruiz', referencia: 'CAM-003', cantidad: 80, fechaInicio: '03 Jun', fechaEstimada: '12 Jun', avance: 25, estado: 'En proceso' },
@@ -29,17 +30,29 @@ export const AdminProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
+  const [items, setItems] = useState<OrdenProduccion[]>(mockOrdenesInicial);
 
   const filtered = useMemo(() => {
-    return mockOrdenes.filter(o =>
+    return items.filter(o =>
       o.id.toLowerCase().includes(search.toLowerCase()) ||
       o.pedido.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, items]);
 
   const closeModals = () => {
     setEditModalOpen(false);
     setSelectedOrden(null);
+  };
+
+  const handleSubmitOrden = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedOrden) return;
+    const fd = new FormData(e.currentTarget);
+    const operario = String(fd.get('operario') ?? '').trim();
+    const estado = (String(fd.get('estado') ?? '') || selectedOrden.estado) as OrdenProduccion['estado'];
+    setItems(prev => prev.map(it => it.id === selectedOrden.id ? { ...it, operario, estado } : it));
+    toast.success('Orden actualizada');
+    closeModals();
   };
 
   const columns: DataTableColumn<OrdenProduccion>[] = [
@@ -109,11 +122,11 @@ export const AdminProduccion: React.FC = () => {
           title="Editar Orden de Producción"
           size="md"
         >
-          <form className={s.form} onSubmit={(e) => { e.preventDefault(); closeModals(); }}>
+          <form className={s.form} onSubmit={handleSubmitOrden}>
             <div className={s.formRow}>
               <div className={s.field}>
                 <label className={s.label}>Operario asignado</label>
-                <select className={s.select} defaultValue={selectedOrden.operario}>
+                <select className={s.select} name="operario" defaultValue={selectedOrden.operario}>
                   <option>Juan Pérez</option>
                   <option>María López</option>
                   <option>Carlos Ruiz</option>
@@ -122,7 +135,7 @@ export const AdminProduccion: React.FC = () => {
               </div>
               <div className={s.field}>
                 <label className={s.label}>Estado</label>
-                <select className={s.select} defaultValue={selectedOrden.estado}>
+                <select className={s.select} name="estado" defaultValue={selectedOrden.estado}>
                   <option>Pendiente</option>
                   <option>En proceso</option>
                   <option>Terminado</option>

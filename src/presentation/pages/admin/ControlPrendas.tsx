@@ -36,11 +36,12 @@ const mockRegistros: PrendaControl[] = [
 
 export const AdminControlPrendas: React.FC = () => {
   const [search, setSearch] = useState('');
+  const [registros, setRegistros] = useState<PrendaControl[]>(mockRegistros);
   const [filtroTipo, setFiltroTipo] = useState<'Todos' | 'Entrega a taller' | 'Recepcion de taller'>('Todos');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'En camino' | 'En taller' | 'Entregado' | 'Recibido' | 'Con novedad'>('Todos');
 
   const filteredRegistros = useMemo(() => {
-    return mockRegistros.filter(r =>
+    return registros.filter(r =>
       (filtroTipo === 'Todos' || r.tipo === filtroTipo) &&
       (filtroEstado === 'Todos' || r.estado === filtroEstado) &&
       (r.numeroOrden.toLowerCase().includes(search.toLowerCase()) ||
@@ -48,7 +49,7 @@ export const AdminControlPrendas: React.FC = () => {
        r.referencia.toLowerCase().includes(search.toLowerCase()) ||
        r.tallerNombre.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [search, filtroTipo, filtroEstado]);
+  }, [search, filtroTipo, filtroEstado, registros]);
 
   const getTipoIcon = (tipo: string) => {
     return tipo === 'Entrega a taller' ? <Truck size={14} /> : <Package size={14} />;
@@ -66,10 +67,10 @@ const getEstadoBadge = (estado: string) => {
   };
 
   const stats = {
-    entregasPendientes: mockRegistros.filter(r => r.tipo === 'Entrega a taller' && (r.estado === 'En camino' || r.estado === 'En taller')).length,
-    recepcionesPendientes: mockRegistros.filter(r => r.tipo === 'Recepcion de taller' && (r.estado === 'En taller' || r.estado === 'Entregado')).length,
-    conNovedad: mockRegistros.filter(r => r.estado === 'Con novedad').length,
-    completadas: mockRegistros.filter(r => r.estado === 'Recibido' || r.estado === 'Entregado').length,
+    entregasPendientes:     registros.filter(r => r.tipo === 'Entrega a taller' && (r.estado === 'En camino' || r.estado === 'En taller')).length,
+    recepcionesPendientes: registros.filter(r => r.tipo === 'Recepcion de taller' && (r.estado === 'En taller' || r.estado === 'Entregado')).length,
+    conNovedad: registros.filter(r => r.estado === 'Con novedad').length,
+    completadas: registros.filter(r => r.estado === 'Recibido' || r.estado === 'Entregado').length,
   };
 
   return (
@@ -165,8 +166,8 @@ const getEstadoBadge = (estado: string) => {
         enableExport
         exportFileName="control_prendas"
         actions={(r) => [
-          ...(r.tipo === 'Recepcion de taller' && !r.fechaRetorno ? [{ label: 'Recepcionar', icon: <CheckCircle size={14} />, onClick: () => toast.success('Prenda recepcionada') }] : []),
-          ...(r.estado === 'Con novedad' ? [{ label: 'Resolver', icon: <CheckCircle size={14} />, onClick: () => toast.success('Novedad resuelta') }] : []),
+          ...(r.tipo === 'Recepcion de taller' && !r.fechaRetorno ? [{ label: 'Recepcionar', icon: <CheckCircle size={14} />, onClick: () => { setRegistros(prev => prev.map(reg => reg.id === r.id ? { ...reg, estado: 'Recibido', cantidadRecibida: reg.cantidad, fechaRetorno: new Date().toISOString().slice(0, 10) } : reg)); toast.success('Prenda recepcionada'); } }] : []),
+          ...(r.estado === 'Con novedad' ? [{ label: 'Resolver', icon: <CheckCircle size={14} />, onClick: () => { setRegistros(prev => prev.map(reg => reg.id === r.id ? { ...reg, estado: 'Entregado' } : reg)); toast.success('Novedad resuelta'); } }] : []),
         ]}
         toolbarLeft={
           <div className={s.quickStats}>

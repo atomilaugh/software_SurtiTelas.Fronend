@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { RotateCcw, CheckCircle, AlertTriangle, Package, Clock, Download, FileText, Plus, ChevronDown } from 'lucide-react';
+import { RotateCcw, CheckCircle, AlertTriangle, Package, Clock, Download, FileText, Plus, ChevronDown, Save } from 'lucide-react';
 import s from './StockDevuelto.module.css';
+import f from '@/styles/Form.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { Modal } from '@/shared/ui/Modal';
 import { toast } from 'sonner';
 
 interface Devolucion {
@@ -24,7 +26,7 @@ interface Devolucion {
   observaciones: string;
 }
 
-const mockDevoluciones: Devolucion[] = [
+const devolucionesIniciales: Devolucion[] = [
   { id: 'DEV-001', numeroDevolucion: 'DEV-2024-001', numeroOrden: 'ORD-2024-003', prenda: 'Blusa estampada', referencia: 'REF-1003', motivo: 'Defecto de confección', cantidad: 15, cantidadInspeccionada: 15, fechaDevolucion: '2024-06-09', estado: 'Aprobado', destino: 'Reingreso a inventario', cliente: 'Distribuidora del Norte', responsable: 'María López', observaciones: 'Defectos menores en costuras. Aprobado para reingreso.' },
   { id: 'DEV-002', numeroDevolucion: 'DEV-2024-002', numeroOrden: 'ORD-2024-007', prenda: 'Uniforme empresarial', referencia: 'REF-1007', motivo: 'Talla incorrecta', cantidad: 8, cantidadInspeccionada: 8, fechaDevolucion: '2024-06-10', estado: 'En inspección', destino: 'Reparación', cliente: 'Cliente G', observaciones: 'Esperando inspección de calidad' },
   { id: 'DEV-003', numeroDevolucion: 'DEV-2024-003', numeroOrden: 'ORD-2024-002', prenda: 'Pantalón jean', referencia: 'REF-1002', motivo: 'Mancha en tela', cantidad: 3, cantidadInspeccionada: 3, fechaDevolucion: '2024-06-10', estado: 'Rechazado', destino: 'Descarte', cliente: 'Cliente B', responsable: 'Carlos Ruiz', observaciones: 'Mancha irreversible. Descarte autorizado.' },
@@ -33,14 +35,32 @@ const mockDevoluciones: Devolucion[] = [
   { id: 'DEV-006', numeroDevolucion: 'DEV-2024-006', numeroOrden: 'ORD-2024-004', prenda: 'Vestido casual', referencia: 'REF-1004', motivo: 'Bolsillo roto', cantidad: 2, cantidadInspeccionada: 2, fechaDevolucion: '2024-06-06', estado: 'Recibido', destino: 'Devolución a proveedor', cliente: 'Cliente D', responsable: 'Juan Pérez', observaciones: 'Pendiente envío a proveedor de insumos.' },
 ];
 
+const destinos: Devolucion['destino'][] = ['Reingreso a inventario', 'Reparación', 'Descarte', 'Devolución a proveedor'];
+
 export const AdminStockDevuelto: React.FC = () => {
   const [search, setSearch] = useState('');
+  const [devoluciones, setDevoluciones] = useState<Devolucion[]>(devolucionesIniciales);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [numeroOrden, setNumeroOrden] = useState('');
+  const [prenda, setPrenda] = useState('');
+  const [referencia, setReferencia] = useState('');
+  const [cliente, setCliente] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [cantidad, setCantidad] = useState('');
+  const [cantidadInspeccionada, setCantidadInspeccionada] = useState('0');
+  const [destino, setDestino] = useState<Devolucion['destino']>('Reingreso a inventario');
+  const [fechaDevolucion, setFechaDevolucion] = useState(new Date().toISOString().slice(0, 10));
+  const [responsable, setResponsable] = useState('');
+  const [observaciones, setObservaciones] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Recibido' | 'En inspección' | 'Aprobado' | 'Rechazado' | 'En reparación' | 'Reingresado' | 'Descartado'>('Todos');
   const [filtroDestino, setFiltroDestino] = useState<'Todos' | 'Reingreso a inventario' | 'Reparación' | 'Descarte' | 'Devolución a proveedor'>('Todos');
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredDevoluciones = useMemo(() => {
-    return mockDevoluciones.filter(d =>
+    return devoluciones.filter(d =>
       (filtroEstado === 'Todos' || d.estado === filtroEstado) &&
       (filtroDestino === 'Todos' || d.destino === filtroDestino) &&
       (d.numeroDevolucion.toLowerCase().includes(search.toLowerCase()) ||
@@ -50,7 +70,7 @@ export const AdminStockDevuelto: React.FC = () => {
        d.cliente.toLowerCase().includes(search.toLowerCase()) ||
        d.motivo.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [search, filtroEstado, filtroDestino]);
+  }, [devoluciones, search, filtroEstado, filtroDestino]);
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -79,20 +99,75 @@ export const AdminStockDevuelto: React.FC = () => {
     toast.success('Exportación iniciada', { description: 'Tu archivo se descargará en breve.' });
   };
 
-  const handleNuevaDevolucion = () => {
-    toast.info('Próximamente', { description: 'El formulario de nueva devolución estará disponible pronto.' });
+  const resetForm = () => {
+    setNumeroOrden('');
+    setPrenda('');
+    setReferencia('');
+    setCliente('');
+    setMotivo('');
+    setCantidad('');
+    setCantidadInspeccionada('0');
+    setDestino('Reingreso a inventario');
+    setFechaDevolucion(new Date().toISOString().slice(0, 10));
+    setResponsable('');
+    setObservaciones('');
+    setFormError(null);
   };
 
-  const handleAccion = (label: string, devolucion: Devolucion) => {
-    toast.success(`${label}`, { description: `Devolución ${devolucion.numeroDevolucion}` });
+  const openModal = () => {
+    resetForm();
+    setModalOpen(true);
   };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSaving(false);
+    setFormError(null);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    if (!numeroOrden.trim()) { setFormError('El número de orden es obligatorio'); return; }
+    if (!prenda.trim()) { setFormError('La prenda es obligatoria'); return; }
+    if (!cliente.trim()) { setFormError('El cliente es obligatorio'); return; }
+    if (!cantidad || Number(cantidad) <= 0) { setFormError('La cantidad debe ser mayor a 0'); return; }
+    setSaving(true);
+    const anio = new Date().getFullYear();
+    const secuencia = String(devoluciones.length + 1).padStart(3, '0');
+    const nueva: Devolucion = {
+      id: `DEV-${secuencia}`,
+      numeroDevolucion: `DEV-${anio}-${secuencia}`,
+      numeroOrden: numeroOrden.trim(),
+      prenda: prenda.trim(),
+      referencia: referencia.trim(),
+      motivo: motivo.trim(),
+      cantidad: Number(cantidad),
+      cantidadInspeccionada: Number(cantidadInspeccionada) || 0,
+      fechaDevolucion,
+      estado: 'Recibido',
+      destino,
+      cliente: cliente.trim(),
+      responsable: responsable.trim() || undefined,
+      observaciones: observaciones.trim(),
+    };
+    setDevoluciones(prev => [nueva, ...prev]);
+    toast.success(`Devolución ${nueva.numeroDevolucion} registrada`);
+    closeModal();
+  };
+
+  const actions = (d: Devolucion) => [
+    { label: 'Inspeccionar', icon: <CheckCircle size={14} />, onClick: () => { setDevoluciones(prev => prev.map(dev => dev.id === d.id ? { ...dev, estado: 'En inspección' } : dev)); toast.success(`Devolución ${d.numeroDevolucion} en inspección`); }, disabled: d.estado !== 'En inspección' && d.estado !== 'Recibido' },
+    { label: 'Asignar destino', icon: <Package size={14} />, onClick: () => { setDevoluciones(prev => prev.map(dev => dev.id === d.id ? { ...dev, estado: 'En reparación' } : dev)); toast.success(`Devolución ${d.numeroDevolucion} en reparación`); }, disabled: !['Recibido', 'En inspección', 'Aprobado'].includes(d.estado) },
+    { label: 'Completar reparación', icon: <CheckCircle size={14} />, onClick: () => { setDevoluciones(prev => prev.map(dev => dev.id === d.id ? { ...dev, estado: 'Reingresado' } : dev)); toast.success(`Devolución ${d.numeroDevolucion} reingresada`); }, disabled: d.estado !== 'En reparación' },
+  ];
 
   const stats = {
-    pendientes: mockDevoluciones.filter(d => ['Recibido', 'En inspección'].includes(d.estado)).length,
-    enReparacion: mockDevoluciones.filter(d => d.estado === 'En reparación').length,
-    reingresados: mockDevoluciones.filter(d => d.estado === 'Reingresado').length,
-    descartados: mockDevoluciones.filter(d => d.estado === 'Descartado').length,
-    totalUnidades: mockDevoluciones.reduce((sum, d) => sum + d.cantidad, 0),
+    pendientes: devoluciones.filter(d => ['Recibido', 'En inspección'].includes(d.estado)).length,
+    enReparacion: devoluciones.filter(d => d.estado === 'En reparación').length,
+    reingresados: devoluciones.filter(d => d.estado === 'Reingresado').length,
+    descartados: devoluciones.filter(d => d.estado === 'Descartado').length,
+    totalUnidades: devoluciones.reduce((sum, d) => sum + d.cantidad, 0),
   };
 
   return (
@@ -106,7 +181,7 @@ export const AdminStockDevuelto: React.FC = () => {
           <Button variant="secondary" leftIcon={<Download size={16} />} onClick={handleExport}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={16} />} onClick={handleNuevaDevolucion}>
+          <Button leftIcon={<Plus size={16} />} onClick={openModal}>
             Nueva Devolución
           </Button>
         </div>
@@ -218,11 +293,7 @@ export const AdminStockDevuelto: React.FC = () => {
             </div>
           ),
         }}
-        actions={(d) => [
-          { label: 'Inspeccionar', icon: <CheckCircle size={14} />, onClick: () => handleAccion('Inspeccionando', d), disabled: d.estado !== 'En inspección' && d.estado !== 'Recibido' },
-          { label: 'Asignar destino', icon: <Package size={14} />, onClick: () => handleAccion('Asignando destino', d), disabled: !['Recibido', 'En inspección'].includes(d.estado) },
-          { label: 'Completar reparación', icon: <CheckCircle size={14} />, onClick: () => handleAccion('Reparación completada', d), disabled: d.estado !== 'En reparación' },
-        ]}
+        actions={actions}
         columns={[
           { key: 'numeroDevolucion', header: 'N° Devolución', width: '140px', sortable: true, render: (d) => <span className={s.tdPrimary}>{d.numeroDevolucion}</span> },
           { key: 'prenda', header: 'Prenda', sortable: true, render: (d) => d.prenda },
@@ -241,6 +312,89 @@ export const AdminStockDevuelto: React.FC = () => {
           )},
         ]}
       />
+
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title="Registrar Nueva Devolución"
+        description="Registra una devolución de stock para su inspección"
+        size="lg"
+        variant="form"
+      >
+        <form onSubmit={handleSubmit} className={f.form}>
+          {formError && <div className={f.formError}>{formError}</div>}
+
+          <div className={f.formRow}>
+            <div className={f.field}>
+              <label className={f.label}>N° Orden *</label>
+              <input className={f.input} value={numeroOrden} onChange={e => setNumeroOrden(e.target.value)} placeholder="Ej: ORD-2024-010" />
+            </div>
+            <div className={f.field}>
+              <label className={f.label}>Prenda *</label>
+              <input className={f.input} value={prenda} onChange={e => setPrenda(e.target.value)} placeholder="Ej: Blusa estampada" />
+            </div>
+          </div>
+
+          <div className={f.formRow}>
+            <div className={f.field}>
+              <label className={f.label}>Referencia</label>
+              <input className={f.input} value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ej: REF-1008" />
+            </div>
+            <div className={f.field}>
+              <label className={f.label}>Cliente *</label>
+              <input className={f.input} value={cliente} onChange={e => setCliente(e.target.value)} placeholder="Ej: Distribuidora del Norte" />
+            </div>
+          </div>
+
+          <div className={f.field}>
+            <label className={f.label}>Motivo de la devolución</label>
+            <input className={f.input} value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej: Defecto de confección" />
+          </div>
+
+          <div className={f.formRow}>
+            <div className={f.field}>
+              <label className={f.label}>Cantidad *</label>
+              <input className={f.input} type="number" min="1" value={cantidad} onChange={e => setCantidad(e.target.value)} placeholder="0" />
+            </div>
+            <div className={f.field}>
+              <label className={f.label}>Cantidad inspeccionada</label>
+              <input className={f.input} type="number" min="0" value={cantidadInspeccionada} onChange={e => setCantidadInspeccionada(e.target.value)} placeholder="0" />
+            </div>
+          </div>
+
+          <div className={f.formRow}>
+            <div className={f.field}>
+              <label className={f.label}>Destino previsto *</label>
+              <select className={f.select} value={destino} onChange={e => setDestino(e.target.value as Devolucion['destino'])}>
+                {destinos.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className={f.field}>
+              <label className={f.label}>Fecha de devolución *</label>
+              <input className={f.input} type="date" value={fechaDevolucion} onChange={e => setFechaDevolucion(e.target.value)} />
+            </div>
+          </div>
+
+          <div className={f.field}>
+            <label className={f.label}>Responsable</label>
+            <input className={f.input} value={responsable} onChange={e => setResponsable(e.target.value)} placeholder="Ej: María López" />
+          </div>
+
+          <div className={f.field}>
+            <label className={f.label}>Observaciones</label>
+            <textarea className={f.textarea} value={observaciones} onChange={e => setObservaciones(e.target.value)} placeholder="Notas sobre la devolución..." rows={3} />
+          </div>
+
+          <div className={f.formActions}>
+            <Button type="button" variant="secondary" onClick={closeModal} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={saving} leftIcon={<Save size={16} />}>
+              Registrar devolución
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

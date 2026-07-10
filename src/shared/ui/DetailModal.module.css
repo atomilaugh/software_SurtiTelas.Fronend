@@ -31,17 +31,17 @@
   gap: 12px;
   overflow: hidden;
   padding: 16px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
   transition: transform 0.18s ease-out, border-color 0.18s ease-out, box-shadow 0.18s ease-out;
 }
 
 .kpiCard:hover {
   transform: translateY(-2px);
-  border-color: #cccccc;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .kpiCard--success {
@@ -82,7 +82,7 @@
 .kpiLabel,
 .fieldLabel,
 .sectionTitle {
-  color: #555555;
+  color: var(--color-text-muted);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -92,7 +92,7 @@
 .kpiIcon,
 .fieldIcon,
 .sectionIcon {
-  color: #000000;
+  color: var(--color-text-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -101,7 +101,7 @@
 .kpiValue {
   position: relative;
   z-index: 1;
-  color: #111111;
+  color: var(--color-text-primary);
   font-size: clamp(1.45rem, 3vw, 2.15rem);
   font-weight: 780;
   line-height: 1;
@@ -113,7 +113,7 @@
   position: relative;
   z-index: 1;
   margin: 0;
-  color: #444444;
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
   line-height: 1.4;
 }
@@ -130,10 +130,17 @@
   flex-direction: column;
   gap: 14px;
   padding: 18px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 22px;
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.sectionsStack,
+.observationsStack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .sectionFull,
@@ -148,7 +155,7 @@
   justify-content: space-between;
   gap: 14px;
   padding-bottom: 14px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .sectionTitleWrap {
@@ -159,13 +166,13 @@
   width: 28px;
   height: 28px;
   border-radius: 10px;
-  background: #f5f5f5;
+  background: var(--color-bg-elevated);
 }
 
 .sectionDescription {
   max-width: 520px;
   margin: 0;
-  color: #444444;
+  color: var(--color-text-secondary);
   font-size: 0.86rem;
   line-height: 1.5;
 }
@@ -185,15 +192,15 @@
   gap: 10px;
   padding: 14px;
   overflow: hidden;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--color-bg-elevated);
   transition: transform 0.18s ease-out, border-color 0.18s ease-out, background 0.18s ease-out;
 }
 
 .fieldCard:hover {
   transform: translateY(-1px);
-  border-color: #cccccc;
+  border-color: var(--color-border-strong);
 }
 
 .fieldCard--success {
@@ -219,7 +226,7 @@
 .fieldValue {
   position: relative;
   z-index: 1;
-  color: #111111;
+  color: var(--color-text-primary);
   font-size: 1rem;
   font-weight: 720;
   line-height: 1.35;
@@ -228,10 +235,10 @@
 
 .observationBlock {
   padding: 18px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 22px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
 }
 
 .observationBlock--success {
@@ -256,7 +263,7 @@
 
 .observationHeader {
   margin-bottom: 10px;
-  color: #111111;
+  color: var(--color-text-primary);
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -264,7 +271,7 @@
 }
 
 .observationBody {
-  color: #444444;
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
   line-height: 1.65;
 }
@@ -282,7 +289,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 12px 0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .detailRow:last-child {
@@ -291,7 +298,7 @@
 
 .detailLabel,
 .detailItemLabel {
-  color: #555555;
+  color: var(--color-text-muted);
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -300,7 +307,7 @@
 
 .detailValue,
 .detailItemValue {
-  color: #111111;
+  color: var(--color-text-primary);
   font-weight: 650;
   overflow-wrap: anywhere;
 }
@@ -316,9 +323,9 @@
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: #f5f5f5;
+  background: var(--color-bg-elevated);
 }
 
 .monoValue {

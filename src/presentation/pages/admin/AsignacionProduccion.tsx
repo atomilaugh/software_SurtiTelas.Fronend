@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Plus, Factory, Clock, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 import s from './AsignacionProduccion.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { Modal } from '@/shared/ui/Modal';
 
 interface OrdenProduccion {
   id: string;
@@ -25,7 +27,7 @@ interface Taller {
   especialidad: string;
 }
 
-const mockOrdenes: OrdenProduccion[] = [
+const ordenesIniciales: OrdenProduccion[] = [
   { id: 'OP-001', numeroOrden: 'ORD-2024-001', prenda: 'Camisa manga larga', referencia: 'REF-1001', cantidad: 200, fechaPrometida: '2024-06-15', estado: 'Pendiente', prioridad: 'Alta', cliente: 'Cliente A' },
   { id: 'OP-002', numeroOrden: 'ORD-2024-002', prenda: 'Pantalón jean', referencia: 'REF-1002', cantidad: 150, fechaPrometida: '2024-06-18', estado: 'Pendiente', prioridad: 'Media', cliente: 'Cliente B' },
   { id: 'OP-003', numeroOrden: 'ORD-2024-003', prenda: 'Blusa estampada', referencia: 'REF-1003', cantidad: 300, fechaPrometida: '2024-06-14', estado: 'Asignada', tallerAsignado: 'Taller Textil El Progreso', prioridad: 'Alta', cliente: 'Cliente C' },
@@ -44,33 +46,37 @@ const mockTalleres: Taller[] = [
 export const AdminAsignacionProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Pendiente' | 'Asignada' | 'En produccion' | 'Completada'>('Todos');
-  const [_modalOpen, setModalOpen] = useState(false);
+  const [ordenes, setOrdenes] = useState<OrdenProduccion[]>(ordenesIniciales);
+  const [modalOpen, setModalOpen] = useState(false);
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
   const [tallerSeleccionado, setTallerSeleccionado] = useState('');
 
   const filteredOrdenes = useMemo(() => {
-    return mockOrdenes.filter(o =>
+    return ordenes.filter(o =>
       (filtroEstado === 'Todos' || o.estado === filtroEstado) &&
       (o.numeroOrden.toLowerCase().includes(search.toLowerCase()) ||
        o.prenda.toLowerCase().includes(search.toLowerCase()) ||
        o.referencia.toLowerCase().includes(search.toLowerCase()) ||
        o.cliente.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [search, filtroEstado]);
+  }, [ordenes, search, filtroEstado]);
 
   const handleOpenModal = (orden: OrdenProduccion) => {
     setSelectedOrden(orden);
-    setTallerSeleccionado('');
+    setTallerSeleccionado(orden.tallerAsignado || '');
     setModalOpen(true);
   };
 
   const handleAsignarTaller = () => {
-    if (selectedOrden && tallerSeleccionado) {
-      alert(`Orden ${selectedOrden.numeroOrden} asignada al taller ${tallerSeleccionado}`);
-      setModalOpen(false);
-      setSelectedOrden(null);
-      setTallerSeleccionado('');
-    }
+    if (!selectedOrden || !tallerSeleccionado) return;
+    setOrdenes(prev => prev.map(o => o.id === selectedOrden.id
+      ? { ...o, estado: 'Asignada', tallerAsignado: tallerSeleccionado }
+      : o
+    ));
+    toast.success(`Orden ${selectedOrden.numeroOrden} asignada a ${tallerSeleccionado}`);
+    setModalOpen(false);
+    setSelectedOrden(null);
+    setTallerSeleccionado('');
   };
 
   const getEstadoBadge = (estado: string) => {
@@ -84,10 +90,10 @@ export const AdminAsignacionProduccion: React.FC = () => {
   };
 
   const stats = {
-    pendientes: mockOrdenes.filter(o => o.estado === 'Pendiente').length,
-    asignadas: mockOrdenes.filter(o => o.estado === 'Asignada').length,
-    enProduccion: mockOrdenes.filter(o => o.estado === 'En produccion').length,
-    completadas: mockOrdenes.filter(o => o.estado === 'Completada').length,
+    pendientes: ordenes.filter(o => o.estado === 'Pendiente').length,
+    asignadas: ordenes.filter(o => o.estado === 'Asignada').length,
+    enProduccion: ordenes.filter(o => o.estado === 'En produccion').length,
+    completadas: ordenes.filter(o => o.estado === 'Completada').length,
   };
 
   return (
@@ -225,6 +231,38 @@ export const AdminAsignacionProduccion: React.FC = () => {
           ),
         }}
       />
+
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={selectedOrden ? `Asignar Taller - ${selectedOrden.numeroOrden}` : 'Asignar Taller'}
+        size="md"
+        variant="form"
+      >
+        {selectedOrden && (
+          <div className={s.detailModalContent}>
+            <div className={s.ordenInfo}>
+              <div className={s.infoRow}><span className={s.infoLabel}>Prenda:</span><span className={s.infoValue}>{selectedOrden.prenda}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Cantidad:</span><span className={s.infoValue}>{selectedOrden.cantidad} unidades</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Fecha prometida:</span><span className={s.infoValue}>{selectedOrden.fechaPrometida}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Cliente:</span><span className={s.infoValue}>{selectedOrden.cliente}</span></div>
+            </div>
+            <div className={s.field}>
+              <label className={s.label}>Seleccionar Taller</label>
+              <div className={s.selectWrapper}>
+                <select className={s.select} value={tallerSeleccionado} onChange={e => setTallerSeleccionado(e.target.value)}>
+                  <option value="">-- Seleccione un taller --</option>
+                  {mockTalleres.map(t => (<option key={t.id} value={t.nombre}>{t.nombre} (Disponible: {t.capacidadDisponible})</option>))}
+                </select>
+              </div>
+            </div>
+            <div className={s.formActions}>
+              <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
+              <Button onClick={handleAsignarTaller} disabled={!tallerSeleccionado}>Asignar taller</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

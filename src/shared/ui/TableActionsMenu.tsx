@@ -1,6 +1,7 @@
 import { ReactNode, useRef, useEffect, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/shared/utils';
+import { Tooltip } from '@/shared/components/Tooltip';
 import s from './TableActionsMenu.module.css';
 
 /* ------------------------------------------------------------------ */
@@ -15,12 +16,13 @@ export interface TableAction {
   danger?: boolean;
   disabled?: boolean;
   shortcut?: string;
+  tooltip?: string;
 }
 
 export interface TableActionsMenuProps {
   trigger: ReactNode;
   actions: TableAction[];
-  primaryAction?: { label: string; icon?: ReactNode; onClick?: () => void };
+  primaryAction?: { label: string; icon?: ReactNode; onClick?: () => void; tooltip?: string };
   align?: 'left' | 'right';
 }
 
@@ -110,6 +112,8 @@ export const TableActionsMenu = ({
         className="cursor-pointer"
         role="button"
         tabIndex={0}
+        data-bs-toggle="tooltip"
+        data-bs-title="Acciones"
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -144,19 +148,21 @@ export const TableActionsMenu = ({
               <div className={s.inner}>
                 {/* Primary action (View Detail) */}
                 {primaryAction && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={cn(s.item, s.primaryItem)}
-                    onClick={() => {
-                      primaryAction.onClick?.();
-                      close();
-                    }}
-                  >
-                    <span className={cn(s.icon, s.primaryIcon)}>{primaryAction.icon}</span>
-                    <span className={cn(s.label, s.primaryLabel)}>{primaryAction.label}</span>
-                    <span className={s.shortcut}>⌘V</span>
-                  </button>
+                  <Tooltip title={primaryAction.tooltip ?? primaryAction.label} as="div" tabIndex={-1}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={cn(s.item, s.primaryItem)}
+                      onClick={() => {
+                        primaryAction.onClick?.();
+                        close();
+                      }}
+                    >
+                      <span className={cn(s.icon, s.primaryIcon)}>{primaryAction.icon}</span>
+                      <span className={cn(s.label, s.primaryLabel)}>{primaryAction.label}</span>
+                      <span className={s.shortcut}>⌘V</span>
+                    </button>
+                  </Tooltip>
                 )}
 
                 {/* Divider after primary */}
@@ -166,21 +172,22 @@ export const TableActionsMenu = ({
 
                 {/* Regular actions */}
                 {regularActions.map((action) => (
-                  <button
-                    key={action.key}
-                    type="button"
-                    role="menuitem"
-                    className={s.item}
-                    onClick={() => {
-                      action.onClick?.();
-                      close();
-                    }}
-                    disabled={action.disabled}
-                  >
-                    {action.icon && <span className={s.icon}>{action.icon}</span>}
-                    <span className={s.label}>{action.label}</span>
-                    {action.shortcut && <span className={s.shortcut}>{action.shortcut}</span>}
-                  </button>
+                  <Tooltip key={action.key} title={action.tooltip ?? action.label} as="div" tabIndex={-1}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={s.item}
+                      onClick={() => {
+                        action.onClick?.();
+                        close();
+                      }}
+                      disabled={action.disabled}
+                    >
+                      {action.icon && <span className={s.icon}>{action.icon}</span>}
+                      <span className={s.label}>{action.label}</span>
+                      {action.shortcut && <span className={s.shortcut}>{action.shortcut}</span>}
+                    </button>
+                  </Tooltip>
                 ))}
 
                 {/* Divider before danger */}
@@ -190,20 +197,21 @@ export const TableActionsMenu = ({
 
                 {/* Danger actions */}
                 {dangerActions.map((action) => (
-                  <button
-                    key={action.key}
-                    type="button"
-                    role="menuitem"
-                    className={cn(s.item, s.dangerItem)}
-                    onClick={() => {
-                      action.onClick?.();
-                      close();
-                    }}
-                    disabled={action.disabled}
-                  >
-                    {action.icon && <span className={cn(s.icon)}>{action.icon}</span>}
-                    <span className={cn(s.label, s.dangerLabel)}>{action.label}</span>
-                  </button>
+                  <Tooltip key={action.key} title={action.tooltip ?? action.label} as="div" tabIndex={-1}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={cn(s.item, s.dangerItem)}
+                      onClick={() => {
+                        action.onClick?.();
+                        close();
+                      }}
+                      disabled={action.disabled}
+                    >
+                      {action.icon && <span className={cn(s.icon)}>{action.icon}</span>}
+                      <span className={cn(s.label, s.dangerLabel)}>{action.label}</span>
+                    </button>
+                  </Tooltip>
                 ))}
               </div>
             </div>

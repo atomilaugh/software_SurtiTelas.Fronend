@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, ToggleLeft, AlertTriangle, Barcode, Package, BarChart3, CreditCard } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
@@ -20,7 +20,7 @@ interface Insumo {
   estado: 'Activo' | 'Inactivo';
 }
 
-const mockInsumos: Insumo[] = [
+const mockInsumosInicial: Insumo[] = [
   { id: 'I-001', codigo: 'INS-001', nombre: 'Algodón Pima', categoria: 'Fibra', medida: 'Kg', stock: 150, stockMin: 50, stockMax: 300, precio: 12000, proveedor: 'Textiles Andina', estado: 'Activo' },
   { id: 'I-002', codigo: 'INS-002', nombre: 'Poliéster', categoria: 'Fibra', medida: 'Kg', stock: 80, stockMin: 100, stockMax: 250, precio: 8500, proveedor: 'Fabricato Sur', estado: 'Activo' },
   { id: 'I-003', codigo: 'INS-003', nombre: 'Botones de náilon', categoria: 'Accesorios', medida: 'Und', stock: 500, stockMin: 200, stockMax: 1000, precio: 250, proveedor: 'Accesorios Pro', estado: 'Activo' },
@@ -33,18 +33,55 @@ export const AdminInsumos: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedInsumo, setSelectedInsumo] = useState<Insumo | null>(null);
+  const [items, setItems] = useState<Insumo[]>(mockInsumosInicial);
+
+  const formRef = useRef<HTMLFormElement>(null);
 
   const filteredInsumos = useMemo(() => {
-    return mockInsumos.filter(i =>
+    return items.filter(i =>
       i.nombre.toLowerCase().includes(search.toLowerCase()) ||
       i.codigo.toLowerCase().includes(search.toLowerCase()) ||
       i.categoria.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, items]);
 
   const handleCloseModal = () => {
     setModalOpen(false);
     setSelectedInsumo(null);
+  };
+
+  const handleSubmitInsumo = () => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const codigo = String(fd.get('codigo') ?? '').trim();
+    const nombre = String(fd.get('nombre') ?? '').trim();
+    const categoria = String(fd.get('categoria') ?? '').trim();
+    const medida = String(fd.get('medida') ?? '').trim();
+    const stockMin = Number(fd.get('stockMin') ?? 0) || 0;
+    const stockMax = Number(fd.get('stockMax') ?? 0) || 0;
+    const precio = Number(fd.get('precio') ?? 0) || 0;
+    const proveedor = String(fd.get('proveedor') ?? '').trim();
+    if (selectedInsumo) {
+      setItems(prev => prev.map(it => it.id === selectedInsumo.id ? { ...it, codigo, nombre, categoria, medida, stockMin, stockMax, precio, proveedor } : it));
+      toast.success('Insumo actualizado');
+    } else {
+      const nuevo: Insumo = {
+        id: `I-${String(items.length + 1).padStart(3, '0')}`,
+        codigo,
+        nombre,
+        categoria,
+        medida,
+        stock: stockMin,
+        stockMin,
+        stockMax,
+        precio,
+        proveedor,
+        estado: 'Activo',
+      };
+      setItems(prev => [nuevo, ...prev]);
+      toast.success('Insumo creado');
+    }
+    handleCloseModal();
   };
 
   const columns: DataTableColumn<Insumo>[] = [
@@ -162,21 +199,21 @@ export const AdminInsumos: React.FC = () => {
               <button className={s.closeBtn} onClick={handleCloseModal}>×</button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form}>
+              <form className={s.form} ref={formRef}>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Código</label>
-                    <input type="text" className={s.input} defaultValue={selectedInsumo?.codigo} />
+                    <input type="text" className={s.input} name="codigo" defaultValue={selectedInsumo?.codigo} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Nombre</label>
-                    <input type="text" className={s.input} defaultValue={selectedInsumo?.nombre} />
+                    <input type="text" className={s.input} name="nombre" defaultValue={selectedInsumo?.nombre} />
                   </div>
                 </div>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Categoría</label>
-                    <select className={s.select} defaultValue={selectedInsumo?.categoria}>
+                    <select className={s.select} name="categoria" defaultValue={selectedInsumo?.categoria}>
                       <option>Fibra</option>
                       <option>Hilos</option>
                       <option>Accesorios</option>
@@ -185,7 +222,7 @@ export const AdminInsumos: React.FC = () => {
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Medida</label>
-                    <select className={s.select} defaultValue={selectedInsumo?.medida}>
+                    <select className={s.select} name="medida" defaultValue={selectedInsumo?.medida}>
                       <option>Kg</option>
                       <option>Unid</option>
                       <option>Lts</option>
@@ -196,21 +233,21 @@ export const AdminInsumos: React.FC = () => {
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Stock mínimo</label>
-                    <input type="number" className={s.input} defaultValue={selectedInsumo?.stockMin} />
+                    <input type="number" className={s.input} name="stockMin" defaultValue={selectedInsumo?.stockMin} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Stock máximo</label>
-                    <input type="number" className={s.input} defaultValue={selectedInsumo?.stockMax} />
+                    <input type="number" className={s.input} name="stockMax" defaultValue={selectedInsumo?.stockMax} />
                   </div>
                 </div>
                 <div className={s.formRow}>
                   <div className={s.field}>
                     <label className={s.label}>Precio</label>
-                    <input type="number" className={s.input} defaultValue={selectedInsumo?.precio} />
+                    <input type="number" className={s.input} name="precio" defaultValue={selectedInsumo?.precio} />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Proveedor</label>
-                    <select className={s.select} defaultValue={selectedInsumo?.proveedor}>
+                    <select className={s.select} name="proveedor" defaultValue={selectedInsumo?.proveedor}>
                       <option>Textiles Andina</option>
                       <option>Fabricato Sur</option>
                       <option>Accesorios Pro</option>
@@ -222,7 +259,7 @@ export const AdminInsumos: React.FC = () => {
                   <Button variant="secondary" onClick={handleCloseModal}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleCloseModal}>
+                  <Button onClick={handleSubmitInsumo}>
                     {selectedInsumo ? 'Guardar cambios' : 'Crear insumo'}
                   </Button>
                 </div>

@@ -5,6 +5,7 @@ import s from './MisEntregas.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DetailModal } from '@/shared/ui/DetailModal';
+import { Tooltip } from '@/shared/components/Tooltip';
 
 interface Entrega {
   id: string;
@@ -83,8 +84,8 @@ export const DomiciliarioEntregas: React.FC = () => {
           ))}
         </div>
         <div className={s.viewToggle}>
-          <button className={`${s.viewToggleBtn} ${viewMode === 'grid' ? s.viewToggleBtnActive : ''}`} onClick={() => setViewMode('grid')} title="Vista grid">⊡</button>
-          <button className={`${s.viewToggleBtn} ${viewMode === 'list' ? s.viewToggleBtnActive : ''}`} onClick={() => setViewMode('list')} title="Vista lista">☰</button>
+          <Tooltip title="Vista grid"><button className={`${s.viewToggleBtn} ${viewMode === 'grid' ? s.viewToggleBtnActive : ''}`} onClick={() => setViewMode('grid')}>⊡</button></Tooltip>
+          <Tooltip title="Vista lista"><button className={`${s.viewToggleBtn} ${viewMode === 'list' ? s.viewToggleBtnActive : ''}`} onClick={() => setViewMode('list')}>☰</button></Tooltip>
         </div>
       </div>
 
