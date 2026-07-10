@@ -33,6 +33,14 @@ export const useDashboardTheme = (): [boolean, () => void] => {
 
     // Persist choice for next visit
     window.localStorage.setItem(STORAGE_KEY, theme ? 'dark' : 'light');
+
+    // Dispatch a global event so portaled UI (modals, dropdowns) can update
+    try {
+      const ev = new CustomEvent('dashboard-theme-changed', { detail: theme ? 'dark' : 'light' });
+      window.dispatchEvent(ev);
+    } catch (e) {
+      // ignore
+    }
   }, [theme]);
 
   const toggle = () => setTheme(prev => !prev);

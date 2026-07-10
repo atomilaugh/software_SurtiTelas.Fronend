@@ -101,6 +101,28 @@ export const TableActionsMenu = ({
     };
   }, [open, close, updatePosition]);
 
+  // Ensure portaled table actions menu uses dashboard theme when opened
+  useEffect(() => {
+    const applyTheme = (value?: string | null) => {
+      try {
+        const val = value ?? (typeof window !== 'undefined' ? window.localStorage.getItem('dashboard-theme') : null) ?? 'light';
+        if (menuRef.current) menuRef.current.setAttribute('data-theme', val);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    if (open) applyTheme();
+
+    const handler = (e: Event) => {
+      const theme = (e as CustomEvent).detail as string | undefined;
+      applyTheme(theme);
+    };
+
+    window.addEventListener('dashboard-theme-changed', handler as EventListener);
+    return () => window.removeEventListener('dashboard-theme-changed', handler as EventListener);
+  }, [open]);
+
   const _primaryIndex = primaryAction ? 0 : -1;
   const regularActions = actions.filter((a) => !a.danger);
   const dangerActions = actions.filter((a) => a.danger);

@@ -62,6 +62,29 @@ export const BaseModal = ({
     };
   }, [open]);
 
+  // Apply dashboard scoped theme to the portaled modal so it matches admin dark mode
+  useEffect(() => {
+    const applyTheme = (value?: string | null) => {
+      try {
+        const val = value ?? window.localStorage.getItem('dashboard-theme') ?? 'light';
+        if (overlayRef.current) overlayRef.current.setAttribute('data-theme', val);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    if (open) applyTheme();
+
+    const handler = (e: Event) => {
+      // event detail is the theme string
+      const theme = (e as CustomEvent).detail as string | undefined;
+      applyTheme(theme);
+    };
+
+    window.addEventListener('dashboard-theme-changed', handler as EventListener);
+    return () => window.removeEventListener('dashboard-theme-changed', handler as EventListener);
+  }, [open]);
+
   if (!open) return null;
 
   const modal = (

@@ -150,6 +150,28 @@ export const DropdownMenu = ({ trigger, items, header, align = 'right', classNam
     };
   }, [open, close, updatePosition]);
 
+  // Ensure portaled dropdown uses dashboard theme when opened
+  useEffect(() => {
+    const applyTheme = (value?: string | null) => {
+      try {
+        const val = value ?? (typeof window !== 'undefined' ? window.localStorage.getItem('dashboard-theme') : null) ?? 'light';
+        if (menuRef.current) menuRef.current.setAttribute('data-theme', val);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    if (open) applyTheme();
+
+    const handler = (e: Event) => {
+      const theme = (e as CustomEvent).detail as string | undefined;
+      applyTheme(theme);
+    };
+
+    window.addEventListener('dashboard-theme-changed', handler as EventListener);
+    return () => window.removeEventListener('dashboard-theme-changed', handler as EventListener);
+  }, [open]);
+
   useEffect(() => {
     activeIndexRef.current = -1;
   }, [items]);
