@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Download, ShoppingBag, Users, DollarSign, TrendingUp, ChevronDown } from 'lucide-react';
 import s from './ReportesVentas.module.css';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
-
-interface VentaMensual {
-  mes: string;
-  ventas: number;
-  pedidos: number;
-  clientes: number;
-}
+import { reportsApi } from '@/infrastructure/api/reportsApi';
+import { PERIODOS_REPORTE_VENTAS, FILTROS_CUMPLIMIENTO } from '@/shared/constants/options';
 
 interface VentaRep {
   id: string;
@@ -22,53 +17,66 @@ interface VentaRep {
   comision: number;
 }
 
-const ventasMensuales: VentaMensual[] = [
-  { mes: 'Ene', ventas: 28500000, pedidos: 45, clientes: 12 },
-  { mes: 'Feb', ventas: 32000000, pedidos: 52, clientes: 15 },
-  { mes: 'Mar', ventas: 29800000, pedidos: 48, clientes: 10 },
-  { mes: 'Abr', ventas: 35000000, pedidos: 58, clientes: 18 },
-  { mes: 'May', ventas: 41000000, pedidos: 67, clientes: 22 },
-  { mes: 'Jun', ventas: 38500000, pedidos: 61, clientes: 19 },
-];
-
-const mockReportes: VentaRep[] = [
-  { id: 'R-001', asesor: 'Juan Pérez', ventasMes: 18500000, pedidosMes: 32, clientesNuevos: 8, cumplimiento: 95, ticketPromedio: 578125, comision: 925000 },
-  { id: 'R-002', asesor: 'María Gómez', ventasMes: 15200000, pedidosMes: 25, clientesNuevos: 6, cumplimiento: 88, ticketPromedio: 608000, comision: 760000 },
-  { id: 'R-003', asesor: 'Carlos Ruiz', ventasMes: 12800000, pedidosMes: 22, clientesNuevos: 4, cumplimiento: 78, ticketPromedio: 581818, comision: 640000 },
-  { id: 'R-004', asesor: 'Ana López', ventasMes: 21000000, pedidosMes: 35, clientesNuevos: 10, cumplimiento: 102, ticketPromedio: 600000, comision: 1050000 },
-  { id: 'R-005', asesor: 'Pedro Díaz', ventasMes: 9500000, pedidosMes: 18, clientesNuevos: 3, cumplimiento: 65, ticketPromedio: 527778, comision: 475000 },
-];
-
 export const AdminReportesVentas: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroCumplimiento, setFiltroCumplimiento] = useState<string>('Todos');
+  const [reportes, setReportes] = useState<VentaRep[]>([]);
+  const [_loading, setLoading] = useState(true);
+  const [_error, setError] = useState<string | null>(null);
 
-  const maxVentas = Math.max(...ventasMensuales.map(d => d.ventas));
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await reportsApi.getSalesReport();
+        const mapped: VentaRep[] = (data.salesByAsesor || []).map((item, index) => {
+          const total = Number(item.total) || 0;
+          const cantidad = Number(item.cantidad) || 0;
+          const totalSales = Number(data.totalSales) || 0;
+          return {
+            id: `R-${String(index + 1).padStart(3, '0')}`,
+            asesor: item.asesorNombre || item.asesor || `Asesor ${index + 1}`,
+            ventasMes: total,
+            pedidosMes: cantidad,
+            clientesNuevos: 0,
+            cumplimiento: total > 0 && totalSales > 0 ? Math.round((total / totalSales) * 100) : 0,
+            ticketPromedio: cantidad > 0 ? Math.round(total / cantidad) : 0,
+            comision: Math.round(total * 0.05),
+          };
+        });
+        setReportes(mapped);
+      } catch {
+        setError('No se pudo cargar el reporte de ventas');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  const maxVentas = Math.max(...reportes.map(d => d.ventasMes), 1);
   const chartHeight = 220;
   const chartPadding = { top: 20, right: 20, bottom: 30, left: 50 };
 
-  const puntos = ventasMensuales.map((d, i) => ({
-    x: chartPadding.left + (i / (ventasMensuales.length - 1)) * (400 - chartPadding.left - chartPadding.right),
-    y: chartPadding.top + (1 - d.ventas / maxVentas) * (chartHeight - chartPadding.top - chartPadding.bottom),
+  const puntos = reportes.map((d, i) => ({
+    x: chartPadding.left + (i / Math.max(reportes.length - 1, 1)) * (400 - chartPadding.left - chartPadding.right),
+    y: chartPadding.top + (1 - d.ventasMes / maxVentas) * (chartHeight - chartPadding.top - chartPadding.bottom),
   }));
 
   const pathD = puntos.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  const areaD = `${pathD} L ${puntos[puntos.length - 1].x} ${chartHeight - chartPadding.bottom} L ${puntos[0].x} ${chartHeight - chartPadding.bottom} Z`;
+  const areaD = puntos.length > 0 ? `${pathD} L ${puntos[puntos.length - 1].x} ${chartHeight - chartPadding.bottom} L ${puntos[0].x} ${chartHeight - chartPadding.bottom} Z` : '';
 
-  const reportesFiltrados = mockReportes.filter(r =>
-    (filtroCumplimiento === 'Todos' ||
-     (filtroCumplimiento === 'Alto' && r.cumplimiento >= 90) ||
-     (filtroCumplimiento === 'Medio' && r.cumplimiento >= 75 && r.cumplimiento < 90) ||
-     (filtroCumplimiento === 'Bajo' && r.cumplimiento < 75)) &&
-    (r.asesor.toLowerCase().includes(search.toLowerCase()))
+  const reportesFiltrados = reportes.filter(r =>
+    (FILTROS_CUMPLIMIENTO.find(f => f.value === filtroCumplimiento)?.test(r.cumplimiento) ?? true) &&
+    (r.asesor?.toLowerCase().includes(search.toLowerCase()))
   );
 
   const stats = {
-    ventasTotales: ventasMensuales.reduce((sum, v) => sum + v.ventas, 0),
-    pedidosTotales: ventasMensuales.reduce((sum, v) => sum + v.pedidos, 0),
-    clientesNuevos: ventasMensuales.reduce((sum, v) => sum + v.clientes, 0),
-    ticketPromedio: Math.round(ventasMensuales.reduce((sum, v) => sum + v.ventas, 0) / ventasMensuales.reduce((sum, v) => sum + v.pedidos, 0)),
-    cumplimientoPromedio: Math.round(mockReportes.reduce((sum, r) => sum + r.cumplimiento, 0) / mockReportes.length),
+    ventasTotales: reportes.reduce((sum, r) => sum + r.ventasMes, 0),
+    pedidosTotales: reportes.reduce((sum, r) => sum + r.pedidosMes, 0),
+    ticketPromedio: reportes.length > 0 ? Math.round(reportes.reduce((sum, r) => sum + r.ventasMes, 0) / Math.max(reportes.reduce((sum, r) => sum + r.pedidosMes, 0), 1)) : 0,
+    cumplimientoPromedio: reportes.length > 0 ? Math.round(reportes.reduce((sum, r) => sum + r.cumplimiento, 0) / reportes.length) : 0,
   };
 
   const formatCurrency = (valor: number) => {
@@ -87,9 +95,9 @@ export const AdminReportesVentas: React.FC = () => {
         <div className={s.headerActions}>
           <div className={s.periodoSelect}>
             <select className={s.select} defaultValue="ultimos_6_meses">
-              <option value="ultimos_6_meses">Últimos 6 meses</option>
-              <option value="ultimo_ano">Último año</option>
-              <option value="todo">Todo el historial</option>
+              {PERIODOS_REPORTE_VENTAS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
             <ChevronDown size={16} className={s.selectIcon} />
           </div>
@@ -112,13 +120,6 @@ export const AdminReportesVentas: React.FC = () => {
           <div>
             <div className={s.statValue}>{stats.pedidosTotales}</div>
             <div className={s.statLabel}>Pedidos</div>
-          </div>
-        </div>
-        <div className={s.statCard}>
-          <Users size={20} className={s.statIcon} />
-          <div>
-            <div className={s.statValue}>{stats.clientesNuevos}</div>
-            <div className={s.statLabel}>Clientes Nuevos</div>
           </div>
         </div>
         <div className={s.statCard}>
@@ -156,11 +157,11 @@ export const AdminReportesVentas: React.FC = () => {
                   <circle cx={p.x} cy={p.y} r="2.5" fill="var(--color-accent)" />
                 </g>
               ))}
-              {puntos.map((p, i) => (
-                <text key={`label-${i}`} x={p.x} y={chartHeight - 6} textAnchor="middle" className={s.chartXLabel}>
-                  {ventasMensuales[i].mes}
-                </text>
-              ))}
+               {puntos.map((p, i) => (
+                 <text key={`label-${i}`} x={p.x} y={chartHeight - 6} textAnchor="middle" className={s.chartXLabel}>
+                   {reportes[i]?.asesor?.charAt(0) || ''}
+                 </text>
+               ))}
             </svg>
           </div>
           <div className={s.chartLegend}>
@@ -176,43 +177,35 @@ export const AdminReportesVentas: React.FC = () => {
             <h3 className={s.chartTitle}>Pedidos y Clientes por Mes</h3>
           </div>
           <div className={s.metricsChart}>
-            {ventasMensuales.map((d) => {
-              const maxPedidos = Math.max(...ventasMensuales.map(v => v.pedidos));
-              const maxClientes = Math.max(...ventasMensuales.map(v => v.clientes));
+            {reportes.length > 0 ? (
+              reportes.map((d) => {
+                const maxPedidos = Math.max(...reportes.map(v => v.pedidosMes), 1);
 
-              return (
-                <div key={d.mes} className={s.metricGroup}>
-                  <div className={s.metricBars}>
-                    <div className={s.metricBarWrapper}>
-                      <div
-                        className={`${s.metricBar} ${s.metricBarPedidos}`}
-                        style={{ height: `${(d.pedidos / maxPedidos) * 100}%` }}
-                      />
+                return (
+                  <div key={d.id} className={s.metricGroup}>
+                    <div className={s.metricBars}>
+                      <div className={s.metricBarWrapper}>
+                        <div
+                          className={`${s.metricBar} ${s.metricBarPedidos}`}
+                          style={{ height: `${(d.pedidosMes / maxPedidos) * 100}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className={s.metricBarWrapper}>
-                      <div
-                        className={`${s.metricBar} ${s.metricBarClientes}`}
-                        style={{ height: `${(d.clientes / maxClientes) * 100}%` }}
-                      />
+                    <div className={s.metricLabels}>
+                      <span className={`${s.metricLabel} ${s.metricLabelPedidos}`}>{d.pedidosMes}</span>
                     </div>
+                    <div className={s.metricMonth}>{d.asesor.split(' ')[0]}</div>
                   </div>
-                  <div className={s.metricLabels}>
-                    <span className={`${s.metricLabel} ${s.metricLabelPedidos}`}>{d.pedidos}</span>
-                    <span className={`${s.metricLabel} ${s.metricLabelClientes}`}>{d.clientes}</span>
-                  </div>
-                  <div className={s.metricMonth}>{d.mes}</div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <p style={{ color: 'var(--color-text-muted)' }}>No hay datos de pedidos disponibles</p>
+            )}
           </div>
           <div className={s.chartLegend}>
             <div className={s.legendItem}>
               <div className={`${s.legendDot} ${s.legendPedidos}`} />
               <span>Pedidos</span>
-            </div>
-            <div className={s.legendItem}>
-              <div className={`${s.legendDot} ${s.legendClientes}`} />
-              <span>Clientes nuevos</span>
             </div>
           </div>
         </div>
@@ -223,13 +216,13 @@ export const AdminReportesVentas: React.FC = () => {
           <h3 className={s.tableTitle}>Reporte por Asesor</h3>
           <div className={s.tableFilters}>
             <div className={s.filterGroup}>
-              {['Todos', 'Alto (>=90)', 'Medio (75-89)', 'Bajo (<75)'].map(f => (
+              {FILTROS_CUMPLIMIENTO.map(f => (
                 <button
-                  key={f}
-                  className={`${s.filterBtn} ${filtroCumplimiento === f ? s.filterBtnActive : ''}`}
-                  onClick={() => setFiltroCumplimiento(f)}
+                  key={f.value}
+                  className={`${s.filterBtn} ${filtroCumplimiento === f.value ? s.filterBtnActive : ''}`}
+                  onClick={() => setFiltroCumplimiento(f.value)}
                 >
-                  {f}
+                  {f.label}
                 </button>
               ))}
             </div>
@@ -249,7 +242,7 @@ export const AdminReportesVentas: React.FC = () => {
         <DataTable<VentaRep>
           data={reportesFiltrados}
           pageSize={10}
-          emptyMessage="No se encontraron reportes"
+          emptyMessage="Sin resultados"
           maxVisibleColumns={5}
           detailPanel={{
             title: (r) => r.asesor,
@@ -260,7 +253,6 @@ export const AdminReportesVentas: React.FC = () => {
                   <div className={s.detailGrid}>
                     <div className={s.detailItem}><span className={s.detailLabel}>Ventas del mes</span><span className={s.tdBold}>{formatCurrency(r.ventasMes)}</span></div>
                     <div className={s.detailItem}><span className={s.detailLabel}>Pedidos</span><span>{r.pedidosMes}</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Clientes nuevos</span><span>{r.clientesNuevos}</span></div>
                     <div className={s.detailItem}><span className={s.detailLabel}>Cumplimiento</span><span>{r.cumplimiento}%</span></div>
                   </div>
                 </div>

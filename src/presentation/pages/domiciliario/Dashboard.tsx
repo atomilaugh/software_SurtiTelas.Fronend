@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { StatCard } from '../admin/StatCard';
 import s from './Dashboard.module.css';
-import { PackageCheck, CheckCircle2, Clock, XCircle, MapPin } from 'lucide-react';
 import { Badge } from '@/shared/ui/Badge';
 import { DetailModal } from '@/shared/ui/DetailModal';
+import { deliveriesApi } from '@/infrastructure/api/deliveriesApi';
+import { useAuthStore } from '@/core/stores/authStore';
+import { PackageCheck, CheckCircle2, Clock, XCircle, MapPin } from 'lucide-react';
 
 interface Entrega {
   id: string;
@@ -15,21 +17,12 @@ interface Entrega {
   estado: 'Entregado' | 'En camino' | 'Pendiente' | 'Fallido';
 }
 
-const entregasSeed: Entrega[] = [
-  { id: 'ENT-043', cliente: 'Almacén El Sol', direccion: 'Cra 15 #45-23', barrio: 'Chapinero', horaEstimada: '09:30', estado: 'Entregado' },
-  { id: 'ENT-044', cliente: 'Boutique Moda+', direccion: 'Cl 80 #12-67', barrio: 'Suba', horaEstimada: '10:15', estado: 'Entregado' },
-  { id: 'ENT-045', cliente: 'Moda Express SAS', direccion: 'Av 68 #34-10', barrio: 'Teusaquillo', horaEstimada: '11:00', estado: 'En camino' },
-  { id: 'ENT-046', cliente: 'Textiles del Norte', direccion: 'Cra 7 #120-45', barrio: 'Usaquén', horaEstimada: '11:45', estado: 'Pendiente' },
-  { id: 'ENT-047', cliente: 'La Casa del Denim', direccion: 'Cl 127 #20-33', barrio: 'Cedritos', horaEstimada: '12:30', estado: 'Pendiente' },
-];
-
-const actividadSeed = [
-  { tipo: 'success', texto: 'Entrega #ENT-041 confirmada — Juan Pérez', tiempo: 'hace 45 min' },
-  { tipo: 'success', texto: 'Entrega #ENT-040 confirmada — Moda Express', tiempo: 'hace 1 h' },
-  { tipo: 'info', texto: 'Ruta del día asignada — 9 entregas', tiempo: 'hace 3 h' },
-  { tipo: 'warning', texto: 'Entrega #ENT-038 reprogramada para mañana', tiempo: 'ayer' },
-  { tipo: 'error', texto: 'Entrega #ENT-035 fallida — cliente ausente', tiempo: 'hace 2 días' },
-];
+const deliveryStatusMap: Record<string, Entrega['estado']> = {
+  'ENTREGADO': 'Entregado',
+  'EN_RUTA': 'En camino',
+  'ASIGNADO': 'Pendiente',
+  'FALLIDO': 'Fallido',
+};
 
 const statusVariant = (estado: Entrega['estado']) => {
   if (estado === 'Entregado') return 'success';
@@ -39,36 +32,96 @@ const statusVariant = (estado: Entrega['estado']) => {
 };
 
 export const DomiciliarioDashboard: React.FC = () => {
-  const [entregas, setEntregas] = useState<Entrega[]>(entregasSeed);
+  const user = useAuthStore((s) => s.user);
+  const [entregas, setEntregas] = useState<Entrega[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedEntrega, setSelectedEntrega] = useState<Entrega | null>(null);
 
-  const completed = entregas.filter(e => e.estado === 'Entregado').length;
-  const enCamino = entregas.filter(e => e.estado === 'En camino').length;
-  const pendientes = entregas.filter(e => e.estado === 'Pendiente').length;
-  const fallidas = entregas.filter(e => e.estado === 'Fallido').length;
-  const nextEntrega = entregas.find(e => e.estado === 'Pendiente') || entregas.find(e => e.estado === 'En camino') || null;
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await deliveriesApi.list(user?.uid ? { domiciliarioId: user.uid } : undefined);
+        const mapped: Entrega[] = result.map((d) => ({
+          id: d.orderId || d.id,
+          cliente: d.clienteNombre || '',
+          direccion: d.direccion || '',
+          barrio: d.ciudad || '',
+          horaEstimada: d.asignadoEn ? new Date(d.asignadoEn).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+          estado: deliveryStatusMap[d.estado] || 'Pendiente',
+        }));
+        setEntregas(mapped);
+      } catch {
+        setError('No se pudieron cargar las entregas');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user?.uid) void load();
+  }, [user?.uid]);
+
+  const completed = entregas.filter((e) => e.estado === 'Entregado').length;
+  const enCamino = entregas.filter((e) => e.estado === 'En camino').length;
+  const pendientes = entregas.filter((e) => e.estado === 'Pendiente').length;
+  const fallidas = entregas.filter((e) => e.estado === 'Fallido').length;
+  const nextEntrega = entregas.find((e) => e.estado === 'Pendiente') || entregas.find((e) => e.estado === 'En camino') || null;
 
   const stats = useMemo(() => [
     { label: 'Entregas Hoy', value: String(entregas.length), trend: 'Jornada actual', trendUp: true, Icon: PackageCheck, color: 'info' as const },
-    { label: 'Completadas', value: String(completed), trend: `${Math.round((completed / entregas.length) * 100)}% del día`, trendUp: true, Icon: CheckCircle2, color: 'success' as const },
+    { label: 'Completadas', value: String(completed), trend: `${Math.round((completed / Math.max(entregas.length, 1)) * 100)}% del día`, trendUp: true, Icon: CheckCircle2, color: 'success' as const },
     { label: 'Pendientes', value: String(pendientes), trend: nextEntrega ? `Próxima ${nextEntrega.horaEstimada}` : 'Sin pendientes', trendUp: pendientes === 0, Icon: Clock, color: 'warning' as const },
     { label: 'Fallidas', value: String(fallidas), trend: fallidas === 0 ? 'Sin novedades' : 'Requiere atención', trendUp: fallidas === 0, Icon: XCircle, color: 'accent' as const },
   ], [entregas.length, completed, pendientes, fallidas, nextEntrega]);
 
   const actividad = useMemo(() => {
-    const latest = nextEntrega ? [{ tipo: 'info' as const, texto: `Próxima entrega: ${nextEntrega.cliente}`, tiempo: 'ahora' }] : [];
-    return [...latest, ...actividadSeed];
-  }, [nextEntrega]);
+    const entregasOrdenadas = [...entregas].sort((a, b) => a.id.localeCompare(b.id));
+    return entregasOrdenadas.map((e) => ({
+      tipo: e.estado === 'Entregado' ? ('success' as const) : e.estado === 'En camino' ? ('info' as const) : e.estado === 'Fallido' ? ('warning' as const) : ('default' as const),
+      texto: e.estado === 'Entregado'
+        ? `Entregado: ${e.cliente}`
+        : e.estado === 'En camino'
+          ? `En camino: ${e.cliente}`
+          : e.estado === 'Fallido'
+            ? `Fallida: ${e.cliente}`
+            : `Pendiente: ${e.cliente}`,
+      tiempo: e.horaEstimada,
+    }));
+  }, [entregas]);
 
-  const marcarSiguiente = () => {
+  const marcarSiguiente = async () => {
     if (!nextEntrega) {
       toast.info('No hay entregas pendientes para marcar');
       return;
     }
     const nuevoEstado: Entrega['estado'] = nextEntrega.estado === 'Pendiente' ? 'En camino' : 'Entregado';
-    setEntregas(prev => prev.map(entrega => entrega.id === nextEntrega.id ? { ...entrega, estado: nuevoEstado } : entrega));
-    toast.success(`${nextEntrega.id} marcada como ${nuevoEstado}`);
+    try {
+      await deliveriesApi.updateStatus(nextEntrega.id, nuevoEstado === 'En camino' ? 'EN_RUTA' : 'ENTREGADO');
+      setEntregas((prev) => prev.map((entrega) => entrega.id === nextEntrega.id ? { ...entrega, estado: nuevoEstado } : entrega));
+      toast.success(`${nextEntrega.id} marcada como ${nuevoEstado}`);
+    } catch {
+      toast.error('No se pudo actualizar el estado de la entrega');
+    }
   };
+
+  if (loading) {
+    return (
+      <div>
+        <h1 className={s.pageTitle}>Dashboard</h1>
+        <p className={s.pageSubtitle}>Cargando métricas...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h1 className={s.pageTitle}>Dashboard</h1>
+        <p className={s.pageSubtitle}>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -118,7 +171,7 @@ export const DomiciliarioDashboard: React.FC = () => {
               <circle className={s.progressRingCircle} cx="50" cy="50" r="42" />
             </svg>
             <div className={s.progressRingText}>
-              <span className={s.progressRingPercent}>{Math.round((completed / entregas.length) * 100)}%</span>
+              <span className={s.progressRingPercent}>{Math.round((completed / Math.max(entregas.length, 1)) * 100)}%</span>
               <span className={s.progressRingLabel}>Completado</span>
             </div>
           </div>
@@ -174,13 +227,17 @@ export const DomiciliarioDashboard: React.FC = () => {
           <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--color-border)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
             Actividad reciente
           </div>
-          {actividad.map((a, i) => (
-            <div key={i} className={s.activityItem}>
-              <div className={`${s.activityDot} ${a.tipo === 'accent' ? s.activityDotAccent : a.tipo === 'success' ? s.activityDotSuccess : a.tipo === 'info' ? s.activityDotInfo : a.tipo === 'warning' ? s.activityDotWarning : s.activityDotError}`} />
-              <span className={s.activityText}>{a.texto}</span>
-              <span className={s.activityTime}>{a.tiempo}</span>
-            </div>
-          ))}
+          {actividad.length === 0 ? (
+            <div style={{ padding: '20px', color: 'rgba(255,255,255,0.5)' }}>Sin actividad registrada</div>
+          ) : (
+            actividad.map((a, i) => (
+              <div key={i} className={s.activityItem}>
+                <div className={`${s.activityDot} ${(a.tipo as string) === 'success' ? s.activityDotSuccess : (a.tipo as string) === 'info' ? s.activityDotInfo : (a.tipo as string) === 'warning' ? s.activityDotWarning : s.activityDotError}`} />
+                <span className={s.activityText}>{a.texto}</span>
+                <span className={s.activityTime}>{a.tiempo}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -207,12 +264,18 @@ export const DomiciliarioDashboard: React.FC = () => {
         ]}
         footer={
           <div className="flex justify-end gap-3">
-            <ButtonVariantSecondary onClick={() => setSelectedEntrega(null)}>Cerrar</ButtonVariantSecondary>
+            <button type="button" className="inline-flex h-8 items-center justify-center rounded-xl border border-[var(--color-border)] bg-transparent px-4 text-sm font-medium text-[var(--color-text-primary)]" onClick={() => setSelectedEntrega(null)}>Cerrar</button>
             {selectedEntrega && selectedEntrega.estado !== 'Entregado' && (
-              <button type="button" className="inline-flex h-8 items-center justify-center rounded-xl bg-[var(--btn-primary-bg)] px-4 text-sm font-medium text-[var(--btn-primary-text)]" onClick={() => {
-                setEntregas(prev => prev.map(entrega => entrega.id === selectedEntrega.id ? { ...entrega, estado: selectedEntrega.estado === 'Pendiente' ? 'En camino' : 'Entregado' } : entrega));
-                toast.success(`${selectedEntrega.id} actualizada`);
-                setSelectedEntrega(null);
+              <button type="button" className="inline-flex h-8 items-center justify-center rounded-xl bg-[var(--btn-primary-bg)] px-4 text-sm font-medium text-[var(--btn-primary-text)]" onClick={async () => {
+                const nuevoEstado = selectedEntrega.estado === 'Pendiente' ? 'En camino' : 'Entregado';
+                try {
+                  await deliveriesApi.updateStatus(selectedEntrega.id, nuevoEstado === 'En camino' ? 'EN_RUTA' : 'ENTREGADO');
+                  setEntregas((prev) => prev.map((e) => e.id === selectedEntrega.id ? { ...e, estado: nuevoEstado } : e));
+                  setSelectedEntrega((prev) => prev ? { ...prev, estado: nuevoEstado } : prev);
+                  toast.success(`${selectedEntrega.id} actualizada a ${nuevoEstado}`);
+                } catch {
+                  toast.error('No se pudo actualizar el estado');
+                }
               }}>
                 Marcar avance
               </button>
@@ -223,9 +286,3 @@ export const DomiciliarioDashboard: React.FC = () => {
     </div>
   );
 };
-
-const ButtonVariantSecondary = ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-  <button type="button" className="inline-flex h-8 items-center justify-center rounded-xl border border-[var(--color-border)] bg-transparent px-4 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-bg-elevated)]" {...props}>
-    {children}
-  </button>
-);

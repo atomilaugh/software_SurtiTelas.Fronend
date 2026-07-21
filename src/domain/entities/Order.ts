@@ -26,7 +26,7 @@ export interface OrderData {
   estado: OrderStatus;
   prioridad?: OrderPriority;
   observaciones?: string;
-  itemsList: OrderItem[];
+  itemsList?: OrderItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -41,7 +41,7 @@ export class Order {
   readonly estado: OrderStatus;
   readonly prioridad?: OrderPriority;
   readonly observaciones?: string;
-  readonly itemsList: OrderItem[];
+  readonly itemsList?: OrderItem[];
   readonly createdAt: string;
   readonly updatedAt: string;
 
@@ -83,11 +83,12 @@ export class Order {
       throw new Error('La cantidad de items del pedido debe ser un número entero positivo');
     }
 
-    if (data.itemsList.length === 0) {
+    const itemsList = data.itemsList ?? [];
+    if (itemsList.length === 0) {
       throw new Error('El pedido debe tener al menos un item');
     }
 
-    const itemsTotal = data.itemsList.reduce(
+    const itemsTotal = itemsList.reduce(
       (sum, item) => sum + item.cantidad,
       0
     );
@@ -96,7 +97,7 @@ export class Order {
       throw new Error('La cantidad de items no coincide con la suma de itemsList');
     }
 
-    const invalidItems = data.itemsList.filter(
+    const invalidItems = itemsList.filter(
       item =>
         !item.nombre.trim() ||
         !Number.isFinite(item.precio) ||

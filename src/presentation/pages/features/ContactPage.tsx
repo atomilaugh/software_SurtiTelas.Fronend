@@ -1,4 +1,4 @@
-﻿import React from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Mail,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import "../styles/ContactPage.css";
+import { companyApi } from "@/infrastructure/api/companyApi";
 
 interface ContactAction {
   name: string;
@@ -44,56 +45,6 @@ const contactActions: ContactAction[] = [
   },
 ];
 
-const contactCards: ContactCard[] = [
-  {
-    title: "Teléfono",
-    icon: <Phone size={22} />,
-    content: "+57 321 826 7514",
-    variant: "light",
-  },
-  {
-    title: "Correo Electrónico",
-    icon: <Mail size={22} />,
-    content: "surticamisetas@gmail.com",
-    variant: "light",
-  },
-  {
-    title: "Ubicación",
-    icon: <MapPin size={22} />,
-    content: "CL 42 CR 27 - 45, Medellín",
-    variant: "light",
-  },
-  {
-    title: "Horario de Atención",
-    icon: <Clock size={22} />,
-    content: (
-      <div className="schedule-content">
-        <div className="schedule-row">
-          <span>Lunes - Sábado</span>
-          <span>8:00 AM - 5:00 PM</span>
-        </div>
-
-        <p className="schedule-notice">
-          No trabajamos domingos ni festivos
-        </p>
-      </div>
-    ),
-    variant: "dark",
-  },
-];
-
-const ContactActionButton = ({
-  action,
-}: {
-  action: ContactAction;
-}) => (
-  <button className={`contact-btn ${action.className}`}>
-    <div className="contact-btn-icon">{action.icon}</div>
-
-    <span>{action.name}</span>
-  </button>
-);
-
 const ContactInfoCard = ({
   card,
 }: {
@@ -116,6 +67,71 @@ const ContactInfoCard = ({
 
 export const SurtitelaLayout: React.FC = () => {
   const navigate = useNavigate();
+  const [company, setCompany] = useState<{ nombre?: string; telefono?: string; email?: string; direccion?: string; ciudad?: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    companyApi.get().then((data) => {
+      if (active) setCompany(data);
+    }).catch(() => {
+      if (active) setCompany(null);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const telefono = company?.telefono || 'No disponible';
+  const email = company?.email || 'No disponible';
+  const direccion = [company?.direccion, company?.ciudad].filter(Boolean).join(', ') || 'No disponible';
+
+  const contactCards: ContactCard[] = [
+    {
+      title: "Teléfono",
+      icon: <Phone size={22} />,
+      content: telefono,
+      variant: "light",
+    },
+    {
+      title: "Correo Electrónico",
+      icon: <Mail size={22} />,
+      content: email,
+      variant: "light",
+    },
+    {
+      title: "Ubicación",
+      icon: <MapPin size={22} />,
+      content: direccion,
+      variant: "light",
+    },
+    {
+      title: "Horario de Atención",
+      icon: <Clock size={22} />,
+      content: (
+        <div className="schedule-content">
+          <div className="schedule-row">
+            <span>Lunes - Sábado</span>
+            <span>8:00 AM - 5:00 PM</span>
+          </div>
+
+          <p className="schedule-notice">
+            No trabajamos domingos ni festivos
+          </p>
+        </div>
+      ),
+      variant: "dark",
+    },
+  ];
+
+  const ContactActionButton = ({
+    action,
+  }: {
+    action: ContactAction;
+  }) => (
+    <button className={`contact-btn ${action.className}`}>
+      <div className="contact-btn-icon">{action.icon}</div>
+
+      <span>{action.name}</span>
+    </button>
+  );
 
   return (
     <main className="landing-page">
@@ -131,7 +147,7 @@ export const SurtitelaLayout: React.FC = () => {
             </div>
 
             <h1>
-              Conecta con <span>Surtitela</span>
+              Conecta con <span>{company?.nombre || 'Surtitela'}</span>
             </h1>
 
             <p>

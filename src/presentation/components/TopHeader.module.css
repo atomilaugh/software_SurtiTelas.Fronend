@@ -541,3 +541,31 @@
   background: #111111;
   border-color: #333333;
 }
+
+.loadingState {
+  color: #6b7280;
+}
+
+[data-theme='dark'] .loadingState {
+  color: #cbd5e1;
+}
+
+.errorState {
+  color: #ef4444;
+  opacity: 1;
+}
+
+.spin {
+  animation: notificationSpin 1s linear infinite;
+}
+
+@keyframes notificationSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

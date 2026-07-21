@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Download, FileText, Calendar, CreditCard, DollarSign, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Download, FileText, Calendar, CreditCard, DollarSign, CheckCircle2, Clock, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
-import { usePedidos } from '@/core/stores';
+import { receiptsApi, type Receipt } from '@/infrastructure/api/receiptsApi';
 import s from './Recibos.module.css';
 
 type ReciboStatus = 'Aprobado' | 'Pendiente' | 'Rechazado';
@@ -24,39 +24,6 @@ interface Recibo {
     total: number;
   };
 }
-
-const reciboDemo: Recibo[] = [
-  {
-    id: '#REC-10023',
-    fecha: '2026-06-12T09:30:00',
-    ordenId: 'ORD-2024-001',
-    metodoPago: 'Transferencia Bancaria',
-    monto: 85000,
-    estado: 'Aprobado',
-    cliente: 'Juan Martínez',
-    detalle: { subtotal: 71429, envio: 0, impuestos: 13571, total: 85000 },
-  },
-  {
-    id: '#REC-10024',
-    fecha: '2026-06-08T16:15:00',
-    ordenId: 'ORD-2024-002',
-    metodoPago: 'Tarjeta de Crédito',
-    monto: 142000,
-    estado: 'Pendiente',
-    cliente: 'Juan Martínez',
-    detalle: { subtotal: 119328, envio: 15000, impuestos: 7672, total: 142000 },
-  },
-  {
-    id: '#REC-10025',
-    fecha: '2026-05-29T11:05:00',
-    ordenId: 'ORD-2024-003',
-    metodoPago: 'Efectivo',
-    monto: 64000,
-    estado: 'Rechazado',
-    cliente: 'Juan Martínez',
-    detalle: { subtotal: 53782, envio: 15000, impuestos: 5218, total: 64000 },
-  },
-];
 
 const statusVariant = (estado: ReciboStatus) => {
   if (estado === 'Aprobado') return 'success';
@@ -80,35 +47,46 @@ const formatDate = (value: string) => new Intl.DateTimeFormat('es-CO', {
   minute: '2-digit',
 }).format(new Date(value));
 
-const buildRecibos = (pedidos: { id: string; fecha: string; total: string; estado: string }[]): Recibo[] => {
-  const paidOrders = pedidos
-    .filter(pedido => ['Despachado', 'En camino', 'Entregado'].includes(pedido.estado))
-    .slice(0, 3)
-    .map((pedido, index) => {
-      const numericTotal = Number.parseInt(pedido.total.replace(/[^0-9]/g, ''), 10) || 0;
-      const subtotal = Math.round(numericTotal / 1.19);
-      const impuestos = numericTotal - subtotal;
+const toRecibo = (dto: Receipt): Recibo => {
+  const total = Number(dto.total) || 0;
+  const metodoPago = dto.pagos && dto.pagos.length > 0 ? dto.pagos[0].method : 'No especificado';
+  const subtotal = Math.round(total / 1.19);
+  const impuestos = total - subtotal;
 
-      return {
-        id: `#REC-${String(10026 + index).padStart(5, '0')}`,
-        fecha: new Date(pedido.fecha).toISOString(),
-        ordenId: pedido.id,
-        metodoPago: index === 0 ? 'Transferencia Bancaria' : index === 1 ? 'Tarjeta de Crédito' : 'Efectivo',
-        monto: numericTotal,
-        estado: 'Aprobado' as ReciboStatus,
-        cliente: 'Juan Martínez',
-        detalle: { subtotal, envio: 0, impuestos, total: numericTotal },
-      };
-    });
-
-  return [...paidOrders, ...reciboDemo];
+  return {
+    id: dto.numero || dto.id,
+    fecha: dto.createdAt || new Date().toISOString(),
+    ordenId: dto.orderId || 'N/A',
+    metodoPago,
+    monto: total,
+    estado: 'Aprobado' as ReciboStatus,
+    cliente: dto.customerId,
+    detalle: { subtotal, envio: 0, impuestos, total },
+  };
 };
 
 export const Recibos: React.FC = () => {
-  const { pedidos } = usePedidos();
+  const [recibos, setRecibos] = useState<Recibo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedRecibo, setSelectedRecibo] = useState<Recibo | null>(null);
 
-  const recibos = useMemo(() => buildRecibos(pedidos), [pedidos]);
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await receiptsApi.list();
+        setRecibos(data.map(toRecibo));
+      } catch {
+        setError('No se pudieron cargar tus recibos. Intenta nuevamente.');
+        toast.error('Error al cargar recibos');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
   const totalAprobado = useMemo(() => recibos
     .filter(recibo => recibo.estado === 'Aprobado')
     .reduce((sum, recibo) => sum + recibo.monto, 0), [recibos]);
@@ -120,6 +98,29 @@ export const Recibos: React.FC = () => {
     toast.success('Abre la ventana de impresión y selecciona "Guardar como PDF" para descargar tu recibo');
     window.print();
   };
+
+  if (loading) {
+    return (
+      <div className={s.recibosPage}>
+        <div className={s.loadingState}>
+          <Loader2 size={28} className={s.loadingSpinner} />
+          <span>Cargando tus recibos...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={s.recibosPage}>
+        <div className={s.errorState}>
+          <AlertCircle size={28} />
+          <span>{error}</span>
+          <Button variant="secondary" onClick={() => window.location.reload()}>Reintentar</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={s.recibosPage}>

@@ -1,50 +1,77 @@
-import React, { useRef, useState } from 'react';
-import { toast } from 'sonner';
+import React, { useEffect, useRef, useState } from 'react';
 import { Edit2, Check, Image as ImageIcon, User } from 'lucide-react';
+import { toast } from 'sonner';
 import s from './PerfilDomiciliario.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
 import { Tooltip } from '@/shared/components/Tooltip';
+import { authApi } from '@/infrastructure/api/authApi';
+import { useAuthStore } from '@/core/stores/authStore';
+import { isValidPhone } from '@/shared/utils/phone';
 
 export const DomiciliarioPerfil: React.FC = () => {
-  const [nombre, setNombre] = useState('Juan Pérez');
-  const [telefono, setTelefono] = useState('310 234 5678');
-  const [ciudad, setCiudad] = useState('Bogotá');
-  const [vehiculo, setVehiculo] = useState('moto');
-  const [placa, setPlaca] = useState('ABC-123');
-  const [turnoActivo, setTurnoActivo] = useState(true);
+  const user = useAuthStore((s) => s.user);
+  const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [email, setEmail] = useState('');
   const [formError, setFormError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [avatarName, setAvatarName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const profile = await authApi.me();
+        setNombre(profile.nombre);
+        setTelefono(profile.telefono ?? '');
+        setEmail(profile.email);
+        setAvatarName(profile.nombre);
+      } catch {
+        toast.error('No se pudo cargar el perfil');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
   const validarPerfil = () => {
     setFormError('');
-    if (!nombre.trim() || !telefono.trim() || !ciudad.trim()) {
-      setFormError('Nombre, teléfono y ciudad son obligatorios.');
+    if (!nombre.trim()) {
+      setFormError('El nombre es obligatorio.');
       return false;
     }
-    if (!/^[\d\s-]{7,}$/.test(telefono.trim())) {
+    if (!isValidPhone(telefono)) {
       setFormError('Ingresa un teléfono válido.');
       return false;
     }
     return true;
   };
 
-  const guardarCambios = () => {
+  const guardarCambios = async () => {
     if (!validarPerfil()) return;
-    toast.success('Cambios guardados correctamente');
+    setSaving(true);
+    try {
+      await authApi.updateProfile({ nombre, telefono });
+      if (user) {
+        useAuthStore.setState({ user: { ...user, name: nombre } });
+      }
+      toast.success('Cambios guardados correctamente');
+    } catch {
+      toast.error('No fue posible guardar los cambios');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const finalizarTurno = () => {
-    if (!turnoActivo) {
-      toast.info('El turno ya está finalizado');
-      return;
-    }
-    setTurnoActivo(false);
-    toast.success('Turno finalizado correctamente');
-  };
+  if (loading) {
+    return <div className={s.pageTitle}>Cargando perfil...</div>;
+  }
 
   return (
     <div>
@@ -54,25 +81,15 @@ export const DomiciliarioPerfil: React.FC = () => {
       <div className={s.perfilLayout}>
         <div className={s.perfilCard}>
           <div className={s.avatar}>
-            J
+            {nombre ? nombre.charAt(0).toUpperCase() : 'U'}
             <Tooltip title="Cambiar foto"><button className={s.avatarEditBtn} type="button" onClick={() => setIsAvatarOpen(true)}>
               <Edit2 size={14} />
             </button></Tooltip>
           </div>
-          <div className={s.perfilName}>{nombre}</div>
-          <div className={s.perfilEmail}>juan.p@surtitelas.com</div>
+          <div className={s.perfilName}>{nombre || 'Cargando...'}</div>
+          <div className={s.perfilEmail}>{email}</div>
           <div className={s.rolTag}>
-            <Badge variant="success" dot>Domiciliario</Badge>
-          </div>
-          <div className={s.perfilStats}>
-            <div className={s.perfilStat}>
-              <div className={s.perfilStatValue}>187</div>
-              <div className={s.perfilStatLabel}>Entregas</div>
-            </div>
-            <div className={s.perfilStat}>
-              <div className={s.perfilStatValue}>4.8</div>
-              <div className={s.perfilStatLabel}>Calificación</div>
-            </div>
+            <Badge variant="success" dot>{user?.role === 'domiciliario' ? 'Domiciliario' : 'Usuario'}</Badge>
           </div>
         </div>
 
@@ -102,48 +119,13 @@ export const DomiciliarioPerfil: React.FC = () => {
                 />
               </div>
             </div>
-            <div className={s.formRow}>
-              <div className={s.field}>
-                <label className={s.label}>Ciudad</label>
-                <input
-                  type="text"
-                  className={s.input}
-                  value={ciudad}
-                  onChange={e => setCiudad(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className={s.perfilFormSection}>
-            <div className={s.perfilFormSectionTitle}>Datos de entrega</div>
-            <div className={s.formRow}>
-              <div className={s.field}>
-                <label className={s.label}>Tipo de vehículo</label>
-                <select className={s.select} value={vehiculo} onChange={e => setVehiculo(e.target.value)}>
-                  <option value="moto">Moto</option>
-                  <option value="bicicleta">Bicicleta</option>
-                  <option value="pie">A pie</option>
-                </select>
-              </div>
-              <div className={s.field}>
-                <label className={s.label}>Placa (si aplica)</label>
-                <input
-                  type="text"
-                  className={s.input}
-                  value={placa}
-                  onChange={e => setPlaca(e.target.value)}
-                  placeholder="ABC-123"
-                />
-              </div>
-            </div>
           </div>
 
           <div className={s.perfilFormSection}>
             <div className={s.perfilFormSectionTitle}>Datos de acceso</div>
             <div className={s.readOnlyField}>
               <label className={s.readOnlyLabel}>Email</label>
-              <div className={s.readOnlyValue}>juan.p@surtitelas.com</div>
+              <div className={s.readOnlyValue}>{email}</div>
               <div className={s.readOnlyNote}>
                 El email es tu identificador de acceso y no puede cambiarse
               </div>
@@ -156,25 +138,6 @@ export const DomiciliarioPerfil: React.FC = () => {
                 Los roles son asignados por el administrador
               </div>
             </div>
-            <div style={{ height: '16px' }} />
-            <div className={s.readOnlyField}>
-              <label className={s.readOnlyLabel}>Zona asignada</label>
-              <div className={s.readOnlyValue}>Bogotá Centro</div>
-              <div className={s.readOnlyNote}>
-                Tu zona de entregas es asignada por el administrador
-              </div>
-            </div>
-          </div>
-
-          <div className={s.turnoSection}>
-            <div className={s.turnoInfo}>
-              <div className={s.turnoLabel}>Estado del turno</div>
-              <div className={s.turnoStatus}>
-                <span className={s.turnoPulse} style={{ background: turnoActivo ? 'var(--color-success)' : 'var(--color-text-muted)' }} />
-                {turnoActivo ? 'Activo' : 'Finalizado'}
-              </div>
-            </div>
-            <Button variant="secondary" size="sm" onClick={finalizarTurno}>{turnoActivo ? 'Finalizar turno' : 'Turno finalizado'}</Button>
           </div>
 
           {formError && (
@@ -184,7 +147,7 @@ export const DomiciliarioPerfil: React.FC = () => {
           )}
 
           <div className={s.formActions}>
-            <Button onClick={guardarCambios}>
+            <Button onClick={guardarCambios} loading={saving}>
               <Check size={16} />
               Guardar cambios
             </Button>
@@ -213,7 +176,7 @@ export const DomiciliarioPerfil: React.FC = () => {
           }} />
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setIsAvatarOpen(false)}>Cancelar</Button>
-            <Button onClick={() => fileInputRef.current?.click()}>
+            <Button onClick={() => { fileInputRef.current?.click(); }}>
               <ImageIcon size={16} />
               Seleccionar imagen
             </Button>

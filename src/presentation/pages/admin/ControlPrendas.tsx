@@ -1,76 +1,89 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Search, Truck, Package, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Search, ClipboardCheck, CheckCircle, XCircle, Layers } from 'lucide-react';
 import s from './ControlPrendas.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { controlPrendaApi, type ControlPrenda } from '@/infrastructure/api/controlPrendaApi';
+import { ETAPAS_CONTROL, ESTADOS_CONTROL } from '@/shared/constants/options';
 
-interface PrendaControl {
-  id: string;
-  numeroOrden: string;
-  prenda: string;
-  referencia: string;
-  tipo: 'Entrega a taller' | 'Recepcion de taller';
-  tallerNombre: string;
-  cantidad: number;
-  cantidadRecibida?: number;
-  fechaSalida: string;
-  fechaRetorno?: string;
-  estado: 'En camino' | 'En taller' | 'Entregado' | 'Recibido' | 'Con novedad';
-  conductor?: string;
-  vehiculo?: string;
-  observaciones: string;
-}
+type Etapa = ControlPrenda['etapa'];
+type Estado = ControlPrenda['estado'];
 
-const mockRegistros: PrendaControl[] = [
-  { id: 'CP-001', numeroOrden: 'ORD-2024-001', prenda: 'Camisa manga larga', referencia: 'REF-1001', tipo: 'Entrega a taller', tallerNombre: 'Taller Textil El Progreso', cantidad: 200, fechaSalida: '2024-06-08', estado: 'Entregado', conductor: 'Carlos Ruiz', vehiculo: 'ABC-123', observaciones: 'Entregado en perfecto estado' },
-  { id: 'CP-002', numeroOrden: 'ORD-2024-003', prenda: 'Blusa estampada', referencia: 'REF-1003', tipo: 'Entrega a taller', tallerNombre: 'Taller Textil El Progreso', cantidad: 300, fechaSalida: '2024-06-09', estado: 'En taller', conductor: 'María López', vehiculo: 'XYZ-789', observaciones: 'En proceso de confección' },
-  { id: 'CP-003', numeroOrden: 'ORD-2024-002', prenda: 'Pantalón jean', referencia: 'REF-1002', tipo: 'Recepcion de taller', tallerNombre: 'Confección Martínez', cantidad: 150, cantidadRecibida: 148, fechaSalida: '2024-05-28', fechaRetorno: '2024-06-10', estado: 'Recibido', observaciones: '2 prendas con defecto menor' },
-  { id: 'CP-004', numeroOrden: 'ORD-2024-006', prenda: 'Camiseta básica', referencia: 'REF-1006', tipo: 'Recepcion de taller', tallerNombre: 'Taller San José', cantidad: 500, cantidadRecibida: 500, fechaSalida: '2024-05-20', fechaRetorno: '2024-06-09', estado: 'Recibido', observaciones: 'Entrega completa y a tiempo' },
-  { id: 'CP-005', numeroOrden: 'ORD-2024-007', prenda: 'Uniforme empresarial', referencia: 'REF-1007', tipo: 'Entrega a taller', tallerNombre: 'Artesanías del Valle', cantidad: 120, fechaSalida: '2024-06-03', estado: 'Con novedad', conductor: 'Juan Pérez', vehiculo: 'DEF-456', observaciones: 'Retraso en entrega por daño en vehículo' },
-  { id: 'CP-006', numeroOrden: 'ORD-2024-004', prenda: 'Vestido casual', referencia: 'REF-1004', tipo: 'Recepcion de taller', tallerNombre: 'Confección Martínez', cantidad: 100, fechaSalida: '2024-06-01', estado: 'En taller', observaciones: 'Esperando finalización' },
-  { id: 'CP-007', numeroOrden: 'ORD-2024-008', prenda: 'Chaqueta impermeable', referencia: 'REF-1008', tipo: 'Entrega a taller', tallerNombre: 'Taller Rápido', cantidad: 80, fechaSalida: '2024-06-05', estado: 'En camino', conductor: 'Ana Gómez', vehiculo: 'GHI-012', observaciones: 'En tránsito hacia el taller' },
-  { id: 'CP-008', numeroOrden: 'ORD-2024-009', prenda: 'Short deportivo', referencia: 'REF-1009', tipo: 'Recepcion de taller', tallerNombre: 'Taller San José', cantidad: 250, cantidadRecibida: 250, fechaSalida: '2024-05-25', fechaRetorno: '2024-06-11', estado: 'Recibido', observaciones: 'Revisión de calidad aprobada' },
-];
+const ETAPAS = ETAPAS_CONTROL as unknown as Etapa[];
+const ESTADOS = ESTADOS_CONTROL as unknown as Estado[];
 
 export const AdminControlPrendas: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [registros, setRegistros] = useState<PrendaControl[]>(mockRegistros);
-  const [filtroTipo, setFiltroTipo] = useState<'Todos' | 'Entrega a taller' | 'Recepcion de taller'>('Todos');
-  const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'En camino' | 'En taller' | 'Entregado' | 'Recibido' | 'Con novedad'>('Todos');
+  const [registros, setRegistros] = useState<ControlPrenda[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filtroEtapa, setFiltroEtapa] = useState<'Todos' | Etapa>('Todos');
+  const [filtroEstado, setFiltroEstado] = useState<'Todos' | Estado>('Todos');
+
+  const fetchRegistros = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await controlPrendaApi.list();
+      setRegistros(data);
+    } catch {
+      setError('No se pudieron cargar los registros de control de prendas');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchRegistros();
+  }, [fetchRegistros]);
 
   const filteredRegistros = useMemo(() => {
+    const q = search.toLowerCase();
     return registros.filter(r =>
-      (filtroTipo === 'Todos' || r.tipo === filtroTipo) &&
+      (filtroEtapa === 'Todos' || r.etapa === filtroEtapa) &&
       (filtroEstado === 'Todos' || r.estado === filtroEstado) &&
-      (r.numeroOrden.toLowerCase().includes(search.toLowerCase()) ||
-       r.prenda.toLowerCase().includes(search.toLowerCase()) ||
-       r.referencia.toLowerCase().includes(search.toLowerCase()) ||
-       r.tallerNombre.toLowerCase().includes(search.toLowerCase()))
+      (r.id.toLowerCase().includes(q) ||
+       (r.produccionNumero ?? '').toLowerCase().includes(q) ||
+       (r.produccionCliente ?? '').toLowerCase().includes(q) ||
+       r.etapa.toLowerCase().includes(q))
     );
-  }, [search, filtroTipo, filtroEstado, registros]);
+  }, [search, filtroEtapa, filtroEstado, registros]);
 
-  const getTipoIcon = (tipo: string) => {
-    return tipo === 'Entrega a taller' ? <Truck size={14} /> : <Package size={14} />;
+  const getEtapaIcon = (etapa: string) => {
+    return etapa === 'Control de Calidad' ? <ClipboardCheck size={14} /> : <Layers size={14} />;
   };
 
-const getEstadoBadge = (estado: string) => {
+  const getEstadoBadge = (estado: string) => {
     switch (estado) {
-      case 'En camino': return 'info';
-      case 'En taller': return 'warning';
-      case 'Entregado': return 'success';
-      case 'Recibido': return 'purple';
-      case 'Con novedad': return 'danger';
+      case 'Proceso': return 'warning';
+      case 'Aprobado': return 'success';
+      case 'Rechazado': return 'danger';
       default: return 'default';
     }
   };
 
   const stats = {
-    entregasPendientes:     registros.filter(r => r.tipo === 'Entrega a taller' && (r.estado === 'En camino' || r.estado === 'En taller')).length,
-    recepcionesPendientes: registros.filter(r => r.tipo === 'Recepcion de taller' && (r.estado === 'En taller' || r.estado === 'Entregado')).length,
-    conNovedad: registros.filter(r => r.estado === 'Con novedad').length,
-    completadas: registros.filter(r => r.estado === 'Recibido' || r.estado === 'Entregado').length,
+    enProceso: registros.filter(r => r.estado === 'Proceso').length,
+    aprobados: registros.filter(r => r.estado === 'Aprobado').length,
+    rechazados: registros.filter(r => r.estado === 'Rechazado').length,
+    total: registros.length,
+  };
+
+  const handleReview = async (r: ControlPrenda, estado: 'Aprobado' | 'Rechazado') => {
+    try {
+      const actualizado = await controlPrendaApi.review(
+        r.id,
+        estado,
+        estado === 'Aprobado' ? r.cantidadTotal : 0,
+        estado === 'Rechazado' ? r.cantidadTotal : 0,
+      );
+      setRegistros(prev => prev.map(reg => reg.id === r.id ? actualizado : reg));
+      toast.success(estado === 'Aprobado' ? 'Control aprobado' : 'Control rechazado');
+    } catch {
+      toast.error('No fue posible actualizar el control');
+    }
   };
 
   return (
@@ -78,34 +91,16 @@ const getEstadoBadge = (estado: string) => {
       <div className={s.header}>
         <div>
           <h1 className={s.pageTitle}>Control de Prendas</h1>
-          <p className={s.pageSubtitle}>Entregas y recepciones</p>
+          <p className={s.pageSubtitle}>Control de calidad de producción</p>
         </div>
         <div className={s.metricsRow}>
-          <div className={`${s.metricCard} ${s.metricCardPrimary}`}>
-            <span className={`${s.metricIcon} ${s.metricIconPending}`}>
-              <Truck size={22} />
-            </span>
-            <div className={s.metricBody}>
-              <span className={s.metricValue}>{stats.entregasPendientes}</span>
-              <span className={s.metricLabel}>Entregas Pendientes</span>
-            </div>
-          </div>
-          <div className={`${s.metricCard} ${s.metricCardSuccess}`}>
-            <span className={`${s.metricIcon} ${s.metricIconReceived}`}>
-              <Package size={22} />
-            </span>
-            <div className={s.metricBody}>
-              <span className={s.metricValue}>{stats.recepcionesPendientes}</span>
-              <span className={s.metricLabel}>Recepciones Pendientes</span>
-            </div>
-          </div>
           <div className={`${s.metricCard} ${s.metricCardWarning}`}>
-            <span className={`${s.metricIcon} ${s.metricIconWarning}`}>
-              <AlertTriangle size={22} />
+            <span className={`${s.metricIcon} ${s.metricIconPending}`}>
+              <Layers size={22} />
             </span>
             <div className={s.metricBody}>
-              <span className={s.metricValue}>{stats.conNovedad}</span>
-              <span className={s.metricLabel}>Con Novedad</span>
+              <span className={s.metricValue}>{stats.enProceso}</span>
+              <span className={s.metricLabel}>En Proceso</span>
             </div>
           </div>
           <div className={`${s.metricCard} ${s.metricCardSuccess}`}>
@@ -113,28 +108,53 @@ const getEstadoBadge = (estado: string) => {
               <CheckCircle size={22} />
             </span>
             <div className={s.metricBody}>
-              <span className={s.metricValue}>{stats.completadas}</span>
-              <span className={s.metricLabel}>Completadas</span>
+              <span className={s.metricValue}>{stats.aprobados}</span>
+              <span className={s.metricLabel}>Aprobados</span>
+            </div>
+          </div>
+          <div className={`${s.metricCard} ${s.metricCardPrimary}`}>
+            <span className={`${s.metricIcon} ${s.metricIconWarning}`}>
+              <XCircle size={22} />
+            </span>
+            <div className={s.metricBody}>
+              <span className={s.metricValue}>{stats.rechazados}</span>
+              <span className={s.metricLabel}>Rechazados</span>
+            </div>
+          </div>
+          <div className={`${s.metricCard} ${s.metricCardSuccess}`}>
+            <span className={`${s.metricIcon} ${s.metricIconReceived}`}>
+              <ClipboardCheck size={22} />
+            </span>
+            <div className={s.metricBody}>
+              <span className={s.metricValue}>{stats.total}</span>
+              <span className={s.metricLabel}>Total</span>
             </div>
           </div>
         </div>
       </div>
 
+      {error && (
+        <div className={s.errorBox}>
+          <span>{error}</span>
+          <button className={s.retryBtn} onClick={() => void fetchRegistros()}>Reintentar</button>
+        </div>
+      )}
+
       <div className={s.filters}>
         <div className={s.filterGroup}>
-          {['Todos', 'Entrega a taller', 'Recepcion de taller'].map(tipo => (
+          {(['Todos', ...ETAPAS] as const).map(etapa => (
             <button
-              key={tipo}
-              className={`${s.filterBtn} ${filtroTipo === tipo ? s.filterBtnActive : ''}`}
-              onClick={() => setFiltroTipo(tipo as typeof filtroTipo)}
+              key={etapa}
+              className={`${s.filterBtn} ${filtroEtapa === etapa ? s.filterBtnActive : ''}`}
+              onClick={() => setFiltroEtapa(etapa as typeof filtroEtapa)}
             >
-              {getTipoIcon(tipo)}
-              <span className={s.filterBtnText}>{tipo}</span>
+              {etapa !== 'Todos' && getEtapaIcon(etapa)}
+              <span className={s.filterBtnText}>{etapa}</span>
             </button>
           ))}
         </div>
         <div className={s.filterGroup}>
-          {['Todos', 'En camino', 'En taller', 'Entregado', 'Recibido', 'Con novedad'].map(estado => (
+          {(['Todos', ...ESTADOS] as const).map(estado => (
             <button
               key={estado}
               className={`${s.filterBtn} ${filtroEstado === estado ? s.filterBtnActive : ''}`}
@@ -148,7 +168,7 @@ const getEstadoBadge = (estado: string) => {
           <Search size={16} className={s.searchIcon} />
           <input
             type="text"
-            placeholder="Buscar por orden, prenda, referencia o taller..."
+            placeholder="Buscar por ID, orden, cliente o etapa..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className={s.searchInput}
@@ -156,90 +176,94 @@ const getEstadoBadge = (estado: string) => {
         </div>
       </div>
 
-      <DataTable<PrendaControl>
+      <DataTable<ControlPrenda>
         data={filteredRegistros}
         pageSize={10}
-        emptyMessage="No se encontraron registros de control de prendas"
+        emptyMessage={loading ? 'Cargando registros...' : error ? error : 'No se encontraron registros de control de prendas'}
         enableSorting
         enableColumnFilters
         enableRowSelection
         enableExport
         exportFileName="control_prendas"
         actions={(r) => [
-          ...(r.tipo === 'Recepcion de taller' && !r.fechaRetorno ? [{ label: 'Recepcionar', icon: <CheckCircle size={14} />, onClick: () => { setRegistros(prev => prev.map(reg => reg.id === r.id ? { ...reg, estado: 'Recibido', cantidadRecibida: reg.cantidad, fechaRetorno: new Date().toISOString().slice(0, 10) } : reg)); toast.success('Prenda recepcionada'); } }] : []),
-          ...(r.estado === 'Con novedad' ? [{ label: 'Resolver', icon: <CheckCircle size={14} />, onClick: () => { setRegistros(prev => prev.map(reg => reg.id === r.id ? { ...reg, estado: 'Entregado' } : reg)); toast.success('Novedad resuelta'); } }] : []),
+          ...(r.estado === 'Proceso' ? [
+            { label: 'Aprobar', icon: <CheckCircle size={14} />, onClick: () => void handleReview(r, 'Aprobado') },
+            { label: 'Rechazar', icon: <XCircle size={14} />, onClick: () => void handleReview(r, 'Rechazado') },
+          ] : []),
         ]}
         toolbarLeft={
           <div className={s.quickStats}>
             <div className={s.quickStatCard}>
               <span className={`${s.quickStatIcon} ${s.quickStatIconPending}`}>
-                <Truck size={14} />
+                <Layers size={14} />
               </span>
-              <span className={s.quickStatNumber}>{stats.entregasPendientes}</span>
-              <span className={s.quickStatLabel}>Pendientes</span>
+              <span className={s.quickStatNumber}>{stats.enProceso}</span>
+              <span className={s.quickStatLabel}>En proceso</span>
             </div>
             <div className={s.quickStatCard}>
               <span className={`${s.quickStatIcon} ${s.quickStatIconReceived}`}>
-                <Package size={14} />
+                <CheckCircle size={14} />
               </span>
-              <span className={s.quickStatNumber}>{stats.recepcionesPendientes}</span>
-              <span className={s.quickStatLabel}>Recepciones</span>
+              <span className={s.quickStatNumber}>{stats.aprobados}</span>
+              <span className={s.quickStatLabel}>Aprobados</span>
             </div>
             <div className={`${s.quickStatCard} ${s.quickStatWarning}`}>
               <span className={`${s.quickStatIcon} ${s.quickStatIconAlert}`}>
-                <AlertTriangle size={14} />
+                <XCircle size={14} />
               </span>
-              <span className={s.quickStatNumber}>{stats.conNovedad}</span>
-              <span className={s.quickStatLabel}>Novedades</span>
+              <span className={s.quickStatNumber}>{stats.rechazados}</span>
+              <span className={s.quickStatLabel}>Rechazados</span>
             </div>
           </div>
         }
         columns={[
-          { key: 'orden', header: 'Orden', width: '180px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar orden...', render: (r) => (
+          { key: 'orden', header: 'Producción', width: '200px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar orden...', render: (r) => (
             <div className="flex flex-col gap-0.5">
-              <span className="font-semibold text-[var(--color-text-primary)]">{r.numeroOrden}</span>
-              <span className="text-xs text-[var(--color-text-secondary)]">{r.referencia}</span>
+              <span className="font-semibold text-[var(--color-text-primary)]">{r.produccionNumero ?? r.produccionId}</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">{r.produccionCliente ?? '—'}</span>
             </div>
           )},
-          { key: 'prenda', header: 'Prenda / Tipo', width: '220px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar prenda...', render: (r) => (
-            <div className="flex flex-col gap-0.5">
-              <span className="font-semibold text-[var(--color-text-primary)]">{r.prenda}</span>
-              <span className="text-xs text-[var(--color-text-secondary)]">{r.tipo === 'Entrega a taller' ? 'Entrega' : 'Recepción'} · {r.cantidad} unidades</span>
+          { key: 'etapa', header: 'Etapa', width: '200px', sortable: true, filterable: true, filterType: 'select', filterOptions: ETAPAS.map(e => ({ value: e, label: e })), render: (r) => (
+            <div className="flex items-center gap-1.5">
+              {getEtapaIcon(r.etapa)}
+              <span className="text-[var(--color-text-primary)]">{r.etapa}</span>
             </div>
           )},
-          { key: 'taller', header: 'Taller / Movimiento', width: '220px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar taller...', render: (r) => (
+          { key: 'cantidades', header: 'Cantidades', width: '240px', sortable: false, render: (r) => (
             <div className="flex flex-col gap-0.5">
-              <span className="text-[var(--color-text-primary)]">{r.tallerNombre}</span>
-              <span className="text-xs text-[var(--color-text-secondary)]">
-                {r.tipo === 'Entrega a taller' ? 'Hacia taller' : 'Desde taller'}
-                {r.fechaRetorno ? ` · ${r.fechaRetorno}` : ''}
-              </span>
+              <span className="text-[var(--color-text-primary)]">Total: {r.cantidadTotal} · Revisadas: {r.cantidadRevisada}</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">Aprobadas: {r.cantidadAprobada} · Rechazadas: {r.cantidadRechazada}</span>
             </div>
           )},
-          { key: 'estado', header: 'Estado', width: '120px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-            { value: 'En camino', label: 'En camino' },
-            { value: 'En taller', label: 'En taller' },
-            { value: 'Entregado', label: 'Entregado' },
-            { value: 'Recibido', label: 'Recibido' },
-            { value: 'Con novedad', label: 'Con novedad' },
-          ], render: (r) => <Badge variant={getEstadoBadge(r.estado)}>{r.estado}</Badge> },
+          { key: 'estado', header: 'Estado', width: '120px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS.map(e => ({ value: e, label: e })), render: (r) => <Badge variant={getEstadoBadge(r.estado)}>{r.estado}</Badge> },
         ]}
         detailPanel={{
-          title: (r) => `${r.tipo === 'Entrega a taller' ? 'Detalle de Entrega' : 'Detalle de Recepción'} - ${r.id}`,
+          title: (r) => `Detalle de Control - ${r.id}`,
           render: (r, onClose) => (
             <div className={s.registroInfo}>
-              <div className={s.infoRow}><span className={s.infoLabel}>N° Orden:</span><span className={s.infoValue}>{r.numeroOrden}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Tipo:</span><Badge variant={r.tipo === 'Entrega a taller' ? 'primary' : 'default'}>{r.tipo}</Badge></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Prenda:</span><span className={s.infoValue}>{r.prenda}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Referencia:</span><span className={s.infoValue}>{r.referencia}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Taller:</span><span className={s.infoValue}>{r.tallerNombre}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Cantidad:</span><span className={s.infoValue}>{r.cantidad} unidades{r.cantidadRecibida !== undefined && <span className={s.cantidadRecibidaModal}> ({r.cantidadRecibida} recibidas)</span>}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Fecha salida:</span><span className={s.infoValue}>{r.fechaSalida}</span></div>
-              {r.fechaRetorno && <div className={s.infoRow}><span className={s.infoLabel}>Fecha retorno:</span><span className={s.infoValue}>{r.fechaRetorno}</span></div>}
-              {r.conductor && <div className={s.infoRow}><span className={s.infoLabel}>Conductor:</span><span className={s.infoValue}>{r.conductor}</span></div>}
-              {r.vehiculo && <div className={s.infoRow}><span className={s.infoLabel}>Vehículo:</span><span className={s.infoValue}>{r.vehiculo}</span></div>}
-              <div className={s.infoRowFull}><span className={s.infoLabel}>Observaciones:</span><span className={s.infoValue}>{r.observaciones}</span></div>
-              <div className={s.formActions}><Button variant="secondary" onClick={onClose}>Cerrar</Button></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>ID:</span><span className={s.infoValue}>{r.id}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Producción:</span><span className={s.infoValue}>{r.produccionNumero ?? r.produccionId}</span></div>
+              {r.produccionCliente && <div className={s.infoRow}><span className={s.infoLabel}>Cliente:</span><span className={s.infoValue}>{r.produccionCliente}</span></div>}
+              <div className={s.infoRow}><span className={s.infoLabel}>Etapa:</span><Badge variant="primary">{r.etapa}</Badge></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Estado:</span><Badge variant={getEstadoBadge(r.estado)}>{r.estado}</Badge></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Cantidad total:</span><span className={s.infoValue}>{r.cantidadTotal} unidades</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Revisadas:</span><span className={s.infoValue}>{r.cantidadRevisada}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Aprobadas:</span><span className={s.infoValue}>{r.cantidadAprobada}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Rechazadas:</span><span className={s.infoValue}>{r.cantidadRechazada}</span></div>
+              {r.revisadoPor && <div className={s.infoRow}><span className={s.infoLabel}>Revisado por:</span><span className={s.infoValue}>{r.revisadoPor.nombre}</span></div>}
+              <div className={s.infoRow}><span className={s.infoLabel}>Creado por:</span><span className={s.infoValue}>{r.creadoPor.nombre}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Creado:</span><span className={s.infoValue}>{new Date(r.createdAt).toLocaleString()}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Actualizado:</span><span className={s.infoValue}>{new Date(r.updatedAt).toLocaleString()}</span></div>
+              {r.observaciones && <div className={s.infoRowFull}><span className={s.infoLabel}>Observaciones:</span><span className={s.infoValue}>{r.observaciones}</span></div>}
+              <div className={s.formActions}>
+                {r.estado === 'Proceso' && (
+                  <>
+                    <Button variant="primary" onClick={() => { void handleReview(r, 'Aprobado'); onClose(); }}>Aprobar</Button>
+                    <Button variant="secondary" onClick={() => { void handleReview(r, 'Rechazado'); onClose(); }}>Rechazar</Button>
+                  </>
+                )}
+                <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+              </div>
             </div>
           ),
         }}
@@ -247,4 +271,3 @@ const getEstadoBadge = (estado: string) => {
     </div>
   );
 };
-

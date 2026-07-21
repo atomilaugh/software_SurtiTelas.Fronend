@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Eye, MapPin, Clock, Package } from 'lucide-react';
 import s from './Historial.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { DetailModal } from '@/shared/ui/DetailModal';
+import { ordersApi } from '@/infrastructure/api/ordersApi';
+import { useAuthStore } from '@/core/stores/authStore';
 
 interface Entrega {
   id: string;
@@ -16,51 +18,87 @@ interface Entrega {
   observaciones: string;
 }
 
-const historialEntregas: Record<string, Entrega[]> = {
-  'Hoy - 08 Jun 2026': [
-    { id: 'ENT-043', pedido: '#PD-2401', cliente: 'Almacén El Sol', direccion: 'Cra 15 #45-23', fecha: '08 Jun 2026', hora: '09:48', estado: 'Entregado', observaciones: '' },
-    { id: 'ENT-044', pedido: '#PD-2402', cliente: 'Boutique Moda+', direccion: 'Cl 80 #12-67', fecha: '08 Jun 2026', hora: '10:31', estado: 'Entregado', observaciones: '' },
-  ],
-  'Ayer - 07 Jun 2026': [
-    { id: 'ENT-039', pedido: '#PD-2397', cliente: 'Moda Casual SAS', direccion: 'Av 68 #34-10', fecha: '07 Jun 2026', hora: '09:15', estado: 'Entregado', observaciones: '' },
-    { id: 'ENT-040', pedido: '#PD-2398', cliente: 'Textiles Andina', direccion: 'Cra 7 #120-45', fecha: '07 Jun 2026', hora: '10:52', estado: 'Entregado', observaciones: '' },
-    { id: 'ENT-041', pedido: '#PD-2399', cliente: 'La Tienda Norte', direccion: 'Cl 127 #20-33', fecha: '07 Jun 2026', hora: '12:08', estado: 'Fallido', observaciones: 'Cliente no atendió' },
-  ],
-};
-
-const rendimiento = [
-  { value: '187', label: 'Total Entregas', sub: 'Desde inicio', color: 'default' },
-  { value: '94%', label: 'Tasa de Éxito', sub: '176 exitosas', color: 'success' },
-  { value: '11', label: 'Fallidas Total', sub: '6% del total', color: 'error' },
-  { value: '4.8', label: 'Calificación', sub: 'Promedio clientes', color: 'default' },
-];
-
 export const DomiciliarioHistorial: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
   const [desde, setDesde] = useState('2026-06-01');
   const [hasta, setHasta] = useState('2026-06-08');
   const [selectedEntrega, setSelectedEntrega] = useState<Entrega | null>(null);
+  const [entregas, setEntregas] = useState<Entrega[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const result = await ordersApi.list({ asesorId: user?.uid });
+        const mapped: Entrega[] = result.pedidos
+          .filter((p) => p.estado === 'Entregado' || p.estado === 'Cancelado')
+          .map((p) => ({
+            id: p.id,
+            pedido: p.id,
+            cliente: p.cliente,
+            direccion: '',
+            fecha: p.fecha,
+            hora: '',
+            estado: p.estado === 'Entregado' ? 'Entregado' : 'Fallido',
+            observaciones: p.observaciones || '',
+          }));
+        setEntregas(mapped);
+      } catch {
+        toast.error('No se pudo cargar el historial');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user?.uid) void load();
+  }, [user?.uid]);
+
+  const groupedByDate = useMemo(() => {
+    const groups: Record<string, Entrega[]> = {};
+    entregas.forEach((e) => {
+      if (!groups[e.fecha]) groups[e.fecha] = [];
+      groups[e.fecha].push(e);
+    });
+    return groups;
+  }, [entregas]);
 
   const filteredHistorial = useMemo(() => {
     const desdeDate = new Date(`${desde}T00:00:00`).getTime();
     const hastaDate = new Date(`${hasta}T23:59:59`).getTime();
 
     const result: Record<string, Entrega[]> = {};
-    Object.entries(historialEntregas).forEach(([date, entregas]) => {
-      const fechaParts = date.split('-').map(part => part.trim());
-      const monthMap: Record<string, string> = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
-      const day = fechaParts[1]?.padStart(2, '0');
-      const month = monthMap[fechaParts[0] || ''];
-      const year = fechaParts[2];
-      if (!day || !month || !year) return;
-      const dateValue = new Date(`${year}-${month}-${day}T12:00:00`).getTime();
-      if (dateValue >= desdeDate && dateValue <= hastaDate) {
-        result[date] = entregas;
+    Object.entries(groupedByDate).forEach(([fecha, ents]) => {
+      const parsed = new Date(fecha.replace(/(\d{2}) (\w+) (\d{4})/, (_, d, m, y) => {
+        const monthMap: Record<string, string> = { Ene:'01', Feb:'02', Mar:'03', Abr:'04', May:'05', Jun:'06', Jul:'07', Ago:'08', Sep:'09', Oct:'10', Nov:'11', Dic:'12' };
+        return `${y}-${monthMap[m] || '01'}-${d}`;
+      })).getTime();
+      if (!Number.isNaN(parsed) && parsed >= desdeDate && parsed <= hastaDate) {
+        result[fecha] = ents;
       }
     });
     return result;
-  }, [desde, hasta]);
+  }, [desde, hasta, groupedByDate]);
 
-  const totalFiltrado = Object.values(filteredHistorial).flat().length;
+  const totalEntregas = entregas.length;
+  const exitosas = entregas.filter((e) => e.estado === 'Entregado').length;
+  const fallidas = entregas.filter((e) => e.estado === 'Fallido').length;
+  const tasaExito = totalEntregas > 0 ? Math.round((exitosas / totalEntregas) * 100) : 0;
+
+  const rendimientoCards = [
+    { value: String(totalEntregas), label: 'Total Entregas', sub: 'Desde inicio', color: 'default' as const },
+    { value: `${tasaExito}%`, label: 'Tasa de Éxito', sub: `${exitosas} exitosas`, color: 'success' as const },
+    { value: String(fallidas), label: 'Fallidas Total', sub: `${totalEntregas > 0 ? Math.round((fallidas / totalEntregas) * 100) : 0}% del total`, color: 'error' as const },
+    { value: '—', label: 'Calificación', sub: 'Promedio clientes', color: 'default' as const },
+  ];
+
+  if (loading) {
+    return (
+      <div>
+        <h1 className={s.pageTitle}>Historial</h1>
+        <p className={s.pageSubtitle}>Cargando...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -68,7 +106,7 @@ export const DomiciliarioHistorial: React.FC = () => {
       <p className={s.pageSubtitle}>Registro de todas tus entregas</p>
 
       <div className={s.rendimientoGrid}>
-        {rendimiento.map((r, i) => (
+        {rendimientoCards.map((r, i) => (
           <div key={i} className={s.rendimientoCard}>
             <div className={`${s.rendimientoValue} ${r.color === 'success' ? s.rendimientoValueSuccess : r.color === 'error' ? s.rendimientoValueError : ''}`}>
               {r.value}
@@ -125,7 +163,7 @@ export const DomiciliarioHistorial: React.FC = () => {
       )}
 
       <div style={{ marginTop: 16, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-        Mostrando {totalFiltrado} entregas filtradas.
+        Mostrando {Object.values(filteredHistorial).flat().length} entregas filtradas.
       </div>
 
       <DetailModal

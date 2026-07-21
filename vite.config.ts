@@ -37,7 +37,7 @@ export default defineConfig({
     port: 5173,
     host: '127.0.0.1', // Servidor local Vite explícito
     open: true, // Abre el navegador automáticamente
-    strictPort: false, // Permite usar otro puerto si 5173 ya está ocupado
+    strictPort: true, // Fijo en 5173: evita saltos a 5174/5179 que rompen CORS
     hmr: {
       overlay: true // Muestra overlay de errores en el navegador
     }

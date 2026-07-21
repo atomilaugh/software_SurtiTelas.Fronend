@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, SlidersHorizontal, X, Sparkles, Heart, ShoppingBag, Star } from 'lucide-react';
 import { FilterDrawer, type FilterState } from '@presentation/pages/components/FilterDrawer';
@@ -6,6 +6,9 @@ import { ProductDetailModal } from '@presentation/components/ProductDetailModal'
 import { toast } from 'sonner';
 import '../styles/CatalogPage.css';
 import { Tooltip } from '@/shared/components/Tooltip';
+import { catalogApi, type ProductsListResult } from '@/infrastructure/api/catalogApi';
+import { useServerPagination } from '@/hooks/useServerPagination';
+import type { Producto as ProductoCore } from '@/core/types';
 
 interface Producto {
   id: string;
@@ -21,25 +24,6 @@ interface Producto {
   nuevo?: boolean;
   rating?: number;
 }
-
-const PRODUCTOS_DEMO: Producto[] = [
-  { id: '1', nombre: 'Camiseta Premium Cotton', categoria: 'Camisetas', precio: 45000, imagen: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=800', marca: 'Nike', tallas: ['S','M','L','XL'], color: 'Blanco', disponible: true, destacado: true, nuevo: false, rating: 4.8 },
-  { id: '2', nombre: 'Polo Tech Dry Fit', categoria: 'Polos', precio: 52000, imagen: 'https://images.unsplash.com/photo-1625910513413-5fc45e77b1b8?q=80&w=800', marca: 'Adidas', tallas: ['M','L','XL'], color: 'Negro', disponible: true, destacado: true, nuevo: true, rating: 4.9 },
-  { id: '3', nombre: 'Hoodie Urban Collection', categoria: 'Sudaderas', precio: 85000, imagen: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=800', marca: 'Puma', tallas: ['S','M','L','XL','XXL'], color: 'Gris', disponible: true, destacado: false, nuevo: false, rating: 4.7 },
-  { id: '4', nombre: 'T-Shirt Classic Fit', categoria: 'Camisetas', precio: 38000, imagen: 'https://images.unsplash.com/photo-1503341504253-dff4815485f1?q=80&w=800', marca: 'Reebok', tallas: ['S','M','L'], color: 'Azul', disponible: true, destacado: false, nuevo: true, rating: 4.6 },
-  { id: '5', nombre: 'Jacket Windbreaker Pro', categoria: 'Chaquetas', precio: 120000, imagen: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=800', marca: 'Under Armour', tallas: ['M','L','XL'], color: 'Verde', disponible: false, destacado: true, nuevo: false, rating: 4.9 },
-  { id: '6', nombre: 'Crop Top Athletic', categoria: 'Blusas', precio: 42000, imagen: 'https://images.unsplash.com/photo-1572715252129-61988a807672?q=80&w=800', marca: 'Nike', tallas: ['XS','S','M'], color: 'Rosa', disponible: true, destacado: false, nuevo: true, rating: 4.5 },
-  { id: '7', nombre: 'Pantaloneta Training', categoria: 'Pantalonetas', precio: 68000, imagen: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?q=80&w=800', marca: 'Adidas', tallas: ['S','M','L','XL'], color: 'Negro', disponible: true, destacado: false, nuevo: false, rating: 4.8 },
-  { id: '8', nombre: 'Tee Minimalist Black', categoria: 'Camisetas', precio: 35000, imagen: 'https://images.unsplash.com/photo-1581655353687-56206c7970d5?q=80&w=800', marca: 'Puma', tallas: ['S','M','L'], color: 'Negro', disponible: true, destacado: false, nuevo: false, rating: 4.4 },
-  { id: '9', nombre: 'Sports Bra Elite', categoria: 'Deporte', precio: 75000, imagen: 'https://images.unsplash.com/photo-1576678927586-0c1b2e0a1b0a?q=80&w=800', marca: 'Nike', tallas: ['S','M','L'], color: 'Rojo', disponible: true, destacado: true, nuevo: true, rating: 4.7 },
-  { id: '10', nombre: 'Leggings Power Stretch', categoria: 'Deporte', precio: 95000, imagen: 'https://images.unsplash.com/photo-1594633312532-aea7c9b2b5c5?q=80&w=800', marca: 'Adidas', tallas: ['XS','S','M','L'], color: 'Negro', disponible: true, destacado: false, nuevo: true, rating: 4.8 },
-  { id: '11', nombre: 'Tank Top Summer', categoria: 'Camisetas', precio: 32000, imagen: 'https://images.unsplash.com/photo-1562157873-818bc0725df6?q=80&w=800', marca: 'Reebok', tallas: ['S','M','L','XL'], color: 'Verde', disponible: true, destacado: false, nuevo: false, rating: 4.3 },
-  { id: '12', nombre: 'Sweatshirt Oversized', categoria: 'Sudaderas', precio: 78000, imagen: 'https://images.unsplash.com/photo-1608612991346-a6f9cbd2d5c3?q=80&w=800', marca: 'Puma', tallas: ['S','M','L','XL'], color: 'Azul Marino', disponible: true, destacado: true, nuevo: false, rating: 4.6 },
-  { id: '13', nombre: 'Vestido Fitness', categoria: 'Vestidos', precio: 110000, imagen: 'https://images.unsplash.com/photo-1595665593695-9bea330b7d9e?q=80&w=800', marca: 'Nike', tallas: ['S','M','L'], color: 'Rosa', disponible: true, destacado: false, nuevo: true, rating: 4.9 },
-  { id: '14', nombre: 'Camisa Polo Vintage', categoria: 'Polos', precio: 65000, imagen: 'https://images.unsplash.com/photo-1589310243389-96bedf0eaae1?q=80&w=800', marca: 'Adidas', tallas: ['M','L','XL'], color: 'Amarillo', disponible: true, destacado: false, nuevo: false, rating: 4.5 },
-  { id: '15', nombre: 'Bomber Jacket Street', categoria: 'Chaquetas', precio: 150000, imagen: 'https://images.unsplash.com/photo-1551024601-bec79cee3d95?q=80&w=800', marca: 'Under Armour', tallas: ['S','M','L','XL'], color: 'Cafe', disponible: true, destacado: true, nuevo: true, rating: 4.8 },
-  { id: '16', nombre: 'Shorts Cargo Men', categoria: 'Shorts', precio: 55000, imagen: 'https://images.unsplash.com/photo-1605348954290-c6f9a9b2e0c3?q=80&w=800', marca: 'Nike', tallas: ['S','M','L','XL'], color: 'Olive', disponible: true, destacado: false, nuevo: false, rating: 4.4 }
-];
 
 const formatPrice = (price: number) => `$${price.toLocaleString('es-CO')}`;
 
@@ -59,6 +43,21 @@ const writeFavoriteIds = (favoriteIds: string[]) => {
   window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
 };
 
+const mapProducto = (p: ProductoCore): Producto => ({
+  id: p.id || p.ref,
+  nombre: p.nombre,
+  categoria: p.categoria || 'General',
+  precio: p.precio,
+  imagen: p.imagenPrincipal || (p.imagenes && p.imagenes[0]) || '',
+  marca: p.marca,
+  tallas: p.tallas,
+  color: (p.colores && p.colores[0]) || undefined,
+  disponible: (p.publicado ?? false) && p.stock !== 'Agotado',
+  destacado: p.destacado,
+  nuevo: p.nuevo,
+  rating: undefined,
+});
+
 const CatalogPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,38 +65,71 @@ const CatalogPage: React.FC = () => {
   const [categoriaActiva, setCategoriaActiva] = useState('Todas');
   const [marcaActiva, setMarcaActiva] = useState('Todas');
   const [filtrosAvanzados, setFiltrosAvanzados] = useState<FilterState>({ tallas: [], marcas: [], categoriasEspeciales: [] });
-  const [productos] = useState<Producto[]>(PRODUCTOS_DEMO);
+  const [allProducts, setAllProducts] = useState<Producto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [visibleProducts, setVisibleProducts] = useState(8);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
 
-  useEffect(() => { const timer = setTimeout(() => setIsLoading(false), 800); return () => clearTimeout(timer); }, []);
-  useEffect(() => { setFavoriteIds(readFavoriteIds()); }, []);
-  useEffect(() => { setVisibleProducts(8); }, [searchTerm, categoriaActiva, marcaActiva, filtrosAvanzados]);
+  const pagination = useServerPagination(12);
 
-  const categoriasUnicas = useMemo(() => { const cats = new Set(productos.map(p => p.categoria)); return ['Todas', ...Array.from(cats)]; }, [productos]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const marcasUnicas = useMemo(() => { const marcs = new Set(productos.map(p => p.marca).filter(Boolean)); return ['Todas', ...Array.from(marcs) as string[]]; }, [productos]);
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const query: Record<string, string | number | boolean | undefined | null> = {
+        page: pagination.page,
+        limit: pagination.limit,
+        sort: 'createdAt',
+        order: 'desc',
+      };
+      if (searchTerm.trim()) query.search = searchTerm.trim();
+      if (categoriaActiva !== 'Todas') query.categoria = categoriaActiva;
+      if (marcaActiva !== 'Todas') query.marca = marcaActiva;
+
+      const result = await catalogApi.list(query);
+      const mapped = result.data.map(mapProducto);
+      
+      if (pagination.page === 1) {
+        setAllProducts(mapped);
+      } else {
+        setAllProducts(prev => [...prev, ...mapped]);
+      }
+      
+      pagination.setTotalRecords(result.meta.totalRecords);
+    } catch {
+      setError('No se pudieron cargar los productos');
+      toast.error('No se pudieron cargar los productos');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pagination.page, pagination.limit, searchTerm, categoriaActiva, marcaActiva, pagination.setTotalRecords]);
+
+  useEffect(() => {
+    void fetchProducts();
+  }, [fetchProducts]);
+
+  useEffect(() => { setFavoriteIds(readFavoriteIds()); }, []);
+
+  const categoriasUnicas = useMemo(() => { const cats = new Set(allProducts.map(p => p.categoria)); return ['Todas', ...Array.from(cats)]; }, [allProducts]);
 
   const productosFiltrados = useMemo(() => {
-    return productos.filter(p => {
-      const matchSearch = searchTerm === '' || p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.categoria.toLowerCase().includes(searchTerm.toLowerCase());
+    return allProducts.filter(p => {
       const matchCategoria = categoriaActiva === 'Todas' || p.categoria === categoriaActiva;
       const matchMarca = marcaActiva === 'Todas' || p.marca === marcaActiva;
       const matchTalla = filtrosAvanzados.tallas.length === 0 || (p.tallas && p.tallas.some(t => filtrosAvanzados.tallas.includes(t)));
       const matchCategoriaEspecial = filtrosAvanzados.categoriasEspeciales.length === 0 || p.categoria.toLowerCase().includes(filtrosAvanzados.categoriasEspeciales[0]?.toLowerCase() || '');
-      return matchSearch && matchCategoria && matchMarca && matchTalla && matchCategoriaEspecial;
+      return matchCategoria && matchMarca && matchTalla && matchCategoriaEspecial;
     });
-  }, [productos, searchTerm, categoriaActiva, marcaActiva, filtrosAvanzados]);
+  }, [allProducts, categoriaActiva, marcaActiva, filtrosAvanzados]);
 
   const handleClearSearch = () => setSearchTerm('');
   const handleAddToCart = (product: Producto) => { setSelectedProduct(product); setIsModalOpen(true); };
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedProduct(null); };
   const handleApplyFilters = (filters: FilterState) => setFiltrosAvanzados(filters);
   const handleResetFilters = () => { setCategoriaActiva('Todas'); setMarcaActiva('Todas'); setFiltrosAvanzados({ tallas: [], marcas: [], categoriasEspeciales: [] }); setSearchTerm(''); };
-  const handleLoadMore = () => setVisibleProducts(prev => prev + 8);
+  const handleLoadMore = () => pagination.setPage(pagination.page + 1);
   const toggleFavorite = (producto: Producto) => {
     setFavoriteIds(current => {
       const exists = current.includes(producto.id);
@@ -111,11 +143,28 @@ const CatalogPage: React.FC = () => {
   const countFiltrosActivos = () => { let count = 0; if (categoriaActiva !== 'Todas') count++; if (marcaActiva !== 'Todas') count++; count += filtrosAvanzados.tallas.length; count += filtrosAvanzados.marcas.length; count += filtrosAvanzados.categoriasEspeciales.length; return count; };
   const totalFiltrosActivos = countFiltrosActivos();
 
-  if (isLoading) {
+  const hasMore = useMemo(() => {
+    if (pagination.page >= pagination.totalPages) return false;
+    if (productosFiltrados.length === 0) return false;
+    if (filtrosAvanzados.tallas.length > 0 || filtrosAvanzados.marcas.length > 0 || filtrosAvanzados.categoriasEspeciales.length > 0) {
+      return false;
+    }
+    return true;
+  }, [pagination.page, pagination.totalPages, productosFiltrados.length, filtrosAvanzados]);
+
+  if (isLoading && pagination.page === 1) {
     return (
       <div className="catalog-page">
         <div className="catalog-hero"><div className="content"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-subtitle" /><div className="skeleton skeleton-search" /></div></div>
         <div className="products-section"><div className="products-grid">{[...Array(8)].map((_, i) => (<div key={i} className="product-card-skeleton"><div className="skeleton skeleton-img" /><div className="skeleton skeleton-text" /><div className="skeleton skeleton-text-short" /></div>))}</div></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="catalog-page">
+        <div className="catalog-hero"><div className="content"><h1>Catálogo</h1><p className="text-red-500">{error}</p></div></div>
       </div>
     );
   }
@@ -213,7 +262,7 @@ const CatalogPage: React.FC = () => {
         ) : (
           <>
             <div className="products-grid">
-              {productosFiltrados.slice(0, visibleProducts).map((producto, idx) => (
+              {productosFiltrados.map((producto, idx) => (
                 <article
                   key={producto.id}
                   className="premium-product-card"
@@ -278,10 +327,10 @@ const CatalogPage: React.FC = () => {
               </article>
               ))}
             </div>
-            {visibleProducts < productosFiltrados.length && (
+            {hasMore && (
               <div className="load-more-container">
-                <button className="load-more-btn" onClick={handleLoadMore}>
-                  Ver más productos
+                <button className="load-more-btn" onClick={handleLoadMore} disabled={isLoading}>
+                  {isLoading ? 'Cargando...' : 'Cargar más productos'}
                 </button>
               </div>
             )}
@@ -303,5 +352,3 @@ const CatalogPage: React.FC = () => {
 };
 
 export default CatalogPage;
-
-

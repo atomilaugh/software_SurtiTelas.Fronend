@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { RotateCcw, CheckCircle, AlertTriangle, Package, Clock, Download, FileText, Plus, ChevronDown, Save } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { RotateCcw, CheckCircle, AlertTriangle, Package, Clock, Download, FileText, Plus, ChevronDown, Save, Loader2, AlertCircle } from 'lucide-react';
 import s from './StockDevuelto.module.css';
 import f from '@/styles/Form.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
@@ -8,6 +8,7 @@ import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
 import { Modal } from '@/shared/ui/Modal';
 import { toast } from 'sonner';
+import { returnsApi, type Return } from '@/infrastructure/api/returnsApi';
 
 interface Devolucion {
   id: string;
@@ -26,23 +27,104 @@ interface Devolucion {
   observaciones: string;
 }
 
-const devolucionesIniciales: Devolucion[] = [
-  { id: 'DEV-001', numeroDevolucion: 'DEV-2024-001', numeroOrden: 'ORD-2024-003', prenda: 'Blusa estampada', referencia: 'REF-1003', motivo: 'Defecto de confección', cantidad: 15, cantidadInspeccionada: 15, fechaDevolucion: '2024-06-09', estado: 'Aprobado', destino: 'Reingreso a inventario', cliente: 'Distribuidora del Norte', responsable: 'María López', observaciones: 'Defectos menores en costuras. Aprobado para reingreso.' },
-  { id: 'DEV-002', numeroDevolucion: 'DEV-2024-002', numeroOrden: 'ORD-2024-007', prenda: 'Uniforme empresarial', referencia: 'REF-1007', motivo: 'Talla incorrecta', cantidad: 8, cantidadInspeccionada: 8, fechaDevolucion: '2024-06-10', estado: 'En inspección', destino: 'Reparación', cliente: 'Cliente G', observaciones: 'Esperando inspección de calidad' },
-  { id: 'DEV-003', numeroDevolucion: 'DEV-2024-003', numeroOrden: 'ORD-2024-002', prenda: 'Pantalón jean', referencia: 'REF-1002', motivo: 'Mancha en tela', cantidad: 3, cantidadInspeccionada: 3, fechaDevolucion: '2024-06-10', estado: 'Rechazado', destino: 'Descarte', cliente: 'Cliente B', responsable: 'Carlos Ruiz', observaciones: 'Mancha irreversible. Descarte autorizado.' },
-  { id: 'DEV-004', numeroDevolucion: 'DEV-2024-004', numeroOrden: 'ORD-2024-006', prenda: 'Camiseta básica', referencia: 'REF-1006', motivo: 'Color diferente al solicitado', cantidad: 20, cantidadInspeccionada: 20, fechaDevolucion: '2024-06-08', estado: 'Reingresado', destino: 'Reingreso a inventario', cliente: 'Cliente F', responsable: 'Ana Gómez', observaciones: 'Reingresado al lote de stock disponible.' },
-  { id: 'DEV-005', numeroDevolucion: 'DEV-2024-005', numeroOrden: 'ORD-2024-005', prenda: 'Short deportivo', referencia: 'REF-1005', motivo: 'Rotura en costura', cantidad: 5, cantidadInspeccionada: 5, fechaDevolucion: '2024-06-07', estado: 'En reparación', destino: 'Reparación', cliente: 'Cliente E', observaciones: 'Enviado a taller para reparación.' },
-  { id: 'DEV-006', numeroDevolucion: 'DEV-2024-006', numeroOrden: 'ORD-2024-004', prenda: 'Vestido casual', referencia: 'REF-1004', motivo: 'Bolsillo roto', cantidad: 2, cantidadInspeccionada: 2, fechaDevolucion: '2024-06-06', estado: 'Recibido', destino: 'Devolución a proveedor', cliente: 'Cliente D', responsable: 'Juan Pérez', observaciones: 'Pendiente envío a proveedor de insumos.' },
-];
+/** El backend usa enums en mayúsculas (INGLÉS). Mapeamos a la UI en español. */
+const ESTADO_TO_UI: Record<string, Devolucion['estado']> = {
+  RECIBIDO: 'Recibido',
+  EN_INSPECCION: 'En inspección',
+  APROBADO: 'Aprobado',
+  RECHAZADO: 'Rechazado',
+  EN_REPARACION: 'En reparación',
+  REINGRESADO: 'Reingresado',
+  DESCARTADO: 'Descartado',
+};
+const ESTADO_TO_API: Record<Devolucion['estado'], string> = {
+  Recibido: 'RECIBIDO',
+  'En inspección': 'EN_INSPECCION',
+  Aprobado: 'APROBADO',
+  Rechazado: 'RECHAZADO',
+  'En reparación': 'EN_REPARACION',
+  Reingresado: 'REINGRESADO',
+  Descartado: 'DESCARTADO',
+};
+const DESTINO_TO_UI: Record<string, Devolucion['destino']> = {
+  REINGRESO_INVENTARIO: 'Reingreso a inventario',
+  REPARACION: 'Reparación',
+  DESCARTE: 'Descarte',
+  DEVOLUCION_PROVEEDOR: 'Devolución a proveedor',
+};
+const DESTINO_TO_API: Record<Devolucion['destino'], string> = {
+  'Reingreso a inventario': 'REINGRESO_INVENTARIO',
+  Reparación: 'REPARACION',
+  Descarte: 'DESCARTE',
+  'Devolución a proveedor': 'DEVOLUCION_PROVEEDOR',
+};
 
-const destinos: Devolucion['destino'][] = ['Reingreso a inventario', 'Reparación', 'Descarte', 'Devolución a proveedor'];
+function toDevolucion(r: Return): Devolucion {
+  return {
+    id: r.id,
+    numeroDevolucion: r.numeroDevolucion,
+    numeroOrden: r.numeroOrden,
+    prenda: r.prenda,
+    referencia: r.referencia,
+    motivo: r.motivo,
+    cantidad: r.cantidad,
+    cantidadInspeccionada: r.cantidadInspeccionada,
+    fechaDevolucion: r.fechaDevolucion,
+    estado: ESTADO_TO_UI[r.estado] ?? 'Recibido',
+    destino: DESTINO_TO_UI[r.destino] ?? 'Reingreso a inventario',
+    cliente: r.cliente,
+    responsable: r.responsable,
+    observaciones: r.observaciones,
+  };
+}
+
+function fromDevolucion(d: Devolucion): Return {
+  return {
+    id: d.id,
+    numeroDevolucion: d.numeroDevolucion,
+    numeroOrden: d.numeroOrden,
+    prenda: d.prenda,
+    referencia: d.referencia,
+    motivo: d.motivo,
+    cantidad: d.cantidad,
+    cantidadInspeccionada: d.cantidadInspeccionada,
+    fechaDevolucion: d.fechaDevolucion,
+    estado: (ESTADO_TO_API[d.estado] ?? 'RECIBIDO') as Return['estado'],
+    destino: (DESTINO_TO_API[d.destino] ?? 'REINGRESO_INVENTARIO') as Return['destino'],
+    cliente: d.cliente,
+    responsable: d.responsable,
+    observaciones: d.observaciones,
+  };
+}
 
 export const AdminStockDevuelto: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [devoluciones, setDevoluciones] = useState<Devolucion[]>(devolucionesIniciales);
+  const [devoluciones, setDevoluciones] = useState<Devolucion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await returnsApi.list();
+        if (!active) return;
+        setDevoluciones(data.map(toDevolucion));
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar las devoluciones');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
 
   const [numeroOrden, setNumeroOrden] = useState('');
   const [prenda, setPrenda] = useState('');
@@ -125,7 +207,7 @@ export const AdminStockDevuelto: React.FC = () => {
     setFormError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     if (!numeroOrden.trim()) { setFormError('El número de orden es obligatorio'); return; }
@@ -151,15 +233,45 @@ export const AdminStockDevuelto: React.FC = () => {
       responsable: responsable.trim() || undefined,
       observaciones: observaciones.trim(),
     };
-    setDevoluciones(prev => [nueva, ...prev]);
-    toast.success(`Devolución ${nueva.numeroDevolucion} registrada`);
-    closeModal();
+    try {
+      const apiInput = fromDevolucion(nueva);
+      const creada = await returnsApi.create({
+        numeroOrden: apiInput.numeroOrden,
+        prenda: apiInput.prenda,
+        referencia: apiInput.referencia,
+        motivo: apiInput.motivo,
+        cantidad: apiInput.cantidad,
+        cantidadInspeccionada: apiInput.cantidadInspeccionada,
+        destino: apiInput.destino,
+        cliente: apiInput.cliente,
+        responsable: apiInput.responsable,
+        observaciones: apiInput.observaciones,
+        fechaDevolucion: apiInput.fechaDevolucion,
+      });
+      setDevoluciones(prev => [{ ...nueva, id: creada.id, numeroDevolucion: creada.numeroDevolucion }, ...prev]);
+      toast.success(`Devolución ${nueva.numeroDevolucion} registrada`);
+      closeModal();
+    } catch {
+      toast.error('No fue posible registrar la devolución');
+      setSaving(false);
+    }
+  };
+
+  const cambiarEstado = async (d: Devolucion, estadoUI: Devolucion['estado']) => {
+    const estadoApi = ESTADO_TO_API[estadoUI];
+    setDevoluciones(prev => prev.map(dev => dev.id === d.id ? { ...dev, estado: estadoUI } : dev));
+    try {
+      await returnsApi.changeStatus(d.id, estadoApi as Return['estado']);
+      toast.success(`Devolución ${d.numeroDevolucion} → ${estadoUI}`);
+    } catch {
+      toast.error(`No se pudo actualizar la devolución ${d.numeroDevolucion}`);
+    }
   };
 
   const actions = (d: Devolucion) => [
-    { label: 'Inspeccionar', icon: <CheckCircle size={14} />, onClick: () => { setDevoluciones(prev => prev.map(dev => dev.id === d.id ? { ...dev, estado: 'En inspección' } : dev)); toast.success(`Devolución ${d.numeroDevolucion} en inspección`); }, disabled: d.estado !== 'En inspección' && d.estado !== 'Recibido' },
-    { label: 'Asignar destino', icon: <Package size={14} />, onClick: () => { setDevoluciones(prev => prev.map(dev => dev.id === d.id ? { ...dev, estado: 'En reparación' } : dev)); toast.success(`Devolución ${d.numeroDevolucion} en reparación`); }, disabled: !['Recibido', 'En inspección', 'Aprobado'].includes(d.estado) },
-    { label: 'Completar reparación', icon: <CheckCircle size={14} />, onClick: () => { setDevoluciones(prev => prev.map(dev => dev.id === d.id ? { ...dev, estado: 'Reingresado' } : dev)); toast.success(`Devolución ${d.numeroDevolucion} reingresada`); }, disabled: d.estado !== 'En reparación' },
+    { label: 'Inspeccionar', icon: <CheckCircle size={14} />, onClick: () => cambiarEstado(d, 'En inspección'), disabled: d.estado !== 'En inspección' && d.estado !== 'Recibido' },
+    { label: 'Asignar destino', icon: <Package size={14} />, onClick: () => cambiarEstado(d, 'En reparación'), disabled: !['Recibido', 'En inspección', 'Aprobado'].includes(d.estado) },
+    { label: 'Completar reparación', icon: <CheckCircle size={14} />, onClick: () => cambiarEstado(d, 'Reingresado'), disabled: d.estado !== 'En reparación' },
   ];
 
   const stats = {
@@ -262,13 +374,27 @@ export const AdminStockDevuelto: React.FC = () => {
         </div>
       )}
 
-      <DataTable<Devolucion>
-        data={filteredDevoluciones}
-        pageSize={10}
-        emptyMessage="No se encontraron devoluciones"
-        maxVisibleColumns={5}
-        modalSize="xl"
-        detailPanel={{
+      <div className={s.tableWrapper}>
+        {loading && (
+          <div className={s.stateBox}>
+            <Loader2 size={28} className={s.spin} />
+            <p>Cargando devoluciones...</p>
+          </div>
+        )}
+        {error && (
+          <div className={s.errorBox}>
+            <AlertCircle size={28} />
+            <p>{error}</p>
+          </div>
+        )}
+        {!loading && !error && (
+        <DataTable<Devolucion>
+          data={filteredDevoluciones}
+          pageSize={10}
+          emptyMessage="No se encontraron devoluciones"
+          maxVisibleColumns={5}
+          modalSize="xl"
+          detailPanel={{
           title: (d) => `Devolución ${d.numeroDevolucion}`,
           render: (d) => (
             <div className={s.detailPanel}>
@@ -310,8 +436,10 @@ export const AdminStockDevuelto: React.FC = () => {
               <Badge variant={getEstadoBadge(d.estado)}>{d.estado}</Badge>
             </div>
           )},
-        ]}
-      />
+          ]}
+        />
+        )}
+      </div>
 
       <Modal
         open={modalOpen}
@@ -366,7 +494,7 @@ export const AdminStockDevuelto: React.FC = () => {
             <div className={f.field}>
               <label className={f.label}>Destino previsto *</label>
               <select className={f.select} value={destino} onChange={e => setDestino(e.target.value as Devolucion['destino'])}>
-                {destinos.map(d => <option key={d} value={d}>{d}</option>)}
+                {(['Reingreso a inventario', 'Reparación', 'Descarte', 'Devolución a proveedor'] as Devolucion['destino'][]).map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
             <div className={f.field}>

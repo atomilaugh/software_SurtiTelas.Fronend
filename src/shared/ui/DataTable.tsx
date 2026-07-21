@@ -44,7 +44,7 @@ export interface DataTableColumn<T> {
 }
 
 export interface DataTableAction<T> {
-  label: string;
+  label: string | ((item: T) => string);
   icon?: ReactNode;
   onClick: (item: T) => void;
   danger?: boolean;
@@ -88,6 +88,12 @@ export interface DataTableProps<T> {
   actions?: DataTableAction<T>[] | ((item: T) => DataTableAction<T>[]);
 
   maxVisibleColumns?: number;
+
+  serverMode?: boolean;
+  currentPage?: number;
+  totalPages?: number;
+  totalItems?: number;
+  onPageChange?: (page: number) => void;
 }
 
 type SortDirection = 'asc' | 'desc';
@@ -207,6 +213,11 @@ export function DataTable<T extends { id?: string | number }>({
   actions,
   modalSize,
   maxVisibleColumns = 5,
+  serverMode = false,
+  currentPage: externalPage,
+  totalPages: externalTotalPages,
+  totalItems: externalTotalItems,
+  onPageChange,
 }: DataTableProps<T>) {
   const tableRef = useRef<HTMLDivElement>(null);
   useDelegatedTooltips(tableRef);
@@ -262,13 +273,25 @@ export function DataTable<T extends { id?: string | number }>({
     return result;
   }, [data, displayColumns, visibleColumns, filterableColumns, columnFilters, sortConfig, enableSorting, searchText]);
 
-  const totalPages = Math.max(1, Math.ceil(processedData.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const start = (safePage - 1) * pageSize;
-  const pageData = useMemo(() => processedData.slice(start, start + pageSize), [processedData, start, pageSize]);
+  const totalPages = serverMode
+    ? (externalTotalPages ?? 1)
+    : Math.max(1, Math.ceil(processedData.length / pageSize));
+  const safePage = serverMode
+    ? (externalPage ?? 1)
+    : Math.min(currentPage, totalPages);
+  const start = serverMode ? 0 : (safePage - 1) * pageSize;
+  const pageData = serverMode ? processedData : useMemo(() => processedData.slice(start, start + pageSize), [processedData, start, pageSize]);
 
-  const from = processedData.length === 0 ? 0 : start + 1;
-  const to = Math.min(start + pageSize, processedData.length);
+  const from = serverMode
+    ? (externalTotalItems ? (safePage - 1) * pageSize + 1 : 0)
+    : processedData.length === 0
+      ? 0
+      : start + 1;
+  const to = serverMode
+    ? externalTotalItems
+      ? Math.min(safePage * pageSize, externalTotalItems)
+      : processedData.length
+    : Math.min(start + pageSize, processedData.length);
   const activeFilterCount = (searchText.trim() ? 1 : 0) + Object.values(columnFilters).filter(value => value.trim()).length;
   const hasActiveFilters = activeFilterCount > 0;
 
@@ -291,7 +314,11 @@ export function DataTable<T extends { id?: string | number }>({
   }, [onSelectionChange, selectedItems]);
 
   const goTo = (page: number) => {
-    setCurrentPage(Math.min(Math.max(page, 1), totalPages));
+    if (serverMode) {
+      onPageChange?.(page);
+    } else {
+      setCurrentPage(Math.min(Math.max(page, 1), totalPages));
+    }
   };
 
   const clearSelection = () => {
@@ -376,9 +403,10 @@ export function DataTable<T extends { id?: string | number }>({
 
     const secondaryActions = getActions(item);
     for (const action of secondaryActions) {
+      const label = typeof action.label === 'function' ? action.label(item) : action.label;
       actions.push({
-        key: action.label,
-        label: action.label,
+        key: label,
+        label,
         icon: action.icon,
         onClick: () => action.onClick(item),
         danger: action.danger,
@@ -707,10 +735,21 @@ export function DataTable<T extends { id?: string | number }>({
 
       <div className={s.footer}>
         <div className={s.footerInfo}>
-          <span className={s.footerRange}>{from}-{to}</span>
-          <span> de </span>
-          <span>{processedData.length}</span>
-          <span className={s.pageSizePill}>{pageSize} por página</span>
+          {serverMode && externalTotalItems != null ? (
+            <>
+              <span className={s.footerRange}>Mostrando {from}-{to}</span>
+              <span> de </span>
+              <span>{externalTotalItems}</span>
+              <span className={s.pageSizePill}>{pageSize} por página</span>
+            </>
+          ) : (
+            <>
+              <span className={s.footerRange}>{from}-{to}</span>
+              <span> de </span>
+              <span>{processedData.length}</span>
+              <span className={s.pageSizePill}>{pageSize} por página</span>
+            </>
+          )}
         </div>
 
         <div className={s.pagination}>

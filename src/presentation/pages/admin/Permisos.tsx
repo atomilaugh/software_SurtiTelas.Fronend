@@ -1,97 +1,185 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, ToggleLeft, Shield, User, Truck } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, Loader2, AlertCircle, EyeOff } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
-import s from './Permisos.module.css';
-import { Badge } from '../../../shared/ui/Badge';
-import { Button } from '../../../shared/ui/Button';
+import { Badge } from '@/shared/ui/Badge';
+import { Button } from '@/shared/ui/Button';
+import { DataTable, DataTableColumn, DataTableAction } from '@/shared/ui/DataTable';
+import { Modal } from '@/shared/ui/Modal';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
 import { useDelegatedTooltips } from '@/shared/components/Tooltip';
+import { cn } from '@/shared/utils';
+import { authApi, type PermissionDTO } from '@/infrastructure/api/authApi';
+import { MODULOS_SISTEMA } from '@/shared/constants/options';
+import s from './Permisos.module.css';
 
-interface Permiso {
-  id: string;
-  nombre: string;
-  descripcion: string;
+interface Permiso extends PermissionDTO {
   modulo: string;
-  tipo: 'Lectura' | 'Escritura' | 'Administrador';
-  roles: number;
-  estado: 'Activo' | 'Inactivo';
-  rolesAsignados: string[];
 }
 
-const rolLabels: Record<string, string> = {
-  admin: 'Administrador',
-  asesor: 'Asesor',
-  domiciliario: 'Domiciliario',
-  cliente: 'Cliente',
+const mapPermissionToPermiso = (p: PermissionDTO, index: number): Permiso => {
+  return {
+    ...p,
+    modulo: p.module,
+  };
 };
-
-const mockPermisosInicial: Permiso[] = [
-  { id: 'P-001', nombre: 'Gestión de usuarios', descripcion: 'Crear, editar y eliminar usuarios', modulo: 'Usuarios', tipo: 'Administrador', roles: 2, estado: 'Activo', rolesAsignados: ['admin'] },
-  { id: 'P-002', nombre: 'Ver usuarios', descripcion: 'Visualizar lista de usuarios', modulo: 'Usuarios', tipo: 'Lectura', roles: 4, estado: 'Activo', rolesAsignados: ['admin', 'asesor', 'domiciliario'] },
-  { id: 'P-003', nombre: 'Gestión de insumos', descripcion: 'Crear y editar insumos', modulo: 'Inventario', tipo: 'Escritura', roles: 2, estado: 'Activo', rolesAsignados: ['admin', 'asesor'] },
-  { id: 'P-004', nombre: 'Alertas stock', descripcion: 'Configurar notificaciones de stock', modulo: 'Inventario', tipo: 'Lectura', roles: 3, estado: 'Activo', rolesAsignados: ['admin', 'asesor', 'domiciliario'] },
-  { id: 'P-005', nombre: 'Ver reportes', descripcion: 'Acceso a visualización de reportes', modulo: 'Reportes', tipo: 'Lectura', roles: 5, estado: 'Activo', rolesAsignados: ['admin', 'asesor', 'domiciliario'] },
-  { id: 'P-006', nombre: 'Editar reportes', descripcion: 'Modificar reportes generados', modulo: 'Reportes', tipo: 'Escritura', roles: 1, estado: 'Inactivo', rolesAsignados: ['admin'] },
-];
 
 export const AdminPermisos: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPermiso, setSelectedPermiso] = useState<Permiso | null>(null);
-  const [items, setItems] = useState<Permiso[]>(mockPermisosInicial);
+  const [items, setItems] = useState<Permiso[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Permiso | null>(null);
 
-  const tableRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
+  const tableRef = React.useRef<HTMLDivElement>(null);
+  const formRef = React.useRef<HTMLFormElement>(null);
   useDelegatedTooltips(tableRef, { placement: 'top' });
 
-  const filteredPermisos = items.filter(p =>
-    p.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    p.descripcion.toLowerCase().includes(search.toLowerCase()) ||
-    p.modulo.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await authApi.listPermissions();
+        if (!active) return;
+        setItems(data.map((p, idx) => mapPermissionToPermiso(p, idx)));
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los permisos');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
+  const filteredPermisos = useMemo(() => {
+    return items.filter(p =>
+      p.code.toLowerCase().includes(search.toLowerCase()) ||
+      p.description.toLowerCase().includes(search.toLowerCase()) ||
+      p.module.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [items, search]);
 
   const handleCloseModal = () => {
     setModalOpen(false);
     setSelectedPermiso(null);
   };
 
-  const handleSubmitPermiso = () => {
+  const handleSubmitPermiso = async () => {
     if (!formRef.current) return;
     const fd = new FormData(formRef.current);
-    const nombre = String(fd.get('nombre') ?? '').trim();
-    const descripcion = String(fd.get('descripcion') ?? '').trim();
-    const modulo = String(fd.get('modulo') ?? '').trim();
-    const tipo = (String(fd.get('tipo') ?? '') || 'Lectura') as Permiso['tipo'];
-    const rolesAsignados = fd.getAll('roles') as string[];
-    if (selectedPermiso) {
-      setItems(prev => prev.map(it => it.id === selectedPermiso.id ? { ...it, nombre, descripcion, modulo, tipo, rolesAsignados } : it));
-      toast.success('Permiso actualizado');
-    } else {
-      const nuevo: Permiso = {
-        id: `P-${String(items.length + 1).padStart(3, '0')}`,
-        nombre,
-        descripcion,
-        modulo,
-        tipo,
-        roles: rolesAsignados.length,
-        estado: 'Activo',
-        rolesAsignados,
-      };
-      setItems(prev => [nuevo, ...prev]);
-      toast.success('Permiso creado');
+    const code = String(fd.get('code') ?? '').trim();
+    const description = String(fd.get('description') ?? '').trim();
+    const module = String(fd.get('module') ?? '').trim();
+    try {
+      if (selectedPermiso) {
+        await authApi.updatePermission(selectedPermiso.id, { code, description, module });
+        setItems(prev => prev.map(it => it.id === selectedPermiso.id ? { ...it, code, description, module } : it));
+        toast.success('Permiso actualizado');
+      } else {
+        const nuevo = await authApi.createPermission({ code, description, module });
+        setItems(prev => [{ ...nuevo, modulo: nuevo.module }, ...prev]);
+        toast.success('Permiso creado');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar permiso');
+    } finally {
+      handleCloseModal();
+      const data = await authApi.listPermissions();
+      setItems(data.map((p, idx) => mapPermissionToPermiso(p, idx)));
     }
-    handleCloseModal();
   };
+
+  const columns: DataTableColumn<Permiso>[] = [
+    {
+      key: 'code',
+      header: 'Código',
+      sortable: true,
+      minWidth: '200px',
+      render: (item: Permiso) => (
+        <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '0.88rem', fontFamily: 'var(--font-mono)' }}>
+          {item.code}
+        </div>
+      ),
+    },
+    {
+      key: 'description',
+      header: 'Descripción',
+      sortable: true,
+      render: (item: Permiso) => (
+        <div style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)' }}>
+          {item.description}
+        </div>
+      ),
+    },
+    {
+      key: 'module',
+      header: 'Módulo',
+      sortable: true,
+      align: 'center',
+      render: (item: Permiso) => (
+        <Badge variant="outline">{item.module}</Badge>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      align: 'center',
+      render: (item: Permiso) => (
+        <Badge variant={item.estado === 'ACTIVO' ? 'success' : 'default'}>
+          {item.estado === 'ACTIVO' ? 'Activo' : 'Inactivo'}
+        </Badge>
+      ),
+    },
+  ];
+
+  const toggleEstado = async (item: Permiso) => {
+    const nuevoEstado = item.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+    try {
+      await authApi.updatePermissionStatus(item.id, nuevoEstado);
+      setItems(prev => prev.map(it => it.id === item.id ? { ...it, estado: nuevoEstado } : it));
+      toast.success(`Permiso ${nuevoEstado === 'ACTIVO' ? 'activado' : 'desactivado'} correctamente`);
+    } catch {
+      toast.error('No se pudo actualizar el estado del permiso');
+    }
+  };
+
+  const actions: DataTableAction<Permiso>[] = [
+    {
+      label: (item: Permiso) => item.estado === 'ACTIVO' ? 'Desactivar' : 'Activar',
+      icon: <EyeOff size={14} aria-hidden="true" focusable="false" />,
+      onClick: (item: Permiso) => void toggleEstado(item),
+    },
+    {
+      label: 'Editar',
+      icon: <Edit size={14} aria-hidden="true" focusable="false" />,
+      onClick: (item: Permiso) => {
+        setSelectedPermiso(item);
+        setModalOpen(true);
+      },
+    },
+    {
+      label: 'Eliminar',
+      icon: <Trash2 size={14} aria-hidden="true" focusable="false" />,
+      danger: true,
+      onClick: (item: Permiso) => setDeleteConfirm(item),
+    },
+  ];
 
   return (
     <div>
-      <div className={s.header}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Permisos</h1>
           <p className={s.pageSubtitle}>Gestión de permisos del sistema</p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus size={16} />
+        <Button leftIcon={<Plus size={16} />} onClick={() => { setSelectedPermiso(null); setModalOpen(true); }}>
           Nuevo Permiso
         </Button>
       </div>
@@ -108,69 +196,35 @@ export const AdminPermisos: React.FC = () => {
       </div>
 
       <div className={s.tableWrapper} ref={tableRef}>
-        <table className={s.table}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Descripción</th>
-              <th>Módulo</th>
-              <th>Tipo</th>
-              <th>Roles</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPermisos.map(permiso => (
-              <tr key={permiso.id}>
-                <td className={s.tdMono}>{permiso.id}</td>
-                <td className={s.tdPrimary}>{permiso.nombre}</td>
-                <td>{permiso.descripcion}</td>
-                <td>{permiso.modulo}</td>
-                <td>
-                  <Badge variant={
-                    permiso.tipo === 'Administrador' ? 'success' :
-                    permiso.tipo === 'Escritura' ? 'warning' : 'default'
-                  }>
-                    {permiso.tipo}
-                  </Badge>
-                </td>
-                <td>
-                  <div className={s.rolesInline}>
-                    {permiso.rolesAsignados.map(rol => (
-                      <Badge key={rol} variant="outline" dot={rol === 'admin'}>
-                        {rolLabels[rol]}
-                      </Badge>
-                    ))}
-                  </div>
-                </td>
-                <td>
-                  <Badge variant={permiso.estado === 'Activo' ? 'success' : 'default'}>
-                    {permiso.estado}
-                  </Badge>
-                </td>
-                <td>
-                  <div className={s.actions}>
-                    <button className={s.actionBtn} data-bs-toggle="tooltip" data-bs-title="Editar" onClick={() => { setSelectedPermiso(permiso); setModalOpen(true); }}>
-                       <Edit size={14} />
-                     </button>
-                     <button className={`${s.actionBtn} ${s.actionBtnToggle}`} data-bs-toggle="tooltip" data-bs-title={permiso.estado === 'Activo' ? 'Desactivar' : 'Activar'} onClick={() => toast.info('Permiso actualizado')}>
-                       <ToggleLeft size={14} />
-                     </button>
-                     <button className={`${s.actionBtn} ${s.actionBtnDanger}`} data-bs-toggle="tooltip" data-bs-title="Eliminar" onClick={() => { if (confirm(`¿Eliminar permiso?`)) toast.success('Permiso eliminado'); }}>
-                       <Trash2 size={14} />
-                     </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {loading && (
+          <div className={cn(s.stateBox)}>
+            <Loader2 size={28} className={s.spin} />
+            <p>Cargando permisos...</p>
+          </div>
+        )}
+        {error && (
+          <div className={cn(s.stateBox, s.errorBox)}>
+            <AlertCircle size={28} />
+            <p>{error}</p>
+          </div>
+        )}
+        {!loading && !error && (
+          <DataTable<Permiso>
+            data={filteredPermisos}
+            columns={columns}
+            actions={actions}
+            enableExport={false}
+            enableRowSelection={false}
+            enableSorting={true}
+            enableColumnFilters={false}
+            toolbarLeft={null}
+            maxVisibleColumns={6}
+          />
+        )}
       </div>
 
       {modalOpen && (
-        <div className={s.modalOverlay} onClick={handleCloseModal}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <h2 className={s.modalTitle}>
@@ -182,56 +236,21 @@ export const AdminPermisos: React.FC = () => {
               <form className={s.form} ref={formRef}>
                 <div className={s.formRow}>
                   <div className={s.field}>
-                    <label className={s.label}>Nombre del Permiso</label>
-                    <input type="text" className={s.input} name="nombre" defaultValue={selectedPermiso?.nombre} />
+                    <label className={s.label}>Código del Permiso</label>
+                    <input type="text" className={s.input} name="code" defaultValue={selectedPermiso?.code} placeholder="ej: catalog:read" />
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Módulo</label>
-                    <select className={s.select} name="modulo" defaultValue={selectedPermiso?.modulo}>
-                      <option>Usuarios</option>
-                      <option>Inventario</option>
-                      <option>Reportes</option>
-                      <option>Producción</option>
-                      <option>Ventas</option>
+                    <select className={s.select} name="module" defaultValue={selectedPermiso?.module}>
+                      {MODULOS_SISTEMA.map(modulo => (
+                        <option key={modulo} value={modulo.toLowerCase()}>{modulo}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
                 <div className={s.field}>
                   <label className={s.label}>Descripción</label>
-                  <textarea className={s.textarea} placeholder="Descripción del permiso..." name="descripcion" defaultValue={selectedPermiso?.descripcion} />
-                </div>
-                <div className={s.field}>
-                  <label className={s.label}>Tipo de permiso</label>
-                  <div className={s.tipoOptions}>
-                    {['Lectura', 'Escritura', 'Administrador'].map(tipo => (
-                      <label key={tipo} className={s.tipoRadio}>
-                        <input type="radio" name="tipo" value={tipo} defaultChecked={selectedPermiso?.tipo === tipo} />
-                        <span>{tipo}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className={s.field}>
-                  <label className={s.label}>Roles con acceso</label>
-                  <div className={s.rolesCheckboxGroup}>
-                    {(['admin', 'asesor', 'domiciliario', 'cliente'] as const).map(rol => (
-                      <label key={rol} className={s.rolesCheckbox}>
-                          <input
-                            type="checkbox"
-                            name="roles"
-                            value={rol}
-                            defaultChecked={selectedPermiso?.rolesAsignados.includes(rol)}
-                          />
-                        <span className={s.rolesLabel}>
-                          {rol === 'admin' && <Shield size={14} />}
-                          {rol === 'asesor' && <User size={14} />}
-                          {rol === 'domiciliario' && <Truck size={14} />}
-                          {rol === 'cliente' && <User size={14} />}
-                          {rolLabels[rol]}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                  <textarea className={s.textarea} placeholder="Descripción del permiso..." name="description" defaultValue={selectedPermiso?.description} />
                 </div>
                 <div className={s.formActions}>
                   <Button variant="secondary" onClick={handleCloseModal}>
@@ -246,6 +265,27 @@ export const AdminPermisos: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            await authApi.deletePermission(deleteConfirm.id);
+            setItems(prev => prev.filter(it => it.id !== deleteConfirm.id));
+            toast.success('Permiso eliminado');
+          } catch {
+            toast.error('No se pudo eliminar el permiso');
+          } finally {
+            setDeleteConfirm(null);
+          }
+        }}
+        title="Eliminar permiso"
+        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.code}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };

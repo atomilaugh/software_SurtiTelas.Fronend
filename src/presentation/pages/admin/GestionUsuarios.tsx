@@ -1,37 +1,52 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Plus, Edit, Trash2, ToggleLeft, User, ShieldCheck, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import s from './GestionUsuarios.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Button } from '@/shared/ui/Button';
 import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '@/shared/ui/DataTable';
+import { usersApi, type Usuario } from '@/infrastructure/api/usersApi';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import { ROL_LABELS, ROLES_SISTEMA, ESTADOS_GENERALES } from '@/shared/constants/options';
+import { isValidPhone } from '@/shared/utils/phone';
 
-interface Usuario {
-  id: string;
-  nombre: string;
-  email: string;
-  telefono: string;
-  rol: string;
-  estado: 'Activo' | 'Inactivo';
-  fechaRegistro: string;
-}
-
-const mockUsuariosInicial: Usuario[] = [
-  { id: 'U-001', nombre: 'Carlos Martínez', email: 'carlos.martinez@surtitelas.com', telefono: '310 123 4567', rol: 'Administrador', estado: 'Activo', fechaRegistro: '2024-01-15' },
-  { id: 'U-002', nombre: 'Ana López', email: 'ana.lopez@surtitelas.com', telefono: '311 234 5678', rol: 'Asesor', estado: 'Activo', fechaRegistro: '2024-02-20' },
-  { id: 'U-003', nombre: 'Luis Pérez', email: 'luis.perez@surtitelas.com', telefono: '312 345 6789', rol: 'Almacén', estado: 'Activo', fechaRegistro: '2024-03-10' },
-  { id: 'U-004', nombre: 'María González', email: 'maria.gonzalez@surtitelas.com', telefono: '313 456 7890', rol: 'Producción', estado: 'Activo', fechaRegistro: '2024-01-25' },
-  { id: 'U-005', nombre: 'Jorge Ruiz', email: 'jorge.ruiz@surtitelas.com', telefono: '314 567 8901', rol: 'Reportes', estado: 'Inactivo', fechaRegistro: '2023-11-05' },
-  { id: 'U-006', nombre: 'Camila Torres', email: 'camila.torres@surtitelas.com', telefono: '315 678 9012', rol: 'Asesor', estado: 'Activo', fechaRegistro: '2024-04-12' },
-];
+const roleToBackend: Record<string, 'ADMIN' | 'ASESOR' | 'DOMICILIARIO' | 'CLIENTE'> = {
+  ADMIN: 'ADMIN',
+  ASESO: 'ASESOR',
+  ASESOR: 'ASESOR',
+  DOMICILIARIO: 'DOMICILIARIO',
+  CLIENTE: 'CLIENTE',
+};
 
 export const AdminGestionUsuarios: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
-  const [items, setItems] = useState<Usuario[]>(mockUsuariosInicial);
+  const [items, setItems] = useState<Usuario[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<Usuario | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
+
+  const fetchUsuarios = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await usersApi.list();
+      setItems(data);
+    } catch {
+      setError('No se pudieron cargar los usuarios');
+      toast.error('No se pudieron cargar los usuarios');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchUsuarios();
+  }, []);
 
   const filteredUsuarios = useMemo(() => {
     return items.filter(u =>
@@ -46,30 +61,43 @@ export const AdminGestionUsuarios: React.FC = () => {
     setSelectedUsuario(null);
   };
 
-  const handleSubmitUsuario = () => {
+  const handleSubmitUsuario = async () => {
     if (!formRef.current) return;
     const fd = new FormData(formRef.current);
     const nombre = String(fd.get('nombre') ?? '').trim();
     const email = String(fd.get('email') ?? '').trim();
     const telefono = String(fd.get('telefono') ?? '').trim();
-    const rol = String(fd.get('rol') ?? '').trim();
-    if (selectedUsuario) {
-      setItems(prev => prev.map(it => it.id === selectedUsuario.id ? { ...it, nombre, email, telefono, rol } : it));
-      toast.success('Usuario actualizado');
-    } else {
-      const nuevo: Usuario = {
-        id: `U-${String(items.length + 1).padStart(3, '0')}`,
-        nombre,
-        email,
-        telefono,
-        rol,
-        estado: 'Activo',
-        fechaRegistro: new Date().toISOString().slice(0, 10),
-      };
-      setItems(prev => [nuevo, ...prev]);
-      toast.success('Usuario creado');
+    const rolLabel = String(fd.get('rol') ?? '').trim();
+    const rol = roleToBackend[rolLabel] ?? 'ASESOR';
+    if (!nombre || !email) {
+      toast.error('Nombre y email son obligatorios');
+      return;
     }
-    handleCloseModal();
+    if (telefono && !isValidPhone(telefono)) {
+      toast.error('Teléfono inválido. Usa formato: 3001234567 o +573001234567');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (selectedUsuario) {
+        const actualizado = await usersApi.updateStatus(
+          selectedUsuario.id,
+          selectedUsuario.estado === 'Activo' ? 'INACTIVO' : 'ACTIVO'
+        );
+        setItems(prev => prev.map(it => it.id === selectedUsuario.id ? actualizado : it));
+        toast.success('Usuario actualizado');
+      } else {
+        const randomPass = Math.random().toString(36).slice(-8);
+        const creado = await usersApi.create({ nombre, email, telefono, role: rol, password: randomPass });
+        setItems(prev => [creado, ...prev]);
+        toast.success('Usuario creado');
+      }
+      handleCloseModal();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar usuario');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const columns: DataTableColumn<Usuario>[] = [
@@ -98,7 +126,6 @@ export const AdminGestionUsuarios: React.FC = () => {
     ],
     render: (item) => (
       <div className={s.detailPanel}>
-        <div className={s.detailRow}><span>Teléfono:</span> {item.telefono}</div>
         <div className={s.detailRow}><span>Email:</span> {item.email}</div>
         <div className={s.detailRow}><span>Rol:</span> {item.rol}</div>
         <div className={s.detailRow}><span>Fecha registro:</span> {item.fechaRegistro}</div>
@@ -108,8 +135,16 @@ export const AdminGestionUsuarios: React.FC = () => {
 
   const actions = ((item: Usuario): DataTableAction<Usuario>[] => [
     { label: 'Editar', icon: <Edit size={14} />, onClick: (i) => { setSelectedUsuario(i); setModalOpen(true); } },
-    { label: 'Activar/Desactivar', icon: <ToggleLeft size={14} />, onClick: () => toast.info(item.estado === 'Activo' ? 'Usuario desactivado' : 'Usuario activado') },
-    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: () => { if (confirm(`¿Eliminar usuario ${item.nombre}?`)) toast.success('Usuario eliminado'); } },
+    { label: 'Activar/Desactivar', icon: <ToggleLeft size={14} />, onClick: async () => {
+      try {
+        const actualizado = await usersApi.updateStatus(item.id, item.estado === 'Activo' ? 'INACTIVO' : 'ACTIVO');
+        setItems(prev => prev.map(it => it.id === item.id ? actualizado : it));
+        toast.success(actualizado.estado === 'Activo' ? 'Usuario activado' : 'Usuario desactivado');
+      } catch {
+        toast.error('No se pudo cambiar el estado del usuario');
+      }
+    } },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => setDeleteConfirm(item) },
   ]) as DataTableAction<Usuario>[] | ((item: Usuario) => DataTableAction<Usuario>[]);
 
   return (
@@ -148,11 +183,12 @@ export const AdminGestionUsuarios: React.FC = () => {
           enableSorting={true}
           toolbarLeft={null}
           maxVisibleColumns={5}
+          emptyMessage={loading ? 'Cargando usuarios...' : error ? error : 'No se encontraron usuarios'}
         />
       </div>
 
       {modalOpen && (
-        <div className={s.modalOverlay} onClick={handleCloseModal}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <h2 className={s.modalTitle}>
@@ -170,11 +206,9 @@ export const AdminGestionUsuarios: React.FC = () => {
                   <div className={s.field}>
                     <label className={s.label}>Rol</label>
                     <select className={s.select} name="rol" defaultValue={selectedUsuario?.rol}>
-                      <option>Administrador</option>
-                      <option>Asesor</option>
-                      <option>Almacén</option>
-                      <option>Producción</option>
-                      <option>Reportes</option>
+                      {ROLES_SISTEMA.map(rol => (
+                        <option key={rol} value={rol}>{ROL_LABELS[rol] ?? rol}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -185,15 +219,15 @@ export const AdminGestionUsuarios: React.FC = () => {
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Teléfono</label>
-                    <input type="tel" className={s.input} name="telefono" defaultValue={selectedUsuario?.telefono} />
+                    <input type="tel" className={s.input} name="telefono" defaultValue={selectedUsuario ? '' : ''} />
                   </div>
                 </div>
                 <div className={s.formActions}>
                   <Button variant="secondary" onClick={handleCloseModal}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleSubmitUsuario}>
-                    {selectedUsuario ? 'Guardar cambios' : 'Crear usuario'}
+                  <Button onClick={handleSubmitUsuario} disabled={saving}>
+                    {saving ? 'Guardando...' : selectedUsuario ? 'Guardar cambios' : 'Crear usuario'}
                   </Button>
                 </div>
               </form>
@@ -201,7 +235,27 @@ export const AdminGestionUsuarios: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            await usersApi.remove(deleteConfirm.id);
+            setItems(prev => prev.filter(it => it.id !== deleteConfirm.id));
+            toast.success('Usuario eliminado');
+          } catch {
+            toast.error('No se pudo eliminar el usuario');
+          } finally {
+            setDeleteConfirm(null);
+          }
+        }}
+        title="Eliminar usuario"
+        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };
-

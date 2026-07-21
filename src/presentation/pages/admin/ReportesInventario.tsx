@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, TrendingDown, Package, AlertTriangle, BarChart3, Download, ChevronDown } from 'lucide-react';
 import s from './ReportesInventario.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { reportsApi, type InventoryReport } from '@/infrastructure/api/reportsApi';
+import { PERIODOS_REPORTE_INVENTARIO } from '@/shared/constants/options';
 
 interface ProductoReporte {
   id: string;
@@ -12,54 +14,91 @@ interface ProductoReporte {
   stockActual: number;
   stockMinimo: number;
   stockMaximo: number;
-  costoUnitario: number;
-  precioVenta: number;
+  costoUnitario: number | null;
+  precioVenta: number | null;
   rotacion: 'Alta' | 'Media' | 'Baja';
-  valorInventario: number;
+  valorInventario: number | null;
   ultimaEntrada: string;
 }
 
-const mockProductos: ProductoReporte[] = [
-  { id: 'P001', nombre: 'Tela Algodón Premium', categoria: 'Telas', stockActual: 450, stockMinimo: 100, stockMaximo: 800, costoUnitario: 12000, precioVenta: 18000, rotacion: 'Alta', valorInventario: 5400000, ultimaEntrada: '2024-06-01' },
-  { id: 'P002', nombre: 'Hilo Cosido #100', categoria: 'Insumos', stockActual: 25, stockMinimo: 50, stockMaximo: 200, costoUnitario: 2500, precioVenta: 4000, rotacion: 'Media', valorInventario: 62500, ultimaEntrada: '2024-05-28' },
-  { id: 'P003', nombre: 'Botón Negro 18mm', categoria: 'Accesorios', stockActual: 800, stockMinimo: 200, stockMaximo: 1000, costoUnitario: 300, precioVenta: 500, rotacion: 'Alta', valorInventario: 240000, ultimaEntrada: '2024-06-05' },
-  { id: 'P004', nombre: 'Tela Licra Negra', categoria: 'Telas', stockActual: 0, stockMinimo: 80, stockMaximo: 300, costoUnitario: 15000, precioVenta: 22000, rotacion: 'Baja', valorInventario: 0, ultimaEntrada: '2024-04-15' },
-  { id: 'P005', nombre: 'Cierre YKK #8', categoria: 'Accesorios', stockActual: 320, stockMinimo: 100, stockMaximo: 500, costoUnitario: 800, precioVenta: 1200, rotacion: 'Alta', valorInventario: 256000, ultimaEntrada: '2024-06-08' },
-  { id: 'P006', nombre: 'Elástico 2cm Blanco', categoria: 'Insumos', stockActual: 15, stockMinimo: 40, stockMaximo: 150, costoUnitario: 600, precioVenta: 900, rotacion: 'Media', valorInventario: 9000, ultimaEntrada: '2024-05-20' },
-  { id: 'P007', nombre: 'Tela Jean Indigo', categoria: 'Telas', stockActual: 120, stockMinimo: 50, stockMaximo: 250, costoUnitario: 18000, precioVenta: 26000, rotacion: 'Alta', valorInventario: 2160000, ultimaEntrada: '2024-06-03' },
-  { id: 'P008', nombre: 'Aguja Industrial 16x231', categoria: 'Insumos', stockActual: 5, stockMinimo: 30, stockMaximo: 100, costoUnitario: 1200, precioVenta: 1800, rotacion: 'Baja', valorInventario: 6000, ultimaEntrada: '2024-03-10' },
-];
+const mapRotacion = (stock: number, minimo: number): 'Alta' | 'Media' | 'Baja' => {
+  if (stock === 0) return 'Baja';
+  if (stock < minimo) return 'Media';
+  return 'Alta';
+};
 
 export const AdminReportesInventario: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('Todos');
-  const [filtroRotacion] = useState<string>('Todos');
   const [periodo, setPeriodo] = useState<string>('ultimo_mes');
+  const [report, setReport] = useState<InventoryReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const categorias = Array.from(new Set(mockProductos.map(p => p.categoria)));
-  // unused removed
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await reportsApi.getInventoryReport();
+        setReport(data);
+      } catch {
+        setError('No se pudo cargar el reporte de inventario');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
 
-  const productosFiltrados = mockProductos.filter(p =>
+  type CategoriaNormalizada = { nombre: string; productos: number };
+  const categoriasSource = report?.categories ?? report?.stockByCategory ?? [];
+  const categoriasReporte: CategoriaNormalizada[] = categoriasSource.map((c: any) => ({
+    nombre: c.nombre ?? c.categoria ?? '',
+    productos: c.productos ?? c.cantidad ?? 0,
+  }));
+
+  const productos: ProductoReporte[] = categoriasReporte.map((cat, index) => {
+    const nombreCat = cat.nombre;
+    const stockActual = Math.max(cat.productos, 0);
+    const stockMinimo = Math.max(stockActual, 1);
+    const stockMaximo = Math.max(stockActual, stockMinimo, 1);
+    const ultimaEntrada = report?.recentMovements?.[index]?.fecha ?? '';
+
+    return {
+      id: `${nombreCat}-${index}`,
+      nombre: nombreCat,
+      categoria: nombreCat,
+      stockActual,
+      stockMinimo,
+      stockMaximo,
+      costoUnitario: null,
+      precioVenta: null,
+      rotacion: mapRotacion(stockActual, Math.max(stockMinimo, 1)),
+      valorInventario: null,
+      ultimaEntrada,
+    };
+  });
+
+  const categorias = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)));
+
+  const productosFiltrados = productos.filter(p =>
     (filtroCategoria === 'Todos' || p.categoria === filtroCategoria) &&
-    (filtroRotacion === 'Todos' || p.rotacion === filtroRotacion) &&
     (p.nombre.toLowerCase().includes(search.toLowerCase()) ||
      p.categoria.toLowerCase().includes(search.toLowerCase()))
   );
 
   const stats = {
-    valorTotal: mockProductos.reduce((sum, p) => sum + p.valorInventario, 0),
-    productosActivos: mockProductos.filter(p => p.stockActual > 0).length,
-    productosBajos: mockProductos.filter(p => p.stockActual > 0 && p.stockActual < p.stockMinimo).length,
-    productosSinStock: mockProductos.filter(p => p.stockActual === 0).length,
+    valorTotal: null as number | null,
+    productosActivos: report?.totalProducts || 0,
+    productosBajos: report?.lowStockProducts ?? report?.lowStock ?? 0,
+    productosSinStock: report?.outOfStockProducts ?? report?.agotado ?? 0,
   };
 
-  const topValor = [...mockProductos].sort((a, b) => b.valorInventario - a.valorInventario).slice(0, 5);
-  const maxValor = topValor[0]?.valorInventario || 1;
-
   const rotacionStats = {
-    alta: mockProductos.filter(p => p.rotacion === 'Alta').length,
-    media: mockProductos.filter(p => p.rotacion === 'Media').length,
-    baja: mockProductos.filter(p => p.rotacion === 'Baja').length,
+    alta: productos.filter(p => p.rotacion === 'Alta').length,
+    media: productos.filter(p => p.rotacion === 'Media').length,
+    baja: productos.filter(p => p.rotacion === 'Baja').length,
   };
 
   const formatCurrency = (valor: number) => {
@@ -75,6 +114,14 @@ export const AdminReportesInventario: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return <div className={s.header}><p>Cargando reporte de inventario...</p></div>;
+  }
+
+  if (error) {
+    return <div className={s.header}><p className="text-red-500">{error}</p></div>;
+  }
+
   return (
     <div>
       <div className={s.header}>
@@ -85,9 +132,9 @@ export const AdminReportesInventario: React.FC = () => {
         <div className={s.headerActions}>
           <div className={s.periodoSelect}>
             <select className={s.select} value={periodo} onChange={e => setPeriodo(e.target.value)}>
-              <option value="ultimo_mes">Último mes</option>
-              <option value="ultimo_trimestre">Último trimestre</option>
-              <option value="ultimo_ano">Último año</option>
+              {PERIODOS_REPORTE_INVENTARIO.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
             <ChevronDown size={16} className={s.selectIcon} />
           </div>
@@ -101,7 +148,7 @@ export const AdminReportesInventario: React.FC = () => {
         <div className={s.statCard}>
           <BarChart3 size={20} className={s.statIcon} />
           <div>
-            <div className={s.statValue}>{formatCurrency(stats.valorTotal)}</div>
+            <div className={s.statValue}>{stats.valorTotal !== null ? formatCurrency(stats.valorTotal) : '—'}</div>
             <div className={s.statLabel}>Valor Total Inventario</div>
           </div>
         </div>
@@ -130,23 +177,29 @@ export const AdminReportesInventario: React.FC = () => {
 
       <div className={s.chartsRow}>
         <div className={s.chartCard}>
-          <h3 className={s.chartTitle}>Top 5 Productos por Valor de Inventario</h3>
+          <h3 className={s.chartTitle}>Movimientos recientes</h3>
           <div className={s.barChart}>
-            {topValor.map((p, i) => (
-              <div key={p.id} className={s.barRow}>
-                <div className={s.barLabel}>
-                  <span className={s.barName}>{p.nombre}</span>
-                  <span className={s.barAmount}>{formatCurrency(p.valorInventario)}</span>
-                </div>
-                <div className={s.barTrack}>
-                  <div
-                    className={`${s.barFill} ${i === 0 ? s.barFillPrimary : i === 1 ? s.barFillAccent : s.barFillDefault}`}
-                    style={{ width: `${(p.valorInventario / maxValor) * 100}%` }}
-                  />
-                </div>
-                <span className={s.barPercent}>{Math.round((p.valorInventario / maxValor) * 100)}%</span>
+            {report?.recentMovements && report.recentMovements.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {report.recentMovements.slice(0, 5).map((mov, i) => (
+                  <div key={mov.id ?? i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: 'var(--color-text-primary)' }}>
+                    <span>{mov.tipo}</span>
+                    <span>{mov.cantidad}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : report?.stockMovements && report.stockMovements.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {report.stockMovements.slice(0, 5).map((mov, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: 'var(--color-text-primary)' }}>
+                    <span>{mov.tipo}</span>
+                    <span>{mov.cantidad}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--color-text-muted)' }}>No hay movimientos recientes disponibles</p>
+            )}
           </div>
         </div>
 
@@ -179,23 +232,23 @@ export const AdminReportesInventario: React.FC = () => {
             <div className={s.rotacionBarRow}>
               <span className={s.rotacionBarLabel}>Alta</span>
               <div className={s.rotacionBarTrack}>
-                <div className={s.rotacionBarFillAlta} style={{ width: `${(rotacionStats.alta / mockProductos.length) * 100}%` }} />
+                <div className={s.rotacionBarFillAlta} style={{ width: `${productos.length > 0 ? (rotacionStats.alta / productos.length) * 100 : 0}%` }} />
               </div>
-              <span className={s.rotacionBarPercent}>{Math.round((rotacionStats.alta / mockProductos.length) * 100)}%</span>
+              <span className={s.rotacionBarPercent}>{productos.length > 0 ? Math.round((rotacionStats.alta / productos.length) * 100) : 0}%</span>
             </div>
             <div className={s.rotacionBarRow}>
               <span className={s.rotacionBarLabel}>Media</span>
               <div className={s.rotacionBarTrack}>
-                <div className={s.rotacionBarFillMedia} style={{ width: `${(rotacionStats.media / mockProductos.length) * 100}%` }} />
+                <div className={s.rotacionBarFillMedia} style={{ width: `${productos.length > 0 ? (rotacionStats.media / productos.length) * 100 : 0}%` }} />
               </div>
-              <span className={s.rotacionBarPercent}>{Math.round((rotacionStats.media / mockProductos.length) * 100)}%</span>
+              <span className={s.rotacionBarPercent}>{productos.length > 0 ? Math.round((rotacionStats.media / productos.length) * 100) : 0}%</span>
             </div>
             <div className={s.rotacionBarRow}>
               <span className={s.rotacionBarLabel}>Baja</span>
               <div className={s.rotacionBarTrack}>
-                <div className={s.rotacionBarFillBaja} style={{ width: `${(rotacionStats.baja / mockProductos.length) * 100}%` }} />
+                <div className={s.rotacionBarFillBaja} style={{ width: `${productos.length > 0 ? (rotacionStats.baja / productos.length) * 100 : 0}%` }} />
               </div>
-              <span className={s.rotacionBarPercent}>{Math.round((rotacionStats.baja / mockProductos.length) * 100)}%</span>
+              <span className={s.rotacionBarPercent}>{productos.length > 0 ? Math.round((rotacionStats.baja / productos.length) * 100) : 0}%</span>
             </div>
           </div>
         </div>
@@ -232,7 +285,7 @@ export const AdminReportesInventario: React.FC = () => {
         <DataTable<ProductoReporte>
           data={productosFiltrados}
           pageSize={10}
-          emptyMessage="No se encontraron productos"
+          emptyMessage="Sin resultados"
           maxVisibleColumns={5}
           detailPanel={{
             title: (p) => p.nombre,
@@ -245,16 +298,16 @@ export const AdminReportesInventario: React.FC = () => {
                     <div className={s.detailItem}><span className={s.detailLabel}>Stock actual</span><span>{p.stockActual}</span></div>
                     <div className={s.detailItem}><span className={s.detailLabel}>Stock mínimo</span><span>{p.stockMinimo}</span></div>
                     <div className={s.detailItem}><span className={s.detailLabel}>Stock máximo</span><span>{p.stockMaximo}</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Costo unitario</span><span>{formatCurrency(p.costoUnitario)}</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Precio venta</span><span>{formatCurrency(p.precioVenta)}</span></div>
+                    <div className={s.detailItem}><span className={s.detailLabel}>Costo unitario</span><span>{p.costoUnitario !== null ? formatCurrency(p.costoUnitario) : '—'}</span></div>
+                    <div className={s.detailItem}><span className={s.detailLabel}>Precio venta</span><span>{p.precioVenta !== null ? formatCurrency(p.precioVenta) : '—'}</span></div>
                   </div>
                 </div>
                 <div className={s.detailSection}>
                   <h4 className={s.detailSectionTitle}>Valores y rotación</h4>
                   <div className={s.detailGrid}>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Valor inventario</span><span className={s.tdBold}>{formatCurrency(p.valorInventario)}</span></div>
+                    <div className={s.detailItem}><span className={s.detailLabel}>Valor inventario</span><span className={s.tdBold}>{p.valorInventario !== null ? formatCurrency(p.valorInventario) : '—'}</span></div>
                     <div className={s.detailItem}><span className={s.detailLabel}>Rotación</span><span><Badge variant={getRotacionBadge(p.rotacion)}>{p.rotacion}</Badge></span></div>
-                    <div className={s.detailItemFull}><span className={s.detailLabel}>Última entrada</span><span>{p.ultimaEntrada}</span></div>
+                    <div className={s.detailItemFull}><span className={s.detailLabel}>Última entrada</span><span>{p.ultimaEntrada || '—'}</span></div>
                   </div>
                 </div>
               </div>
@@ -281,9 +334,9 @@ export const AdminReportesInventario: React.FC = () => {
             { key: 'rotacion', header: 'Rotación', width: '100px', sortable: true, render: (p) => (
               <Badge variant={getRotacionBadge(p.rotacion)}>{p.rotacion}</Badge>
             )},
-            { key: 'precioVenta', header: 'Precio', width: '110px', sortable: true, align: 'right', render: (p) => <span className={s.tdRight}>{formatCurrency(p.precioVenta)}</span> },
+            { key: 'precioVenta', header: 'Precio', width: '110px', sortable: true, align: 'right', render: (p) => <span className={s.tdRight}>{p.precioVenta !== null ? formatCurrency(p.precioVenta) : '—'}</span> },
             { key: 'ultimaEntrada', header: 'Última Entrada', width: '110px', sortable: true, render: (p) => (
-              <span className={s.tdMuted}>{p.ultimaEntrada}</span>
+              <span className={s.tdMuted}>{p.ultimaEntrada || '—'}</span>
             )},
           ]}
         />
@@ -291,5 +344,3 @@ export const AdminReportesInventario: React.FC = () => {
     </div>
   );
 };
-
-

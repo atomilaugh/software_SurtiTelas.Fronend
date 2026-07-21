@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Plus, Edit } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
@@ -7,46 +7,77 @@ import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { Modal } from '../../../shared/ui/Modal';
+import { customersApi } from '@/infrastructure/api/customersApi';
+import { authApi } from '@/infrastructure/api/authApi';
+import type { Cliente } from '@/core/types';
+import { useServerPagination } from '@/hooks/useServerPagination';
 
-interface Cliente {
+interface AsesorOption {
   id: string;
   nombre: string;
-  ciudad: string;
-  tel: string;
-  asesor: string;
-  pedidos: number;
-  estado: 'Activo' | 'Inactivo';
-  email?: string;
-  direccion?: string;
-  observaciones?: string;
-  isTrustedCustomer?: boolean;
+  role: string;
 }
-
-const mockClientesInicial: Cliente[] = [
-  { id: 'CL-001', nombre: 'Almacén El Sol', ciudad: 'Bogotá', tel: '310 234 5678', asesor: 'Camila Torres', pedidos: 34, estado: 'Activo', email: 'contacto@alsol.com', isTrustedCustomer: true },
-  { id: 'CL-002', nombre: 'Boutique Moda+', ciudad: 'Medellín', tel: '311 345 6789', asesor: 'Luis Herrera', pedidos: 18, estado: 'Activo', email: 'info@modaplus.co', isTrustedCustomer: false },
-  { id: 'CL-003', nombre: 'Textiles Andina', ciudad: 'Cali', tel: '312 456 7890', asesor: 'Camila Torres', pedidos: 52, estado: 'Activo', email: 'ventas@andina.com', isTrustedCustomer: true },
-  { id: 'CL-004', nombre: 'Moda Casual SAS', ciudad: 'Barranquilla', tel: '313 567 8901', asesor: 'Pedro Gómez', pedidos: 9, estado: 'Inactivo', email: 'admin@modacasual.com', isTrustedCustomer: false },
-  { id: 'CL-005', nombre: 'Confección del Valle', ciudad: 'Cali', tel: '314 567 8902', asesor: 'Luis Herrera', pedidos: 27, estado: 'Activo', email: 'ventas@delvalle.com', isTrustedCustomer: false },
-  { id: 'CL-006', nombre: 'Telas Premium', ciudad: 'Bogotá', tel: '315 567 8903', asesor: 'Camila Torres', pedidos: 41, estado: 'Activo', email: 'info@telaspremium.com', isTrustedCustomer: true },
-  { id: 'CL-007', nombre: 'Moda Express', ciudad: 'Medellín', tel: '316 567 8904', asesor: 'Pedro Gómez', pedidos: 15, estado: 'Activo', email: 'ventas@modaexpress.co', isTrustedCustomer: false },
-  { id: 'CL-008', nombre: 'Estilo Único', ciudad: 'Cartagena', tel: '317 567 8905', asesor: 'Luis Herrera', pedidos: 22, estado: 'Activo', email: 'info@estilounico.com', isTrustedCustomer: false },
-  { id: 'CL-009', nombre: 'Telas del Caribe', ciudad: 'Barranquilla', tel: '318 567 8906', asesor: 'Camila Torres', pedidos: 8, estado: 'Inactivo', email: 'admin@telascaribe.com', isTrustedCustomer: false },
-  { id: 'CL-010', nombre: 'Confección Moderna', ciudad: 'Bogotá', tel: '319 567 8907', asesor: 'Pedro Gómez', pedidos: 33, estado: 'Activo', email: 'ventas@confeccionmoderna.com', isTrustedCustomer: true },
-];
 
 export const AdminClientes: React.FC = () => {
   const [search, setSearch] = useState('');
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
-  const [items, setItems] = useState<Cliente[]>(mockClientesInicial);
+  const [pageData, setPageData] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [asesores, setAsesores] = useState<AsesorOption[]>([]);
+  const [loadingAsesores, setLoadingAsesores] = useState(true);
 
   const formRef = useRef<HTMLFormElement>(null);
+  const pagination = useServerPagination(10);
 
-  const filteredClientes = items.filter(c =>
-    c.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    c.ciudad.toLowerCase().includes(search.toLowerCase())
-  );
+  const fetchClientes = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const query: Record<string, string | number | boolean | undefined | null> = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
+      if (search.trim()) query.search = search.trim();
+      const result = await customersApi.list(query);
+      setPageData(result.data);
+      pagination.setTotalRecords(result.meta.totalRecords);
+    } catch {
+      setError('No se pudieron cargar los clientes');
+      toast.error('No se pudieron cargar los clientes');
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, search, pagination.setTotalRecords]);
+
+  useEffect(() => {
+    void fetchClientes();
+  }, [fetchClientes]);
+
+  const fetchAsesores = async () => {
+    setLoadingAsesores(true);
+    try {
+      const data = await authApi.listUsers();
+      const users = (data as { data: Array<{ id: string; nombre: string; role: string }> }).data;
+      const mapped: AsesorOption[] = users
+        .filter(u => u.role === 'ASESOR' || u.role === 'ADMIN')
+        .map(u => ({ id: u.id, nombre: u.nombre, role: u.role }));
+      setAsesores(mapped);
+    } catch {
+      toast.error('No se pudieron cargar los asesores');
+    } finally {
+      setLoadingAsesores(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchAsesores();
+  }, []);
+
+  const handlePageChange = useCallback((newPage: number) => {
+    pagination.setPage(newPage);
+  }, [pagination]);
 
   const handleEdit = (cliente: Cliente) => {
     setSelectedCliente(cliente);
@@ -58,34 +89,29 @@ export const AdminClientes: React.FC = () => {
     setSelectedCliente(null);
   };
 
-  const handleSubmitCliente = () => {
+  const handleSubmitCliente = async () => {
     if (!formRef.current) return;
     const fd = new FormData(formRef.current);
     const nombre = String(fd.get('nombre') ?? '').trim();
     const ciudad = String(fd.get('ciudad') ?? '').trim();
     const tel = String(fd.get('tel') ?? '').trim();
     const email = String(fd.get('email') ?? '').trim();
-    const asesor = String(fd.get('asesor') ?? '').trim();
+    const asesorId = String(fd.get('asesorId') ?? '').trim();
     const isTrustedCustomer = fd.get('isTrustedCustomer') === 'on';
-    if (selectedCliente) {
-      setItems(prev => prev.map(it => it.id === selectedCliente.id ? { ...it, nombre, ciudad, tel, email, asesor, isTrustedCustomer } : it));
-      toast.success('Cliente actualizado');
-    } else {
-      const nuevo: Cliente = {
-        id: `CL-${String(items.length + 1).padStart(3, '0')}`,
-        nombre,
-        ciudad,
-        tel,
-        asesor,
-        pedidos: 0,
-        estado: 'Activo',
-        email,
-        isTrustedCustomer,
-      };
-      setItems(prev => [nuevo, ...prev]);
-      toast.success('Cliente creado');
+    try {
+      if (selectedCliente) {
+        const actualizado = await customersApi.update(selectedCliente.id, { nombre, ciudad, tel, email, asesorId: asesorId || undefined, isTrustedCustomer });
+        setPageData(prev => prev.map(it => it.id === selectedCliente.id ? actualizado : it));
+        toast.success('Cliente actualizado');
+      } else {
+        const nuevo = await customersApi.create({ nombre, ciudad, tel, email, asesorId: asesorId || undefined, isTrustedCustomer, estado: 'Activo' });
+        setPageData(prev => [nuevo, ...prev]);
+        toast.success('Cliente creado');
+      }
+      handleCloseFormModal();
+    } catch {
+      toast.error('No fue posible guardar el cliente');
     }
-    handleCloseFormModal();
   };
 
   return (
@@ -106,22 +132,27 @@ export const AdminClientes: React.FC = () => {
           placeholder="Buscar clientes..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onSearch={(value) => setSearch(value)}
+          onSearch={(value) => { setSearch(value); pagination.setPage(1); }}
           debounceMs={100}
           minChars={0}
         />
       </div>
 
       <DataTable<Cliente>
-        data={filteredClientes}
-        pageSize={10}
-        emptyMessage="No se encontraron clientes"
+        data={pageData}
+        pageSize={pagination.limit}
+        emptyMessage={loading ? 'Cargando clientes...' : error ? error : 'Sin resultados'}
         enableSorting
         enableColumnFilters
         enableRowSelection
         enableExport
         exportFileName="clientes"
         maxVisibleColumns={5}
+        serverMode
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.totalRecords}
+        onPageChange={handlePageChange}
         columns={[
           { key: 'id', header: 'ID', width: '90px', sortable: true, filterable: true, render: (c) => <span className={s.tdMono}>{c.id}</span> },
           { key: 'nombre', header: 'Nombre', sortable: true, filterable: true, render: (c) => <span className={s.tdPrimary}>{c.nombre}</span> },
@@ -140,7 +171,7 @@ export const AdminClientes: React.FC = () => {
           )},
         ]}
         actions={(c) => [
-          { label: 'Editar', icon: <Edit size={14} />, onClick: () => handleEdit(c) },
+          { label: 'Editar', icon: <Edit size={14} aria-hidden="true" focusable="false" />, onClick: () => handleEdit(c) },
         ]}
         detailPanel={{
           title: (c) => `Cliente: ${c.nombre}`,
@@ -217,10 +248,11 @@ export const AdminClientes: React.FC = () => {
             </div>
             <div className={s.field}>
               <label className={s.label}>Asesor asignado</label>
-              <select className={s.select} name="asesor">
-                <option>Camila Torres</option>
-                <option>Luis Herrera</option>
-                <option>Pedro Gómez</option>
+              <select className={s.select} name="asesorId" disabled={loadingAsesores}>
+                <option value="">-- Seleccione un asesor --</option>
+                {asesores.map(a => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
               </select>
             </div>
           </div>

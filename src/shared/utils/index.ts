@@ -32,6 +32,7 @@ export const debounce = <T extends (...args: unknown[]) => void>(fn: T, delay = 
 export const slugify = (str: string) =>
   str.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
-
+export { isValidNit, normalizeNit, formatNitDisplay, isValidDocumentNumber, normalizeDocumentNumber } from './document';
+export { toNumber, toInteger, roundTo, toPercent, clamp, isPositiveNumber, isNonNegativeNumber, isInteger, parseCurrency } from './number';
 
 

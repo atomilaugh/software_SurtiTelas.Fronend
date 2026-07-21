@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SearchInput } from '@/shared/ui/SearchInput';
@@ -8,93 +8,97 @@ import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { Modal } from '../../../shared/ui/Modal';
+import { ordersApi } from '@/infrastructure/api/ordersApi';
+import { customersApi } from '@/infrastructure/api/customersApi';
+import { authApi, type BackendAuthUser } from '@/infrastructure/api/authApi';
+import { useAuthStore } from '@/core/stores/authStore';
+import { ESTADOS_PEDIDO, ORDER_STATUS_COLORS } from '@/shared/constants/options';
+import type { Pedido, PedidoItem, Cliente } from '@/core/types';
+import { useServerPagination } from '@/hooks/useServerPagination';
 
-interface ItemPedido {
+type PedidoFormItem = {
   id: string;
-  descripcion: string;
-  cantidad: string;
-  precio: string;
-}
-
-interface Pedido {
-  id: string;
-  cliente: string;
-  asesor: string;
-  fecha: string;
-  items: number;
-  total: string;
-  estado: 'Nuevo' | 'En producción' | 'Listo' | 'Despachado' | 'Entregado' | 'Cancelado';
-  observaciones?: string;
-}
-
-const pedidosIniciales: Pedido[] = [
-  { id: '#PD-2401', cliente: 'Almacén El Sol', asesor: 'Camila Torres', fecha: '08 Jun 2026', items: 24, total: '$2.480.000', estado: 'En producción' },
-  { id: '#PD-2400', cliente: 'Boutique Moda+', asesor: 'Luis Herrera', fecha: '07 Jun 2026', items: 8, total: '$980.000', estado: 'Listo' },
-  { id: '#PD-2399', cliente: 'Textiles Andina', asesor: 'Camila Torres', fecha: '07 Jun 2026', items: 45, total: '$5.120.000', estado: 'Despachado' },
-  { id: '#PD-2398', cliente: 'Moda Casual SAS', asesor: 'Pedro Gómez', fecha: '06 Jun 2026', items: 12, total: '$1.340.000', estado: 'Entregado' },
-  { id: '#PD-2397', cliente: 'La Tienda Norte', asesor: 'Luis Herrera', fecha: '05 Jun 2026', items: 6, total: '$720.000', estado: 'Cancelado' },
-  { id: '#PD-2396', cliente: 'Confección del Valle', asesor: 'Camila Torres', fecha: '04 Jun 2026', items: 18, total: '$2.150.000', estado: 'Nuevo' },
-  { id: '#PD-2395', cliente: 'Telas Premium', asesor: 'Luis Herrera', fecha: '03 Jun 2026', items: 22, total: '$3.200.000', estado: 'En producción' },
-  { id: '#PD-2394', cliente: 'Moda Express', asesor: 'Pedro Gómez', fecha: '02 Jun 2026', items: 9, total: '$1.180.000', estado: 'Listo' },
-];
-
-const clientes = ['Almacén El Sol', 'Boutique Moda+', 'Textiles Andina', 'Moda Casual SAS', 'La Tienda Norte', 'Confección del Valle', 'Telas Premium', 'Moda Express'];
-const asesores = ['Camila Torres', 'Luis Herrera', 'Pedro Gómez'];
-const estadosPedido: Pedido['estado'][] = ['Nuevo', 'En producción', 'Listo', 'Despachado', 'Entregado', 'Cancelado'];
-
-const orderStatuses: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default' | null> = {
-  'Nuevo': 'default',
-  'En producción': 'info',
-  'Listo': 'warning',
-  'Despachado': 'default',
-  'Entregado': 'success',
-  'Cancelado': 'danger',
+  nombre: string;
+  precio: number;
+  cantidad: number;
 };
+
+const orderStatuses = ORDER_STATUS_COLORS;
 
 const formatoCOP = (valor: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(valor);
 
 export const AdminPedidos: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
+  const [pageData, setPageData] = useState<Pedido[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [asesores, setAsesores] = useState<BackendAuthUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
-  const [pedidos, setPedidos] = useState<Pedido[]>(pedidosIniciales);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
+
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
-  const [cliente, setCliente] = useState('');
-  const [clienteLibre, setClienteLibre] = useState('');
-  const [asesor, setAsesor] = useState(asesores[0]);
+  const [clienteNombre, setClienteNombre] = useState('');
+  const [asesorId, setAsesorId] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [estado, setEstado] = useState<Pedido['estado']>('Nuevo');
   const [observaciones, setObservaciones] = useState('');
-  const [items, setItems] = useState<ItemPedido[]>([
-    { id: 'I1', descripcion: '', cantidad: '', precio: '' },
+  const [items, setItems] = useState<PedidoFormItem[]>([
+    { id: 'I1', nombre: '', precio: 0, cantidad: 1 },
   ]);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const filteredPedidos = pedidos.filter(p =>
-    p.id.toLowerCase().includes(search.toLowerCase()) ||
-    p.cliente.toLowerCase().includes(search.toLowerCase())
-  );
+  const pagination = useServerPagination(10);
 
-  const subtotal = items.reduce((sum, it) => sum + (Number(it.cantidad) || 0) * (Number(it.precio) || 0), 0);
-  const totalItems = items.reduce((sum, it) => sum + (Number(it.cantidad) || 0), 0);
+  const hydrate = useCallback(async () => {
+    setLoading(true);
+    try {
+      const ordersQuery: Record<string, string | number | boolean | undefined | null> = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
+      if (search.trim()) ordersQuery.search = search.trim();
+      const [ordersResult, clientsResult, _profile, usersResult] = await Promise.all([
+        ordersApi.list(ordersQuery),
+        customersApi.list(),
+        authApi.me(),
+        authApi.listUsers(),
+      ]);
+      setPageData(ordersResult.pedidos);
+      pagination.setTotalRecords(ordersResult.meta.totalRecords);
+      setClientes(clientsResult.data);
+      setAsesores(usersResult.data.filter((u) => u.role === 'ASESOR'));
+      if (!asesorId && usersResult.data.some((u) => u.role === 'ASESOR')) {
+        const adminAsesor = usersResult.data.find((u) => u.role === 'ASESOR');
+        setAsesorId(adminAsesor?.id ?? '');
+      }
+    } catch {
+      toast.error('No se pudieron cargar los pedidos');
+    } finally {
+      setLoading(false);
+    }
+  }, [asesorId, pagination.page, pagination.limit, search, pagination.setTotalRecords]);
 
-  const closeModals = () => {
-    setViewModalOpen(false);
-    setEditModalOpen(false);
-    setSelectedPedido(null);
-  };
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  const handlePageChange = useCallback((newPage: number) => {
+    pagination.setPage(newPage);
+  }, [pagination]);
+
+  const subtotal = items.reduce((sum, it) => sum + it.precio * it.cantidad, 0);
+  const totalItems = items.reduce((sum, it) => sum + it.cantidad, 0);
 
   const resetForm = () => {
-    setCliente(clientes[0]);
-    setClienteLibre('');
-    setAsesor(asesores[0]);
+    setClienteNombre('');
+    setAsesorId('');
     setFecha(new Date().toISOString().slice(0, 10));
     setEstado('Nuevo');
     setObservaciones('');
-    setItems([{ id: 'I1', descripcion: '', cantidad: '', precio: '' }]);
+    setItems([{ id: 'I1', nombre: '', precio: 0, cantidad: 1 }]);
     setFormError(null);
   };
 
@@ -106,61 +110,94 @@ export const AdminPedidos: React.FC = () => {
 
   const openEdit = (p: Pedido) => {
     setSelectedPedido(p);
-    setCliente(p.cliente);
-    setClienteLibre('');
-    setAsesor(p.asesor);
+    setClienteNombre(p.cliente);
     setFecha(p.fecha);
     setEstado(p.estado);
     setObservaciones(p.observaciones || '');
-    setItems([{ id: 'I1', descripcion: '', cantidad: String(p.items), precio: '' }]);
+    setItems(
+      (p.itemsList ?? []).map((it, idx) => ({
+        id: `I${idx + 1}-${Date.now()}`,
+        nombre: it.nombre,
+        precio: it.precio,
+        cantidad: it.cantidad,
+      }))
+    );
     setFormError(null);
     setEditModalOpen(true);
   };
 
-  const updateItem = (id: string, field: keyof ItemPedido, value: string) => {
-    setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
+  const updateFormItem = (id: string, field: keyof PedidoFormItem, value: string | number) => {
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, [field]: value } : it))
+    );
   };
 
   const addItem = () => {
-    setItems(prev => [...prev, { id: `I${prev.length + 1}-${Date.now()}`, descripcion: '', cantidad: '', precio: '' }]);
+    setItems((prev) => [
+      ...prev,
+      { id: `I${prev.length + 1}-${Date.now()}`, nombre: '', precio: 0, cantidad: 1 },
+    ]);
   };
 
   const removeItem = (id: string) => {
-    setItems(prev => prev.length > 1 ? prev.filter(it => it.id !== id) : prev);
+    setItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    const clienteFinal = cliente === '__otro__' ? clienteLibre.trim() : cliente.trim();
-    if (!clienteFinal) { setFormError('El cliente es obligatorio'); return; }
-    const itemsValidos = items.filter(it => it.descripcion.trim() && Number(it.cantidad) > 0);
-    if (itemsValidos.length === 0) { setFormError('Debes agregar al menos un producto al pedido'); return; }
-    setSaving(true);
-    const total = itemsValidos.reduce((sum, it) => sum + (Number(it.cantidad) || 0) * (Number(it.precio) || 0), 0);
-    const cantidadItems = itemsValidos.reduce((sum, it) => sum + (Number(it.cantidad) || 0), 0);
-    if (selectedPedido) {
-      setPedidos(prev => prev.map(p => p.id === selectedPedido.id ? {
-        ...p, cliente: clienteFinal, asesor, fecha, estado, observaciones, items: cantidadItems, total: formatoCOP(total),
-      } : p));
-      toast.success(`Pedido ${selectedPedido.id} actualizado`);
-    } else {
-      const secuencia = pedidos.length + 2401;
-      const nuevo: Pedido = {
-        id: `#PD-${secuencia}`,
-        cliente: clienteFinal,
-        asesor,
-        fecha,
-        estado,
-        observaciones,
-        items: cantidadItems,
-        total: formatoCOP(total),
-      };
-      setPedidos(prev => [nuevo, ...prev]);
-      toast.success(`Pedido ${nuevo.id} creado`);
+
+    const clienteFinal = clienteNombre.trim();
+    if (!clienteFinal) {
+      setFormError('El cliente es obligatorio');
+      return;
     }
-    setSaving(false);
-    closeModals();
+
+    const clienteDto = clientes.find((c) => c.nombre.toLowerCase() === clienteFinal.toLowerCase());
+    if (!clienteDto) {
+      setFormError('Selecciona un cliente válido');
+      return;
+    }
+
+    const itemsValidos = items.filter((it) => it.nombre.trim() && it.cantidad > 0);
+    if (itemsValidos.length === 0) {
+      setFormError('Debes agregar al menos un producto al pedido');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const itemsList: PedidoItem[] = itemsValidos.map((it) => ({
+        productId: undefined,
+        nombre: it.nombre,
+        precio: it.precio,
+        cantidad: it.cantidad,
+      }));
+
+      if (selectedPedido) {
+        const actualizado = await ordersApi.updateStatus(selectedPedido.id, estado);
+        setPageData((prev) =>
+          prev.map((p) => (p.id === selectedPedido.id ? actualizado : p))
+        );
+        toast.success(`Pedido ${selectedPedido.id} actualizado`);
+      } else {
+        const resultado = await ordersApi.create({
+          clienteId: clienteDto.id,
+          asesorId: asesorId || user?.uid,
+          itemsList,
+          prioridad: undefined,
+          observaciones: observaciones || undefined,
+        });
+        await hydrate();
+        toast.success(`Pedido ${resultado.pedido.id} creado`);
+      }
+      setEditModalOpen(false);
+      resetForm();
+    } catch {
+      toast.error('No fue posible guardar el pedido.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -181,36 +218,34 @@ export const AdminPedidos: React.FC = () => {
           placeholder="Buscar pedidos..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onSearch={(value) => setSearch(value)}
+          onSearch={(value) => { setSearch(value); pagination.setPage(1); }}
           debounceMs={100}
           minChars={0}
         />
       </div>
 
       <DataTable<Pedido>
-        data={filteredPedidos}
-        pageSize={10}
-        emptyMessage="No se encontraron pedidos"
+        data={pageData}
+        pageSize={pagination.limit}
+        emptyMessage={loading ? 'Cargando pedidos...' : 'Sin resultados'}
         enableSorting
         enableColumnFilters
         enableRowSelection
         enableExport
         exportFileName="pedidos"
         maxVisibleColumns={5}
+        serverMode
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.totalRecords}
+        onPageChange={handlePageChange}
         columns={[
-          { key: 'id', header: 'ID Pedido', width: '110px', sortable: true, filterable: true, render: (p) => <span className={s.tdMono}>{p.id}</span> },
+          { key: 'id', header: 'ID Pedido', width: '130px', sortable: true, filterable: true, render: (p) => <span className={s.tdMono}>{p.numero ?? p.id}</span> },
           { key: 'cliente', header: 'Cliente', sortable: true, filterable: true, render: (p) => <span className={s.tdPrimary}>{p.cliente}</span> },
           { key: 'asesor', header: 'Asesor', render: (p) => p.asesor },
           { key: 'fecha', header: 'Fecha', width: '110px', render: (p) => p.fecha },
           { key: 'total', header: 'Total', width: '120px', render: (p) => p.total },
-          { key: 'estado', header: 'Estado', width: '130px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-            { value: 'Nuevo', label: 'Nuevo' },
-            { value: 'En producción', label: 'En producción' },
-            { value: 'Listo', label: 'Listo' },
-            { value: 'Despachado', label: 'Despachado' },
-            { value: 'Entregado', label: 'Entregado' },
-            { value: 'Cancelado', label: 'Cancelado' },
-          ], render: (p) => (
+          { key: 'estado', header: 'Estado', width: '130px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_PEDIDO.map(es => ({ value: es, label: es })), render: (p) => (
             <Badge variant={orderStatuses[p.estado]}>{p.estado}</Badge>
           )},
         ]}
@@ -218,13 +253,13 @@ export const AdminPedidos: React.FC = () => {
           { label: 'Editar', onClick: () => openEdit(p) },
         ]}
         detailPanel={{
-          title: (p) => `Pedido ${p.id}`,
+          title: (p) => `Pedido ${p.numero ?? p.id}`,
           render: (p, onClose) => (
             <div className={s.detailModalContent}>
               <div className={s.detailSection}>
                 <h4 className={s.detailSectionTitle}>Detalles del pedido</h4>
                 <div className={s.detailGrid}>
-                  <div className={s.detailItem}><span className={s.detailLabel}>ID</span><span>{p.id}</span></div>
+                  <div className={s.detailItem}><span className={s.detailLabel}>ID</span><span>{p.numero ?? p.id}</span></div>
                   <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{p.cliente}</span></div>
                   <div className={s.detailItem}><span className={s.detailLabel}>Asesor</span><span>{p.asesor}</span></div>
                   <div className={s.detailItem}><span className={s.detailLabel}>Items</span><span>{p.items}</span></div>
@@ -240,37 +275,9 @@ export const AdminPedidos: React.FC = () => {
         }}
       />
 
-      {/* Modal Ver Pedido */}
-      <Modal
-        open={viewModalOpen && !!selectedPedido}
-        onClose={closeModals}
-        title="Detalle de Pedido"
-        size="md"
-      >
-        {selectedPedido && (
-          <div className={s.detailModalContent}>
-            <div className={s.detailSection}>
-              <h4 className={s.detailSectionTitle}>Detalles del pedido</h4>
-              <div className={s.detailGrid}>
-                <div className={s.detailItem}><span className={s.detailLabel}>ID</span><span>{selectedPedido.id}</span></div>
-                <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{selectedPedido.cliente}</span></div>
-                <div className={s.detailItem}><span className={s.detailLabel}>Asesor</span><span>{selectedPedido.asesor}</span></div>
-                <div className={s.detailItem}><span className={s.detailLabel}>Fecha</span><span>{selectedPedido.fecha}</span></div>
-                <div className={s.detailItem}><span className={s.detailLabel}>Items</span><span>{selectedPedido.items}</span></div>
-                <div className={s.detailItem}><span className={s.detailLabel}>Total</span><span>{selectedPedido.total}</span></div>
-              </div>
-            </div>
-            <div className={s.modalActions}>
-              <Button variant="secondary" onClick={closeModals}>Cerrar</Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Modal Nuevo / Editar Pedido */}
       <Modal
         open={editModalOpen}
-        onClose={closeModals}
+        onClose={() => { setEditModalOpen(false); resetForm(); }}
         title={selectedPedido ? 'Editar Pedido' : 'Nuevo Pedido'}
         description={selectedPedido ? `Modificando ${selectedPedido.id}` : 'Completa la información del pedido'}
         size="xl"
@@ -282,36 +289,38 @@ export const AdminPedidos: React.FC = () => {
           <div className={f.formRow}>
             <div className={f.field}>
               <label className={f.label}>Cliente *</label>
-              <select className={f.select} value={cliente} onChange={e => setCliente(e.target.value)}>
-                {clientes.map(c => <option key={c} value={c}>{c}</option>)}
-                <option value="__otro__">Otro (escribir)...</option>
+              <select className={f.select} value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)}>
+                <option value="">Selecciona un cliente</option>
+                {clientes.map((c) => (
+                  <option key={c.id} value={c.nombre}>
+                    {c.nombre}
+                  </option>
+                ))}
               </select>
             </div>
-            {cliente === '__otro__' && (
-              <div className={f.field}>
-                <label className={f.label}>Nombre del cliente *</label>
-                <input className={f.input} value={clienteLibre} onChange={e => setClienteLibre(e.target.value)} placeholder="Nombre del cliente" />
-              </div>
-            )}
-          </div>
-
-          <div className={f.formRow}>
             <div className={f.field}>
               <label className={f.label}>Asesor *</label>
-              <select className={f.select} value={asesor} onChange={e => setAsesor(e.target.value)}>
-                {asesores.map(a => <option key={a} value={a}>{a}</option>)}
+              <select className={f.select} value={asesorId} onChange={(e) => setAsesorId(e.target.value)}>
+                <option value="">Selecciona un asesor</option>
+                {asesores.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre}
+                  </option>
+                ))}
               </select>
             </div>
             <div className={f.field}>
               <label className={f.label}>Fecha *</label>
-              <input className={f.input} type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
+              <input className={f.input} type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
           </div>
 
           <div className={f.field}>
             <label className={f.label}>Estado *</label>
-            <select className={f.select} value={estado} onChange={e => setEstado(e.target.value as Pedido['estado'])}>
-              {estadosPedido.map(es => <option key={es} value={es}>{es}</option>)}
+            <select className={f.select} value={estado} onChange={(e) => setEstado(e.target.value as Pedido['estado'])}>
+              {ESTADOS_PEDIDO.map(es => (
+                <option key={es} value={es}>{es}</option>
+              ))}
             </select>
           </div>
 
@@ -328,16 +337,47 @@ export const AdminPedidos: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {items.map(it => {
-                  const sub = (Number(it.cantidad) || 0) * (Number(it.precio) || 0);
+                {items.map((it) => {
+                  const sub = it.precio * it.cantidad;
                   return (
                     <tr key={it.id}>
-                      <td><input className={f.input} value={it.descripcion} onChange={e => updateItem(it.id, 'descripcion', e.target.value)} placeholder="Producto" /></td>
-                      <td className={f.centerCol}><input className={f.input} type="number" min="1" value={it.cantidad} onChange={e => updateItem(it.id, 'cantidad', e.target.value)} /></td>
-                      <td className={f.rightCol}><input className={f.input} type="number" min="0" value={it.precio} onChange={e => updateItem(it.id, 'precio', e.target.value)} /></td>
-                      <td className={f.rightCol} style={{ fontWeight: 600 }}>{formatoCOP(sub)}</td>
                       <td>
-                        <button type="button" className={f.removeRowBtn} onClick={() => removeItem(it.id)} aria-label="Eliminar producto" disabled={items.length === 1}>
+                        <input
+                          className={f.input}
+                          value={it.nombre}
+                          onChange={(e) => updateFormItem(it.id, 'nombre', e.target.value)}
+                          placeholder="Producto"
+                        />
+                      </td>
+                      <td className={f.centerCol}>
+                        <input
+                          className={f.input}
+                          type="number"
+                          min="1"
+                          value={it.cantidad}
+                          onChange={(e) => updateFormItem(it.id, 'cantidad', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className={f.rightCol}>
+                        <input
+                          className={f.input}
+                          type="number"
+                          min="0"
+                          value={it.precio}
+                          onChange={(e) => updateFormItem(it.id, 'precio', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className={f.rightCol} style={{ fontWeight: 600 }}>
+                        {formatoCOP(sub)}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={f.removeRowBtn}
+                          onClick={() => removeItem(it.id)}
+                          aria-label="Eliminar producto"
+                          disabled={items.length === 1}
+                        >
                           <Trash2 size={16} />
                         </button>
                       </td>
@@ -358,11 +398,17 @@ export const AdminPedidos: React.FC = () => {
 
           <div className={f.field}>
             <label className={f.label}>Observaciones</label>
-            <textarea className={f.textarea} value={observaciones} onChange={e => setObservaciones(e.target.value)} placeholder="Notas del pedido..." rows={2} />
+            <textarea
+              className={f.textarea}
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              placeholder="Notas del pedido..."
+              rows={2}
+            />
           </div>
 
           <div className={f.formActions}>
-            <Button type="button" variant="secondary" onClick={closeModals} disabled={saving}>
+            <Button type="button" variant="secondary" onClick={() => { setEditModalOpen(false); resetForm(); }} disabled={saving}>
               Cancelar
             </Button>
             <Button type="submit" loading={saving} leftIcon={<Save size={16} />}>

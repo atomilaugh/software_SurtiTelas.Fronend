@@ -7,6 +7,9 @@ import { useAuth } from '@/app/providers/AppProviders';
 import { useDashboardTheme } from '@/core/hooks/useDashboardTheme';
 import { TopHeader } from '@/presentation/components/TopHeader';
 import { cn } from '@/shared/utils';
+import { useAuthStore } from '@/core/stores/authStore';
+import { authApi } from '@/infrastructure/api/authApi';
+import { notificationsApi } from '@/infrastructure/api/notificationsApi';
 import logoImg from '@/assets/images/logos/partner-logo-2-Photoroom.png';
 
 const asesorMenu: SidebarItem[] = [
@@ -27,6 +30,43 @@ export const AsesorLayout: React.FC = () => {
   });
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const storeUser = useAuthStore((s) => s.user);
+  const [sidebarUser, setSidebarUser] = useState({ name: 'Cargando...', role: 'asesor', initials: '' });
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const profile = await authApi.me();
+        if (!active) return;
+        const initials = profile.nombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+        setSidebarUser({ name: profile.nombre, role: 'asesor', initials });
+      } catch {
+        if (storeUser) {
+          const initials = storeUser.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() ?? '';
+          setSidebarUser({ name: storeUser.name ?? 'Asesor', role: 'asesor', initials });
+        }
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, [storeUser]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const notifs = await notificationsApi.list();
+        if (!active) return;
+        setNotificationCount(notifs.filter(n => !n.leida).length);
+      } catch {
+        setNotificationCount(0);
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem('surtitelas.sidebarCollapsed', String(isCollapsed));
@@ -38,7 +78,7 @@ export const AsesorLayout: React.FC = () => {
       document.querySelectorAll<HTMLElement>('[data-dashboard-theme]').forEach(el => el.removeAttribute('data-theme'));
       document.documentElement.removeAttribute('data-theme');
       document.body?.removeAttribute('data-theme');
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
 
@@ -62,7 +102,7 @@ export const AsesorLayout: React.FC = () => {
         logo={logoImg}
         brandName="SURTI CAMISETAS"
         panelLabel="Panel de Asesor"
-        user={{ name: 'Camila Torres', role: 'asesor', initials: 'CT' }}
+        user={sidebarUser}
         onLogout={handleLogout}
         showCollapse={true}
         homeHref="/"
@@ -71,12 +111,12 @@ export const AsesorLayout: React.FC = () => {
       <div className={s.mainContent}>
         <TopHeader
           user={{
-            name: 'Camila Torres',
-            email: 'asesor@surticamisetas.com',
+            name: sidebarUser.name,
+            email: storeUser?.email ?? '',
             role: 'asesor',
-            initial: 'CT',
+            initial: sidebarUser.initials,
           }}
-          notificationCount={2}
+          notificationCount={notificationCount}
           onSearch={() => {}}
           onToggleTheme={toggleTheme}
           onNotificationClick={handleNotificationClick}

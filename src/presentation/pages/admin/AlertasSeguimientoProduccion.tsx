@@ -1,41 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, AlertTriangle, Bell, Clock, Calendar, Factory, Package, X, CheckCircle } from 'lucide-react';
 import s from './AlertasSeguimientoProduccion.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { alertsApi, type Alert } from '@/infrastructure/api/alertsApi';
+import { TIPO_ALERTA_SEGUIMIENTO, ESTADOS_ALERTA } from '@/shared/constants/options';
 
 interface AlertaSeguimiento {
   id: string;
   numeroOrden: string;
   prenda: string;
   tallerNombre: string;
-  tipo: 'Retraso en entrega' | 'Cancelacion de taller' | 'Calidad baja' | 'Cambio de fecha' | 'Produccion detenida' | 'Material faltante';
+  tipo: string;
   descripcion: string;
   fechaAlerta: string;
   fechaComprometida: string;
-  estado: 'Pendiente' | 'Vista' | 'Resuelta';
+  estado: (typeof ESTADOS_ALERTA)[number] | 'Cancelada';
   prioridad: 'Alta' | 'Media' | 'Baja';
   avance: number;
 }
 
-const mockAlertas: AlertaSeguimiento[] = [
-  { id: 'AS-001', numeroOrden: 'ORD-2024-013', prenda: 'Camisa manga larga', tallerNombre: 'Taller Textil El Progreso', tipo: 'Retraso en entrega', descripcion: 'Orden con 3 días de retraso. Taller reportó demora en insumos', fechaAlerta: '2024-06-10', fechaComprometida: '2024-06-12', estado: 'Pendiente', prioridad: 'Alta', avance: 45 },
-  { id: 'AS-002', numeroOrden: 'ORD-2024-014', prenda: 'Pantalón jean', tallerNombre: 'Confección Martínez', tipo: 'Produccion detenida', descripcion: 'Producción detenida por falla de maquinaria', fechaAlerta: '2024-06-10', fechaComprometida: '2024-06-15', estado: 'Pendiente', prioridad: 'Alta', avance: 30 },
-  { id: 'AS-003', numeroOrden: 'ORD-2024-015', prenda: 'Blusa estampada', tallerNombre: 'Taller San José', tipo: 'Cambio de fecha', descripcion: 'Taller solicita extensión de 2 días para entrega', fechaAlerta: '2024-06-09', fechaComprometida: '2024-06-14', estado: 'Vista', prioridad: 'Media', avance: 70 },
-  { id: 'AS-004', numeroOrden: 'ORD-2024-016', prenda: 'Vestido casual', tallerNombre: 'Artesanías del Valle', tipo: 'Calidad baja', descripcion: 'Inspección detectó defectos en 15% de prendas', fechaAlerta: '2024-06-08', fechaComprometida: '2024-06-18', estado: 'Pendiente', prioridad: 'Media', avance: 85 },
-  { id: 'AS-005', numeroOrden: 'ORD-2024-017', prenda: 'Short deportivo', tallerNombre: 'Taller Rápido', tipo: 'Cancelacion de taller', descripcion: 'Taller canceló orden por sobrecupo. Requiere reasignación', fechaAlerta: '2024-06-07', fechaComprometida: '2024-06-20', estado: 'Resuelta', prioridad: 'Alta', avance: 0 },
-  { id: 'AS-006', numeroOrden: 'ORD-2024-018', prenda: 'Chaqueta impermeable', tallerNombre: 'Confección Martínez', tipo: 'Material faltante', descripcion: 'Falta tela impermeable. Orden en espera de insumo', fechaAlerta: '2024-06-10', fechaComprometida: '2024-06-16', estado: 'Pendiente', prioridad: 'Alta', avance: 20 },
-];
+const TIPO_MAP = TIPO_ALERTA_SEGUIMIENTO;
+
+const MODULO = 'seguimiento-produccion';
+
+function mapAlert(a: Alert): AlertaSeguimiento {
+  const metadata = (a.metadata ?? {}) as Record<string, unknown>;
+  const tipo = TIPO_MAP[a.tipo] ?? (a.tipo as AlertaSeguimiento['tipo']);
+  return {
+    id: a.id,
+    numeroOrden: (metadata.numeroOrden as string) ?? a.referenciaId ?? '-',
+    prenda: (metadata.prenda as string) ?? '-',
+    tallerNombre: (metadata.tallerNombre as string) ?? '-',
+    tipo,
+    descripcion: a.mensaje,
+    fechaAlerta: a.createdAt ? a.createdAt.slice(0, 10) : '-',
+    fechaComprometida: (metadata.fechaComprometida as string) ?? '-',
+    estado: a.estado,
+    prioridad: a.prioridad as AlertaSeguimiento['prioridad'],
+    avance: typeof metadata.avance === 'number' ? metadata.avance : 0,
+  };
+}
 
 export const AdminAlertasSeguimientoProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Pendiente' | 'Vista' | 'Resuelta'>('Todos');
+  const [filtroEstado, setFiltroEstado] = useState<'Todos' | (typeof ESTADOS_ALERTA)[number]>('Todos');
   const [filtroTipo] = useState<string>('Todos');
   const [selectedAlerta, setSelectedAlerta] = useState<AlertaSeguimiento | null>(null);
   const [_showFilters] = useState(true);
+  const [alertas, setAlertas] = useState<AlertaSeguimiento[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredAlertas = mockAlertas.filter(a =>
+  const loadAlertas = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await alertsApi.list({ modulo: MODULO });
+      setAlertas(data.map(mapAlert));
+    } catch (_e) {
+      setError('No se pudieron cargar las alertas');
+      setAlertas([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAlertas();
+  }, [loadAlertas]);
+
+  const handleMarcarResuelta = async (alerta: AlertaSeguimiento) => {
+    try {
+      await alertsApi.markAsResolved(alerta.id);
+      await loadAlertas();
+    } catch {
+      setError('No se pudo marcar como resuelta');
+    }
+  };
+
+  const filteredAlertas = alertas.filter(a =>
     (filtroEstado === 'Todos' || a.estado === filtroEstado) &&
     (filtroTipo === 'Todos' || a.tipo === filtroTipo) &&
     (a.numeroOrden.toLowerCase().includes(search.toLowerCase()) ||
@@ -43,8 +88,6 @@ export const AdminAlertasSeguimientoProduccion: React.FC = () => {
      a.tallerNombre.toLowerCase().includes(search.toLowerCase()) ||
      a.descripcion.toLowerCase().includes(search.toLowerCase()))
   );
-
- // const tiposUnicos = Array.from(new Set(mockAlertas.map(a => a.tipo)));
 
   const getBadgeVariant = (estado: string) => {
     switch (estado) {
@@ -82,10 +125,10 @@ export const AdminAlertasSeguimientoProduccion: React.FC = () => {
   };
 
   const stats = {
-    pendientes: mockAlertas.filter(a => a.estado === 'Pendiente').length,
-    criticas: mockAlertas.filter(a => a.prioridad === 'Alta' && a.estado !== 'Resuelta').length,
-    resueltas: mockAlertas.filter(a => a.estado === 'Resuelta').length,
-    retrasadas: mockAlertas.filter(a => a.tipo === 'Retraso en entrega' && a.estado !== 'Resuelta').length,
+    pendientes: alertas.filter(a => a.estado === 'Pendiente').length,
+    criticas: alertas.filter(a => a.prioridad === 'Alta' && a.estado !== 'Resuelta').length,
+    resueltas: alertas.filter(a => a.estado === 'Resuelta').length,
+    retrasadas: alertas.filter(a => a.tipo === 'Retraso en entrega' && a.estado !== 'Resuelta').length,
   };
 
   return (
@@ -127,9 +170,16 @@ export const AdminAlertasSeguimientoProduccion: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className={s.errorBox}>
+          <span>{error}</span>
+          <button className={s.retryBtn} onClick={loadAlertas}>Reintentar</button>
+        </div>
+      )}
+
       <div className={s.filters}>
         <div className={s.filterGroup}>
-          {['Todos', 'Pendiente', 'Vista', 'Resuelta'].map(estado => (
+          {['Todos', ...ESTADOS_ALERTA].map(estado => (
             <button
               key={estado}
               className={`${s.filterBtn} ${filtroEstado === estado ? s.filterBtnActive : ''}`}
@@ -151,62 +201,62 @@ export const AdminAlertasSeguimientoProduccion: React.FC = () => {
         </div>
       </div>
 
-      <DataTable<AlertaSeguimiento>
-        data={filteredAlertas}
-        pageSize={10}
-        emptyMessage="No se encontraron alertas"
-        onRowClick={setSelectedAlerta}
-        actions={(a) => [
-          ...(a.estado !== 'Resuelta' ? [{ label: 'Marcar resuelta', icon: <CheckCircle size={14} />, onClick: () => setSelectedAlerta(a) }] : []),
-        ]}
-        columns={[
-          { key: 'id', header: 'ID', width: '80px', render: (a) => <span className={s.tdMono}>{a.id}</span> },
-          { key: 'numeroOrden', header: 'Orden', width: '120px', render: (a) => <span className={s.tdMono}>{a.numeroOrden}</span> },
-          { key: 'prenda', header: 'Prenda', render: (a) => a.prenda },
-          { key: 'tallerNombre', header: 'Taller', width: '160px', render: (a) => (
-            <div className={s.tallerCell}>
-              <Factory size={14} />
-              {a.tallerNombre}
-            </div>
-          )},
-          { key: 'tipo', header: 'Tipo', width: '170px', render: (a) => (
-            <div className={s.tipoCell}>
-              {getTipoIcon(a.tipo)}
-              <span>{a.tipo}</span>
-            </div>
-          )},
-          { key: 'descripcion', header: 'Descripción', width: '180px', render: (a) => (
-            <div className={s.descripcionCell} title={a.descripcion}>{a.descripcion}</div>
-          )},
-          { key: 'avance', header: 'Avance', width: '120px', render: (a) => (
-            <div className={s.avanceCell}>
-              <div className={s.avanceBar}>
-                <div className={`${s.avanceFill} ${getAvanceColor(a.avance)}`} style={{ width: `${a.avance}%` }} />
+      {loading ? (
+        <div className={s.loadingBox}>Cargando alertas...</div>
+      ) : (
+        <DataTable<AlertaSeguimiento>
+          data={filteredAlertas}
+          pageSize={10}
+          emptyMessage="No se encontraron alertas"
+          onRowClick={setSelectedAlerta}
+          actions={(a) => [
+            ...(a.estado !== 'Resuelta' ? [{ label: 'Marcar resuelta', icon: <CheckCircle size={14} />, onClick: () => handleMarcarResuelta(a) }] : []),
+          ]}
+          columns={[
+            { key: 'id', header: 'ID', width: '80px', render: (a) => <span className={s.tdMono}>{a.id}</span> },
+            { key: 'numeroOrden', header: 'Orden', width: '120px', render: (a) => <span className={s.tdMono}>{a.numeroOrden}</span> },
+            { key: 'prenda', header: 'Prenda', render: (a) => a.prenda },
+            { key: 'tallerNombre', header: 'Taller', width: '160px', render: (a) => (
+              <div className={s.tallerCell}>
+                <Factory size={14} />
+                {a.tallerNombre}
               </div>
-              <span className={s.avanceText}>{a.avance}%</span>
-            </div>
-          )},
-          { key: 'fechaComprometida', header: 'Fecha límite', width: '120px', render: (a) => (
-            <div className={s.fechaCell}>
-              <Calendar size={14} />
-              {a.fechaComprometida}
-            </div>
-          )},
-          { key: 'prioridad', header: 'Prioridad', width: '100px', render: (a) => (
-            <Badge variant={a.prioridad === 'Alta' ? 'danger' : a.prioridad === 'Media' ? 'warning' : 'success'}>{a.prioridad}</Badge>
-          )},
-          { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-            { value: 'Pendiente', label: 'Pendiente' },
-            { value: 'Vista', label: 'Vista' },
-            { value: 'Resuelta', label: 'Resuelta' },
-          ], render: (a) => (
-            <Badge variant={getBadgeVariant(a.estado)}>{a.estado}</Badge>
-          )},
-        ]}
-      />
+            )},
+            { key: 'tipo', header: 'Tipo', width: '170px', render: (a) => (
+              <div className={s.tipoCell}>
+                {getTipoIcon(a.tipo)}
+                <span>{a.tipo}</span>
+              </div>
+            )},
+            { key: 'descripcion', header: 'Descripción', width: '180px', render: (a) => (
+              <div className={s.descripcionCell} title={a.descripcion}>{a.descripcion}</div>
+            )},
+            { key: 'avance', header: 'Avance', width: '120px', render: (a) => (
+              <div className={s.avanceCell}>
+                <div className={s.avanceBar}>
+                  <div className={`${s.avanceFill} ${getAvanceColor(a.avance)}`} style={{ width: `${a.avance}%` }} />
+                </div>
+                <span className={s.avanceText}>{a.avance}%</span>
+              </div>
+            )},
+            { key: 'fechaComprometida', header: 'Fecha límite', width: '120px', render: (a) => (
+              <div className={s.fechaCell}>
+                <Calendar size={14} />
+                {a.fechaComprometida}
+              </div>
+            )},
+            { key: 'prioridad', header: 'Prioridad', width: '100px', render: (a) => (
+              <Badge variant={a.prioridad === 'Alta' ? 'danger' : a.prioridad === 'Media' ? 'warning' : 'success'}>{a.prioridad}</Badge>
+            )},
+            { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_ALERTA.map(e => ({ value: e, label: e })), render: (a) => (
+              <Badge variant={getBadgeVariant(a.estado)}>{a.estado}</Badge>
+            )},
+          ]}
+        />
+      )}
 
       {selectedAlerta && (
-        <div className={s.modalOverlay} onClick={() => setSelectedAlerta(null)}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <h2 className={s.modalTitle}>
@@ -263,7 +313,7 @@ export const AdminAlertasSeguimientoProduccion: React.FC = () => {
                   Cerrar
                 </Button>
                 {selectedAlerta.estado !== 'Resuelta' && (
-                  <Button onClick={() => setSelectedAlerta(null)}>
+                  <Button onClick={() => { handleMarcarResuelta(selectedAlerta); setSelectedAlerta(null); }}>
                     Marcar como resuelta
                   </Button>
                 )}
@@ -275,4 +325,3 @@ export const AdminAlertasSeguimientoProduccion: React.FC = () => {
     </div>
   );
 };
-

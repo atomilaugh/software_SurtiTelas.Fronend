@@ -1,4 +1,4 @@
-﻿import React from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Tooltip } from "@/shared/components/Tooltip";
 import {
   MessageCircle,
@@ -9,14 +9,26 @@ import {
 } from 'lucide-react';
 import { FaInstagram, FaTiktok } from 'react-icons/fa';
 
-
-// O si estás usando una versión anterior de Font Awesome
-
 // Assets
 import logoSurticamisetas from '@assets/images/logos/partner-logo-1.png';
 import logoSurtitela from '@assets/images/logos/partner-logo-2.jpg';
+import { companyApi } from '@/infrastructure/api/companyApi';
 
 const Footer: React.FC = () => {
+  const [company, setCompany] = useState<{ nombre?: string; telefono?: string; email?: string; direccion?: string; ciudad?: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    companyApi.get().then((data) => {
+      if (active) setCompany(data);
+    }).catch(() => {
+      if (active) setCompany(null);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const direccion = [company?.direccion, company?.ciudad].filter(Boolean).join(', ') || 'No disponible';
+
   return (
     <footer className="site-footer">
       <div className="footer-main-container">
@@ -63,10 +75,8 @@ const Footer: React.FC = () => {
           <div className="footer-social-icons">
             <Tooltip title="WhatsApp">
               <a
-                href="https://wa.me/573245148316"
                 className="social-icon-btn"
-                target="_blank"
-                rel="noreferrer"
+                aria-disabled="true"
                 aria-label="WhatsApp"
               >
                 <MessageCircle size={22} />
@@ -75,10 +85,8 @@ const Footer: React.FC = () => {
 
             <Tooltip title="Instagram">
               <a
-                href="https://www.instagram.com/_surticamisetas_?igsh=MXR4MnEwNHB2aThqag=="
                 className="social-icon-btn"
-                target="_blank"
-                rel="noreferrer"
+                aria-disabled="true"
                 aria-label="Instagram"
               >
                 <FaInstagram size={22} />
@@ -87,10 +95,8 @@ const Footer: React.FC = () => {
 
             <Tooltip title="TikTok">
               <a
-                href="https://www.tiktok.com/@surti_camisetas"
                 className="social-icon-btn"
-                target="_blank"
-                rel="noreferrer"
+                aria-disabled="true"
                 aria-label="TikTok"
               >
                 <FaTiktok size={22} />
@@ -140,25 +146,23 @@ const Footer: React.FC = () => {
               <MapPin size={20} className="contact-icon" />
 
               <div>
-                CL 42 CR 27-45
-                <br />
-                <span>Medellín, Colombia</span>
+                {direccion}
               </div>
             </li>
 
             <li>
               <Phone size={20} className="contact-icon" />
-              <span>324 514 8316</span>
+              <span>{company?.telefono || 'No disponible'}</span>
             </li>
 
             <li>
               <Mail size={20} className="contact-icon" />
-              <span>surticamisetas@gmail.com</span>
+              <span>{company?.email || 'No disponible'}</span>
             </li>
 
             <li>
               <User size={20} className="contact-icon" />
-              <span>Jonathan Montoya</span>
+              <span>{company?.nombre || 'No disponible'}</span>
             </li>
 
           </ul>
@@ -184,10 +188,8 @@ const Footer: React.FC = () => {
       {/* Botón flotante WhatsApp */}
       <Tooltip title="WhatsApp">
         <a
-          href="https://wa.me/573218267514"
           className="whatsapp-float-btn"
-          target="_blank"
-          rel="noreferrer"
+          aria-disabled="true"
           aria-label="WhatsApp"
         >
           <MessageCircle size={32} fill="currentColor" />
@@ -198,5 +200,3 @@ const Footer: React.FC = () => {
 };
 
 export default Footer;
-
-

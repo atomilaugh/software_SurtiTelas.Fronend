@@ -678,3 +678,30 @@
     align-items: stretch;
   }
 }
+
+.loadingRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+.spin {
+  animation: contactSpin 1s linear infinite;
+}
+
+@keyframes contactSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.errorRow {
+  padding: 16px;
+  color: #dc2626;
+  font-size: 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}

@@ -1,28 +1,71 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, Edit, Trash2, X, Package, AlertTriangle } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Inventario.module.css';
 import { Button } from '@/shared/ui/Button';
 import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '@/shared/ui/DataTable';
-import { useAppStore } from '@/core/stores';
-import type { Producto } from '@/core/types';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import { inventoryApi, type InventoryMovement } from '@/infrastructure/api/inventoryApi';
+import { useAuthStore } from '@/core/stores/authStore';
+import { TIPOS_MOVIMIENTO, MOTIVOS_MOVIMIENTO } from '@/shared/constants/options';
+
+interface MovimientoFila {
+  id: string;
+  ref: string;
+  nombre: string;
+  cantidadStock: number;
+  stock: 'OK' | 'Bajo stock' | 'Agotado';
+  tela: string;
+  tipo: string;
+  motivo: string;
+}
+
+function toFila(m: InventoryMovement): MovimientoFila {
+  return {
+    id: m.id,
+    ref: m.productId ?? m.rawMaterialId ?? m.id,
+    nombre: m.motivo,
+    cantidadStock: m.cantidad,
+    stock: m.tipo === 'salida' ? 'Bajo stock' : m.tipo === 'ajuste' ? 'Agotado' : 'OK',
+    tela: m.tipo,
+    tipo: m.tipo,
+    motivo: m.motivo,
+  };
+}
 
 export const AdminInventario: React.FC = () => {
   const [search, setSearch] = useState('');
   const [ajusteModalOpen, setAjusteModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
+  const [selectedProducto, setSelectedProducto] = useState<MovimientoFila | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const productos = useAppStore(s => s.productos);
-  const addMovimiento = useAppStore(s => s.addMovimiento);
-  const updateProducto = useAppStore(s => s.updateProducto);
-  const deleteProducto = useAppStore(s => s.deleteProducto);
+  const user = useAuthStore((st) => st.user);
+  const [productos, setProductos] = useState<MovimientoFila[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<MovimientoFila | null>(null);
 
   const [editCantidad, setEditCantidad] = useState(0);
   const [editMotivo, setEditMotivo] = useState('Ingreso de mercancía');
   const [editTipo, setEditTipo] = useState<'entrada' | 'salida' | 'ajuste'>('entrada');
+
+  useEffect(() => {
+    const fetchMovimientos = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await inventoryApi.list();
+        setProductos(result.data.map(toFila));
+      } catch {
+        setError('No se pudieron cargar los movimientos de inventario');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void fetchMovimientos();
+  }, []);
 
   const filtered = useMemo(() => {
     return productos.filter(p =>
@@ -54,18 +97,19 @@ export const AdminInventario: React.FC = () => {
     setAjusteModalOpen(true);
   };
 
-
   const handleGuardarAjuste = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      addMovimiento({
+      await inventoryApi.create({
         tipo: editTipo,
-        productoRef: selectedProducto?.ref || '',
         cantidad: Math.abs(editCantidad),
         motivo: editMotivo,
-        usuario: 'admin',
+        productId: selectedProducto?.ref || undefined,
+        usuarioId: user?.uid ?? '',
       });
+      const result = await inventoryApi.list();
+      setProductos(result.data.map(toFila));
       closeModals();
     } catch {
       setFormError('Error al registrar movimiento');
@@ -74,20 +118,41 @@ export const AdminInventario: React.FC = () => {
     }
   };
 
-  const handleEliminar = (ref: string) => {
-    if (confirm('¿Está seguro de eliminar este producto?')) {
-      deleteProducto(ref);
+  const handleEliminar = (item: MovimientoFila) => {
+    setDeleteConfirm(item);
+  };
+
+  const handleEditarSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProducto) return;
+    setSaving(true);
+    try {
+      await inventoryApi.create({
+        tipo: 'ajuste',
+        cantidad: Math.abs(editCantidad),
+        ajuste: editCantidad,
+        motivo: 'Edición de stock',
+        productId: selectedProducto.ref,
+        usuarioId: user?.uid ?? '',
+      });
+      const result = await inventoryApi.list();
+      setProductos(result.data.map(toFila));
+      closeModals();
+    } catch {
+      setFormError('Error al actualizar el producto');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const columns: DataTableColumn<Producto>[] = [
+  const columns: DataTableColumn<MovimientoFila>[] = [
     { key: 'ref', header: 'Referencia', sortable: true },
     { key: 'nombre', header: 'Producto', sortable: true },
     { key: 'cantidadStock', header: 'Disponible', sortable: true, align: 'right' },
     { key: 'stock', header: 'Estado', sortable: true },
   ];
 
-  const detailPanel: DataTableDetailPanel<Producto> = {
+  const detailPanel: DataTableDetailPanel<MovimientoFila> = {
     title: item => `Detalle: ${item.nombre}`,
     size: 'lg',
     header: item => ({
@@ -112,9 +177,9 @@ export const AdminInventario: React.FC = () => {
     ),
   };
 
-  const actions: DataTableAction<Producto>[] = [
+  const actions: DataTableAction<MovimientoFila>[] = [
     { label: 'Editar', icon: <Edit size={14} />, onClick: (item) => { setSelectedProducto(item); setEditCantidad(item.cantidadStock); setEditModalOpen(true); } },
-    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => handleEliminar(item.ref) },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => handleEliminar(item) },
   ];
 
   return (
@@ -150,14 +215,14 @@ export const AdminInventario: React.FC = () => {
           enableExport={false}
           enableRowSelection={false}
           enableSorting={true}
+          emptyMessage={loading ? 'Cargando inventario...' : error ? error : 'No se encontraron productos'}
           toolbarLeft={null}
           maxVisibleColumns={5}
-          emptyMessage="No se encontraron productos"
         />
       </div>
 
       {ajusteModalOpen && (
-        <div className={s.modalOverlay} onClick={closeModals}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <h2 className={s.modalTitle}>Ajustar Stock</h2>
@@ -183,9 +248,9 @@ export const AdminInventario: React.FC = () => {
                 <div className={s.field}>
                   <label className={s.label}>Tipo de movimiento</label>
                   <select className={s.select} value={editTipo} onChange={e => setEditTipo(e.target.value as 'entrada' | 'salida' | 'ajuste')}>
-                    <option value="entrada">Entrada (+)</option>
-                    <option value="salida">Salida (-)</option>
-                    <option value="ajuste">Ajuste</option>
+                    {TIPOS_MOVIMIENTO.map(t => (
+                      <option key={t} value={t}>{t === 'entrada' ? 'Entrada (+)' : t === 'salida' ? 'Salida (-)' : 'Ajuste'}</option>
+                    ))}
                   </select>
                 </div>
                 <div className={s.field}>
@@ -195,10 +260,9 @@ export const AdminInventario: React.FC = () => {
                 <div className={s.field}>
                   <label className={s.label}>Motivo</label>
                   <select className={s.select} value={editMotivo} onChange={e => setEditMotivo(e.target.value)}>
-                    <option>Ingreso de mercancía</option>
-                    <option>Devolución cliente</option>
-                    <option>Daño/rotura</option>
-                    <option>Corrección inventario</option>
+                    {MOTIVOS_MOVIMIENTO.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
                   </select>
                 </div>
                 <div className={s.modalFooter}>
@@ -212,20 +276,14 @@ export const AdminInventario: React.FC = () => {
       )}
 
       {editModalOpen && selectedProducto && (
-        <div className={s.modalOverlay} onClick={closeModals}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <h2 className={s.modalTitle}>Editar Producto</h2>
               <button className={s.closeBtn} onClick={closeModals}><X size={16} /></button>
             </div>
             <div className={s.modalBody}>
-              <form className={s.form} onSubmit={e => {
-                e.preventDefault();
-                updateProducto(selectedProducto.ref, { 
-                  cantidadStock: editCantidad,
-                });
-                closeModals();
-              }}>
+              <form className={s.form} onSubmit={handleEditarSubmit}>
                 <div className={s.field}>
                   <label className={s.label}>Referencia</label>
                   <input type="text" className={s.input} value={selectedProducto.ref} readOnly style={{ opacity: 0.6 }} />
@@ -247,6 +305,20 @@ export const AdminInventario: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => {
+          if (!deleteConfirm) return;
+          setProductos(prev => prev.filter(p => p.ref !== deleteConfirm.ref));
+          setDeleteConfirm(null);
+        }}
+        title="Eliminar producto"
+        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };

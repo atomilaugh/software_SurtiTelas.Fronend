@@ -1,10 +1,13 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, ToggleLeft, AlertTriangle, Barcode, Package, BarChart3, CreditCard } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Insumos.module.css';
 import { Button } from '@/shared/ui/Button';
 import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '@/shared/ui/DataTable';
+import { stockApi, type RawMaterial } from '@/infrastructure/api/stockApi';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import { CATEGORIAS_INSUMO, UNIDADES_MEDIDA_INSUMO } from '@/shared/constants/options';
 
 interface Insumo {
   id: string;
@@ -20,22 +23,64 @@ interface Insumo {
   estado: 'Activo' | 'Inactivo';
 }
 
-const mockInsumosInicial: Insumo[] = [
-  { id: 'I-001', codigo: 'INS-001', nombre: 'Algodón Pima', categoria: 'Fibra', medida: 'Kg', stock: 150, stockMin: 50, stockMax: 300, precio: 12000, proveedor: 'Textiles Andina', estado: 'Activo' },
-  { id: 'I-002', codigo: 'INS-002', nombre: 'Poliéster', categoria: 'Fibra', medida: 'Kg', stock: 80, stockMin: 100, stockMax: 250, precio: 8500, proveedor: 'Fabricato Sur', estado: 'Activo' },
-  { id: 'I-003', codigo: 'INS-003', nombre: 'Botones de náilon', categoria: 'Accesorios', medida: 'Und', stock: 500, stockMin: 200, stockMax: 1000, precio: 250, proveedor: 'Accesorios Pro', estado: 'Activo' },
-  { id: 'I-004', codigo: 'INS-004', nombre: 'Hilo polyester', categoria: 'Hilos', medida: 'Unds', stock: 25, stockMin: 30, stockMax: 500, precio: 1200, proveedor: 'Hilos del Valle', estado: 'Activo' },
-  { id: 'I-005', codigo: 'INS-005', nombre: 'Cremallera', categoria: 'Cierres', medida: 'Und', stock: 350, stockMin: 100, stockMax: 500, precio: 1800, proveedor: 'Cierres Técnicos', estado: 'Activo' },
-  { id: 'I-006', codigo: 'INS-006', nombre: 'Etiquetas', categoria: 'Accesorios', medida: 'Und', stock: 120, stockMin: 100, stockMax: 500, precio: 150, proveedor: 'Etiquetas Express', estado: 'Inactivo' },
-];
+function toInsumo(m: RawMaterial): Insumo {
+  return {
+    id: m.id,
+    codigo: m.id,
+    nombre: m.nombre,
+    categoria: m.categoria ?? '',
+    medida: m.unidadMedida,
+    stock: m.stockActual,
+    stockMin: m.stockMinimo,
+    stockMax: m.stockMinimo ?? 0,
+    precio: m.precioUnitario,
+    proveedor: '',
+    estado: m.stockActual > 0 ? 'Activo' : 'Inactivo',
+  };
+}
 
 export const AdminInsumos: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedInsumo, setSelectedInsumo] = useState<Insumo | null>(null);
-  const [items, setItems] = useState<Insumo[]>(mockInsumosInicial);
+  const [items, setItems] = useState<Insumo[]>([]);
+  const [proveedores, setProveedores] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Insumo | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const fetchInsumos = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await stockApi.rawMaterials.list();
+        setItems(data.map(toInsumo));
+      } catch {
+        setError('No se pudieron cargar los insumos');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void fetchInsumos();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const fetchProveedores = async () => {
+      try {
+        const result = await stockApi.suppliers.list();
+        if (!active) return;
+        setProveedores(result.data.map(p => p.nombre));
+      } catch {
+        if (active) setProveedores([]);
+      }
+    };
+    void fetchProveedores();
+    return () => { active = false; };
+  }, []);
 
   const filteredInsumos = useMemo(() => {
     return items.filter(i =>
@@ -50,38 +95,61 @@ export const AdminInsumos: React.FC = () => {
     setSelectedInsumo(null);
   };
 
-  const handleSubmitInsumo = () => {
+  const handleSubmitInsumo = async () => {
     if (!formRef.current) return;
     const fd = new FormData(formRef.current);
-    const codigo = String(fd.get('codigo') ?? '').trim();
+    const _codigo = String(fd.get('codigo') ?? '').trim();
     const nombre = String(fd.get('nombre') ?? '').trim();
     const categoria = String(fd.get('categoria') ?? '').trim();
     const medida = String(fd.get('medida') ?? '').trim();
     const stockMin = Number(fd.get('stockMin') ?? 0) || 0;
-    const stockMax = Number(fd.get('stockMax') ?? 0) || 0;
+    const _stockMax = Number(fd.get('stockMax') ?? 0) || 0;
     const precio = Number(fd.get('precio') ?? 0) || 0;
-    const proveedor = String(fd.get('proveedor') ?? '').trim();
-    if (selectedInsumo) {
-      setItems(prev => prev.map(it => it.id === selectedInsumo.id ? { ...it, codigo, nombre, categoria, medida, stockMin, stockMax, precio, proveedor } : it));
-      toast.success('Insumo actualizado');
-    } else {
-      const nuevo: Insumo = {
-        id: `I-${String(items.length + 1).padStart(3, '0')}`,
-        codigo,
-        nombre,
-        categoria,
-        medida,
-        stock: stockMin,
-        stockMin,
-        stockMax,
-        precio,
-        proveedor,
-        estado: 'Activo',
-      };
-      setItems(prev => [nuevo, ...prev]);
-      toast.success('Insumo creado');
+    const _proveedor = String(fd.get('proveedor') ?? '').trim();
+    try {
+      if (selectedInsumo) {
+        const actualizado = await stockApi.rawMaterials.update(selectedInsumo.id, {
+          nombre,
+          categoria,
+          unidadMedida: medida,
+          stockActual: stockMin,
+          stockMinimo: stockMin,
+          precioUnitario: precio,
+        });
+        setItems(prev => prev.map(it => it.id === selectedInsumo.id ? toInsumo(actualizado) : it));
+        toast.success('Insumo actualizado');
+      } else {
+        const nuevo = await stockApi.rawMaterials.create({
+          nombre,
+          categoria,
+          unidadMedida: medida,
+          stockActual: stockMin,
+          stockMinimo: stockMin,
+          precioUnitario: precio,
+        });
+        setItems(prev => [toInsumo(nuevo), ...prev]);
+        toast.success('Insumo creado');
+      }
+      handleCloseModal();
+    } catch {
+      toast.error('No fue posible guardar el insumo');
     }
-    handleCloseModal();
+  };
+
+  const handleToggleEstado = async (item: Insumo) => {
+    const nuevoEstado: Insumo['estado'] = item.estado === 'Activo' ? 'Inactivo' : 'Activo';
+    const stockActual = nuevoEstado === 'Activo' ? Math.max(item.stock, item.stockMin || 1) : 0;
+    try {
+      const actualizado = await stockApi.rawMaterials.update(item.id, { stockActual });
+      setItems(prev => prev.map(it => it.id === item.id ? toInsumo(actualizado) : it));
+      toast.success(`Insumo ${nuevoEstado === 'Activo' ? 'activado' : 'desactivado'}`);
+    } catch {
+      toast.error('No fue posible cambiar el estado del insumo');
+    }
+  };
+
+  const handleEliminar = async (item: Insumo) => {
+    setDeleteConfirm(item);
   };
 
   const columns: DataTableColumn<Insumo>[] = [
@@ -137,7 +205,7 @@ export const AdminInsumos: React.FC = () => {
       <div className={s.detailPanel}>
         <div className={s.detailRow}><span>Medida:</span> {item.medida}</div>
         <div className={s.detailRow}><span>Precio:</span> ${item.precio.toLocaleString()}</div>
-        <div className={s.detailRow}><span>Proveedor:</span> {item.proveedor}</div>
+        <div className={s.detailRow}><span>Proveedor:</span> {item.proveedor || '—'}</div>
         <div className={s.detailRow}><span>Stock mínimo:</span> {item.stockMin}</div>
         <div className={s.detailRow}><span>Stock máximo:</span> {item.stockMax}</div>
       </div>
@@ -146,8 +214,8 @@ export const AdminInsumos: React.FC = () => {
 
   const actions = ((item: Insumo): DataTableAction<Insumo>[] => [
     { label: 'Editar', icon: <Edit size={14} />, onClick: (i) => { setSelectedInsumo(i); setModalOpen(true); } },
-    { label: item.estado === 'Activo' ? 'Desactivar' : 'Activar', icon: <ToggleLeft size={14} />, onClick: (item) => toast.success(`Insumo ${item.estado === 'Activo' ? 'desactivado' : 'activado'}`) },
-    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => { if (confirm(`¿Eliminar ${item.nombre}?`)) toast.success('Insumo eliminado'); } },
+    { label: item.estado === 'Activo' ? 'Desactivar' : 'Activar', icon: <ToggleLeft size={14} />, onClick: () => handleToggleEstado(item) },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: () => handleEliminar(item) },
   ]) as DataTableAction<Insumo>[] | ((item: Insumo) => DataTableAction<Insumo>[]);
 
   return (
@@ -184,13 +252,13 @@ export const AdminInsumos: React.FC = () => {
           enableExport={false}
           enableRowSelection={false}
           enableSorting={true}
-          toolbarLeft={null}
+          emptyMessage={loading ? 'Cargando insumos...' : error ? error : 'Sin resultados'}
           maxVisibleColumns={5}
         />
       </div>
 
       {modalOpen && (
-        <div className={s.modalOverlay} onClick={handleCloseModal}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <h2 className={s.modalTitle}>
@@ -214,19 +282,13 @@ export const AdminInsumos: React.FC = () => {
                   <div className={s.field}>
                     <label className={s.label}>Categoría</label>
                     <select className={s.select} name="categoria" defaultValue={selectedInsumo?.categoria}>
-                      <option>Fibra</option>
-                      <option>Hilos</option>
-                      <option>Accesorios</option>
-                      <option>Cierres</option>
+                      {CATEGORIAS_INSUMO.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Medida</label>
                     <select className={s.select} name="medida" defaultValue={selectedInsumo?.medida}>
-                      <option>Kg</option>
-                      <option>Unid</option>
-                      <option>Lts</option>
-                      <option>Mts</option>
+                      {UNIDADES_MEDIDA_INSUMO.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
                 </div>
@@ -248,10 +310,8 @@ export const AdminInsumos: React.FC = () => {
                   <div className={s.field}>
                     <label className={s.label}>Proveedor</label>
                     <select className={s.select} name="proveedor" defaultValue={selectedInsumo?.proveedor}>
-                      <option>Textiles Andina</option>
-                      <option>Fabricato Sur</option>
-                      <option>Accesorios Pro</option>
-                      <option>Hilos del Valle</option>
+                      <option value="">Sin proveedor</option>
+                      {proveedores.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
                 </div>
@@ -268,6 +328,27 @@ export const AdminInsumos: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            await stockApi.rawMaterials.remove(deleteConfirm.id);
+            setItems(prev => prev.filter(it => it.id !== deleteConfirm.id));
+            toast.success('Insumo eliminado');
+          } catch {
+            toast.error('No fue posible guardar el insumo');
+          } finally {
+            setDeleteConfirm(null);
+          }
+        }}
+        title="Eliminar insumo"
+        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };

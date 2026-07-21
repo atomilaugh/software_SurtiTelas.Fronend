@@ -11,7 +11,7 @@ import { ProductPreviewModal } from '@/presentation/components/ProductPreviewMod
 import { ProductDetailModal } from '@/presentation/components/ProductDetailModal';
 import { useProductos } from '@/core/stores';
 import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
-import type { Producto, PublicationStatus } from '@/core/types';
+import type { Producto, ProductoDetalle, PublicationStatus } from '@/core/types';
 
 const publishStatus = (p: Producto): PublicationStatus => {
   if (!p.publicado) return p.estado === 'Inactivo' ? 'Oculto' : 'Borrador';
@@ -31,27 +31,24 @@ export const AsesorCatalogo: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [editingRef, setEditingRef] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Producto | null>(null);
 
-  const [nombre, setNombre] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [descripcionCorta, setDescripcionCorta] = useState('');
-  const [categoria, setCategoria] = useState('');
-  const [subcategoria, setSubcategoria] = useState('');
-  const [marca, setMarca] = useState('SurtiTelas');
-  const [precio, setPrecio] = useState('');
-  const [precioAnterior, setPrecioAnterior] = useState('');
-  const [descuento, setDescuento] = useState('');
-  const [cantidadStock, setCantidadStock] = useState('');
-  const [estado, setEstado] = useState<'Activo' | 'Inactivo'>('Activo');
-  const [colores, setColores] = useState<string[]>([]);
-  const [tallas, setTallas] = useState<string[]>([]);
-  const [imagenes, setImagenes] = useState<string[]>([]);
-  const [imagenPrincipal, setImagenPrincipal] = useState('');
-  const [destacado, setDestacado] = useState(false);
-  const [oferta, setOferta] = useState(false);
-  const [nuevo, setNuevo] = useState(false);
-  const [masVendido, setMasVendido] = useState(false);
-  const [tela, setTela] = useState('');
+  const emptyForm: ProductoDetalle = {
+    nombre: '',
+    precio: 0,
+    imagen: '',
+    categoria: '',
+    descripcion: '',
+    tallas: [],
+    colores: [],
+    rating: undefined,
+    reviews: undefined,
+  };
+
+  const [form, setForm] = useState<ProductoDetalle>(emptyForm);
+
+  const updateForm = (patch: Partial<ProductoDetalle>) =>
+    setForm((prev) => ({ ...prev, ...patch }));
 
   const filtered = useMemo(() => {
     return productos.filter(p =>
@@ -62,26 +59,7 @@ export const AsesorCatalogo: React.FC = () => {
   }, [productos, search]);
 
   const resetForm = () => {
-    setNombre('');
-    setDescripcion('');
-    setDescripcionCorta('');
-    setCategoria('');
-    setSubcategoria('');
-    setMarca('SurtiTelas');
-    setPrecio('');
-    setPrecioAnterior('');
-    setDescuento('');
-    setCantidadStock('');
-    setEstado('Activo');
-    setColores([]);
-    setTallas([]);
-    setImagenes([]);
-    setImagenPrincipal('');
-    setDestacado(false);
-    setOferta(false);
-    setNuevo(false);
-    setMasVendido(false);
-    setTela('');
+    setForm(emptyForm);
     setEditingRef(null);
     setFormError(null);
     setIsModalOpen(false);
@@ -89,41 +67,31 @@ export const AsesorCatalogo: React.FC = () => {
 
   const openEdit = (product: Producto) => {
     setEditingRef(product.ref);
-    setNombre(product.nombre);
-    setDescripcion(product.descripcion || '');
-    setDescripcionCorta(product.descripcionCorta || product.descripcion || '');
-    setCategoria(product.categoria || 'General');
-    setSubcategoria(product.subcategoria || '');
-    setMarca(product.marca || 'SurtiTelas');
-    setPrecio(String(product.precio));
-    setPrecioAnterior(product.precioAnterior ? String(product.precioAnterior) : '');
-    setDescuento(product.descuento ? String(product.descuento) : '');
-    setCantidadStock(String(product.cantidadStock));
-    setEstado(product.estado || 'Activo');
-    setColores(product.colores || []);
-    setTallas(product.tallas || []);
-    setImagenes(product.imagenes || []);
-    setImagenPrincipal(product.imagenPrincipal || '');
-    setDestacado(product.destacado || false);
-    setOferta(product.oferta || false);
-    setNuevo(product.nuevo || false);
-    setMasVendido(product.masVendido || false);
-    setTela(product.tela || '');
+    setForm({
+      id: product.ref,
+      nombre: product.nombre,
+      precio: product.precio,
+      imagen: product.imagenPrincipal || product.imagenes?.[0] || '',
+      categoria: product.categoria || '',
+      descripcion: product.descripcion || product.descripcionCorta || '',
+      tallas: product.tallas || [],
+      colores: product.colores || [],
+      rating: undefined,
+      reviews: undefined,
+    });
     setFormError(null);
     setIsModalOpen(true);
   };
 
   const validateForm = (): boolean => {
     setFormError(null);
-    if (!nombre.trim()) { setFormError('El nombre del producto es obligatorio'); return false; }
-    if (!categoria.trim()) { setFormError('La categoría es obligatoria'); return false; }
-    if (!precio || Number(precio) <= 0) { setFormError('El precio debe ser mayor a 0'); return false; }
-    if (!imagenPrincipal && (!imagenes || imagenes.length === 0)) {
+    if (!form.nombre?.trim()) { setFormError('El nombre del producto es obligatorio'); return false; }
+    if (!form.categoria?.trim()) { setFormError('La categoría es obligatoria'); return false; }
+    if (!form.precio || Number(form.precio) <= 0) { setFormError('El precio debe ser mayor a 0'); return false; }
+    if (!form.imagen?.trim()) {
       setFormError('Debes añadir al menos 1 imagen para el producto.');
       return false;
     }
-    if (imagenes.length > 4) { setFormError('El producto permite un máximo de 4 imágenes.'); return false; }
-    if (cantidadStock !== '' && Number(cantidadStock) < 0) { setFormError('La cantidad en stock no puede ser negativa'); return false; }
     return true;
   };
 
@@ -132,41 +100,40 @@ export const AsesorCatalogo: React.FC = () => {
     if (!validateForm()) return;
     setSaving(true);
     try {
-      const totalQty = Number(cantidadStock) || 0;
-      const pre = precioAnterior ? Number(precioAnterior) : Number(precio);
-      const desc = descuento ? Number(descuento) : 0;
+      const totalQty = 0;
       const stockStatus: Producto['stock'] = totalQty === 0 ? 'Agotado' : totalQty <= 10 ? 'Bajo stock' : 'OK';
       const baseData: Omit<Producto, 'ref'> = {
-        nombre: nombre.trim(),
-        descripcion: descripcion.trim() || descripcionCorta.trim(),
-        descripcionCorta: descripcionCorta.trim() || descripcion.trim() || nombre.trim(),
-        categoria: categoria.trim(),
-        subcategoria: subcategoria.trim(),
-        marca: marca.trim(),
-        precio: Number(precio),
-        precioAnterior: pre,
-        descuento: desc,
+        nombre: form.nombre.trim(),
+        descripcion: form.descripcion?.trim() || '',
+        descripcionCorta: form.descripcion?.trim() || form.nombre.trim(),
+        categoria: form.categoria?.trim() || 'General',
+        subcategoria: '',
+        marca: 'SurtiTelas',
+        precio: Number(form.precio) || 0,
+        precioAnterior: 0,
+        descuento: 0,
         stock: stockStatus,
         cantidadStock: totalQty,
-        estado,
-        imagenes: imagenes.filter(Boolean),
-        imagenPrincipal: imagenPrincipal || (imagenes.length > 0 ? imagenes[0] : ''),
-        destacado,
-        oferta,
-        nuevo,
-        masVendido,
-        tela,
-        colores,
-        tallas,
+        estado: 'Activo',
+        imagenes: form.imagen ? [form.imagen] : [],
+        imagenPrincipal: form.imagen || '',
+        publicado: false,
+        destacado: false,
+        oferta: false,
+        nuevo: false,
+        masVendido: false,
+        tela: '',
+        colores: form.colores || [],
+        tallas: form.tallas || [],
       };
 
       if (editingRef) {
-        const refreshed = updateProducto(editingRef, baseData);
+        const refreshed = await updateProducto(editingRef, baseData);
         toast.success(`${refreshed.nombre} actualizado correctamente`);
       } else {
         const nuevoCodigo = `PROD-${String(productos.length + 1).padStart(3, '0')}`;
-        createProducto({ ...baseData, codigo: nuevoCodigo });
-        toast.success('Producto creado correctamente');
+        const creado = await createProducto({ ...baseData, codigo: nuevoCodigo });
+        toast.success(`${creado.nombre} creado correctamente`);
       }
 
       resetForm();
@@ -177,24 +144,24 @@ export const AsesorCatalogo: React.FC = () => {
     }
   };
 
-  const handleDelete = (product: Producto) => {
-    deleteProducto(product.ref);
-    toast.success('Producto eliminado del catálogo');
-  };
-
-  const handleTogglePublication = () => {
+  const handleTogglePublication = async () => {
     if (!publicationProduct) return;
     const status = publishStatus(publicationProduct);
-    const success = status === 'Publicado'
-      ? unpublishProducto(publicationProduct.ref)
-      : publishProducto(publicationProduct.ref);
+    try {
+      const success = status === 'Publicado'
+        ? await unpublishProducto(publicationProduct.ref)
+        : await publishProducto(publicationProduct.ref);
 
-    if (success) {
-      toast.success(status === 'Publicado' ? 'Producto ocultado correctamente' : 'Producto publicado correctamente');
-    } else {
-      toast.error('El producto requiere nombre, categoría, precio e imagen para publicarse');
+      if (success) {
+        toast.success(status === 'Publicado' ? 'Producto ocultado correctamente' : 'Producto publicado correctamente');
+      } else {
+        toast.error('El producto requiere nombre, categoría, precio e imagen para publicarse');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cambiar estado de publicación');
+    } finally {
+      setPublicationProduct(null);
     }
-    setPublicationProduct(null);
   };
 
   const handleEdit = (product: Producto) => openEdit(product);
@@ -309,9 +276,7 @@ export const AsesorCatalogo: React.FC = () => {
       label: 'Eliminar',
       icon: <Trash2 size={14} />,
       danger: true,
-      onClick: () => {
-        if (window.confirm(`¿Eliminar "${item.nombre}"?`)) handleDelete(item);
-      },
+      onClick: (item) => setDeleteConfirm(item),
     },
   ];
 
@@ -358,134 +323,49 @@ export const AsesorCatalogo: React.FC = () => {
           <div className={s.formRow}>
             <div className={s.formGroup}>
               <label>Nombre del Producto *</label>
-              <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Camiseta Oversize Premium" />
+              <input type="text" value={form.nombre} onChange={(e) => updateForm({ nombre: e.target.value })} placeholder="Ej: Camiseta Oversize Premium" />
             </div>
             <div className={s.formGroup}>
               <label>Categoría *</label>
-              <input type="text" value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Ej: Camisetas" />
+              <input type="text" value={form.categoria || ''} onChange={(e) => updateForm({ categoria: e.target.value })} placeholder="Ej: Camisetas" />
             </div>
           </div>
 
           <div className={s.formGroup}>
-            <label>Descripción Corta</label>
-            <input type="text" value={descripcionCorta} onChange={(e) => setDescripcionCorta(e.target.value)} placeholder="Resumen breve para el catálogo" />
-          </div>
-
-          <div className={s.formGroup}>
-            <label>Descripción Completa</label>
-            <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Añade detalles..." rows={3} />
+            <label>Descripción</label>
+            <textarea value={form.descripcion || ''} onChange={(e) => updateForm({ descripcion: e.target.value })} placeholder="Añade detalles..." rows={3} />
           </div>
 
           <div className={s.formRow}>
             <div className={s.formGroup}>
               <label>Precio ($) *</label>
-              <input type="number" min="1" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Precio base" />
+              <input type="number" min="1" value={form.precio} onChange={(e) => updateForm({ precio: Number(e.target.value) })} placeholder="Precio base" />
             </div>
             <div className={s.formGroup}>
-              <label>Precio Anterior (opcional)</label>
-              <input type="number" min="0" value={precioAnterior} onChange={(e) => setPrecioAnterior(e.target.value)} placeholder="Sin descuento" />
-            </div>
-          </div>
-
-          <div className={s.formRow}>
-            <div className={s.formGroup}>
-              <label>Descuento (%)</label>
-              <input type="number" min="0" max="100" value={descuento} onChange={(e) => setDescuento(e.target.value)} placeholder="0" />
-            </div>
-            <div className={s.formGroup}>
-              <label>Cantidad Stock</label>
-              <input type="number" min="0" value={cantidadStock} onChange={(e) => setCantidadStock(e.target.value)} placeholder="Unidades en bodega" />
-            </div>
-          </div>
-
-          <div className={s.formRow}>
-              <div className={s.formGroup}>
-                <label>Tipo de Tela</label>
-                <input type="text" value={tela} onChange={(e) => setTela(e.target.value)} placeholder="Ej: Algodón, Poliéster" />
-              </div>
-            <div className={s.formGroup}>
-              <label>Marca</label>
-              <input type="text" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Marca" />
+              <label>Calificación (rating)</label>
+              <input type="number" min="0" max="5" step="0.1" value={form.rating ?? ''} onChange={(e) => updateForm({ rating: e.target.value ? Number(e.target.value) : undefined })} placeholder="0 - 5" />
             </div>
           </div>
 
           <div className={s.formRow}>
             <div className={s.formGroup}>
               <label>Colores Disponibles</label>
-              <input type="text" value={colores.join(', ')} onChange={(e) => setColores(e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Ej: Azul, Blanco, Verde" />
+              <input type="text" value={(form.colores || []).join(', ')} onChange={(e) => updateForm({ colores: e.target.value.split(',').map(c => c.trim()).filter(Boolean) })} placeholder="Ej: Azul, Blanco, Verde" />
             </div>
             <div className={s.formGroup}>
               <label>Tallas Disponibles</label>
-              <input type="text" value={tallas.join(', ')} onChange={(e) => setTallas(e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean))} placeholder="Ej: S, M, L, XL" />
+              <input type="text" value={(form.tallas || []).join(', ')} onChange={(e) => updateForm({ tallas: e.target.value.split(',').map(t => t.trim().toUpperCase()).filter(Boolean) })} placeholder="Ej: S, M, L, XL" />
             </div>
           </div>
 
-          <div className={s.formGroup}>
-            <label>Subcategoría</label>
-            <input type="text" value={subcategoria} onChange={(e) => setSubcategoria(e.target.value)} placeholder="Ej: Básicas, Premium" />
-          </div>
-
-          <div className={s.formGroup}>
-            <label>Imagen Principal (URL)</label>
-            <input type="text" value={imagenPrincipal} onChange={(e) => setImagenPrincipal(e.target.value)} placeholder="https://..." />
-          </div>
-
-          <div className={s.formGroup}>
-            <label>Imágenes de Referencia (Máximo 4)</label>
-            <div className={s.uploadContainer}>
-              <label className={s.uploadPlaceholder}>
-                <span style={{ fontSize: '1.2rem' }}>+</span>
-                <span>Agregar imagen (URL)</span>
-                <input
-                  type="text"
-                  className={s.hiddenFileInput}
-                  placeholder="Pegar URL y presionar Enter"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value.trim() && imagenes.length < 4) {
-                      e.preventDefault();
-                      setImagenes([...imagenes, e.currentTarget.value.trim()]);
-                      e.currentTarget.value = '';
-                    }
-                  }}
-                />
-              </label>
-              {imagenes.length > 0 && (
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {imagenes.map((url, index) => (
-                    <div key={index} className={s.previewBox} style={{ width: '100px' }}>
-                      <img src={url} alt={`Ref ${index + 1}`} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: '6px' }} />
-                      <button type="button" onClick={() => setImagenes(imagenes.filter((_, i) => i !== index))} className={s.removeImgBtn}>
-                        <span style={{ fontSize: '14px' }}>×</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+          <div className={s.formRow}>
+            <div className={s.formGroup}>
+              <label>Imagen del Producto (URL) *</label>
+              <input type="text" value={form.imagen || ''} onChange={(e) => updateForm({ imagen: e.target.value })} placeholder="https://..." />
             </div>
-          </div>
-
-          <div className={s.formGroup}>
-            <label>Estado</label>
-            <select value={estado} onChange={(e) => setEstado(e.target.value === 'Inactivo' ? 'Inactivo' : 'Activo')}>
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo (Oculto)</option>
-            </select>
-          </div>
-
-          <div className={s.formGroup}>
-            <label>Etiquetas</label>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {[
-                { key: 'destacado', label: 'Destacado', state: destacado, set: setDestacado },
-                { key: 'oferta', label: 'Oferta', state: oferta, set: setOferta },
-                { key: 'nuevo', label: 'Nuevo', state: nuevo, set: setNuevo },
-                { key: 'masVendido', label: 'Más vendido', state: masVendido, set: setMasVendido },
-              ].map(({ key, label, state, set }) => (
-                <label key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--color-text-secondary)', padding: '6px 12px', background: state ? 'rgba(244,162,97,0.15)' : 'rgba(255,255,255,0.04)', borderRadius: '8px', border: `1px solid ${state ? 'rgba(244,162,97,0.3)' : 'rgba(255,255,255,0.1)'}` }}>
-                  <input type="checkbox" checked={state} onChange={(e) => set(e.target.checked)} />
-                  {label}
-                </label>
-              ))}
+            <div className={s.formGroup}>
+              <label>Reseñas (reviews)</label>
+              <input type="number" min="0" value={form.reviews ?? ''} onChange={(e) => updateForm({ reviews: e.target.value ? Number(e.target.value) : undefined })} placeholder="0" />
             </div>
           </div>
 
@@ -505,6 +385,26 @@ export const AsesorCatalogo: React.FC = () => {
           ? `¿Ocultar "${publicationProduct.nombre}" del catálogo público?`
           : `¿Publicar "${publicationProduct?.nombre}" en el catálogo público?`}
         confirmLabel={publicationProduct && publishStatus(publicationProduct) === 'Publicado' ? 'Ocultar' : 'Publicar'}
+      />
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            await deleteProducto(deleteConfirm.ref);
+            toast.success('Producto eliminado del catálogo');
+          } catch {
+            toast.error('No se pudo eliminar el producto');
+          } finally {
+            setDeleteConfirm(null);
+          }
+        }}
+        title="Eliminar producto"
+        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
       />
 
       <ProductPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} product={previewProduct} />

@@ -1,96 +1,181 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react'
 import { Download, Calendar, BarChart3, TrendingUp, PieChart, LineChart } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './AdminReportes.module.css';
 import { StatCard } from './StatCard';
 import { Badge } from '../../../shared/ui/Badge';
 import { BarChart, LineChart as LineChartComp, PieChart as PieChartComp, TopProducts } from './Chart';
+import { reportsApi, type Report, type SalesReport } from '../../../infrastructure/api/reportsApi';
+import { adminContent } from '@/shared/config/adminContent';
 
-const reportStats = [
-  { label: 'Ventas Totales', value: '$128M', trend: '+15%', trendUp: true, Icon: BarChart3, color: 'accent' as const },
-  { label: 'Pedidos Completados', value: '1,847', trend: '+8%', trendUp: true, Icon: TrendingUp, color: 'success' as const },
-  { label: 'Clientes Nuevos', value: '128', trend: '+22%', trendUp: true, Icon: PieChart, color: 'info' as const },
-  { label: 'Comisiones Pagadas', value: '$8.4M', trend: '-3%', trendUp: false, Icon: LineChart, color: 'warning' as const },
-];
+const formatCurrency = (valor: number) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(valor);
 
-interface Reporte {
-  id: string;
-  tipo: string;
-  periodo: string;
-  generado: string;
-  estado: 'Disponible' | 'Procesando' | 'Error';
+function formatRelativeDate(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return adminContent.reports.relativeTimes.moment;
+  if (diffMins < 60) return adminContent.reports.relativeTimes.minutes(diffMins);
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return adminContent.reports.relativeTimes.hours(diffHours);
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return adminContent.reports.relativeTimes.yesterday;
+  if (diffDays < 7) return adminContent.reports.relativeTimes.days(diffDays);
+  return new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 }
 
-const mockReportes: Reporte[] = [
-  { id: 'RPT-001', tipo: 'Ventas por Periodo', periodo: 'Junio 2026', generado: 'Hace 2 horas', estado: 'Disponible' },
-  { id: 'RPT-002', tipo: 'Rendimiento de Asesores', periodo: 'Mayo 2026', generado: 'Hace 1 día', estado: 'Disponible' },
-  { id: 'RPT-003', tipo: 'Productos Más Vendidos', periodo: 'Junio 2026', generado: 'Hace 3 horas', estado: 'Disponible' },
-  { id: 'RPT-004', tipo: 'Inventario por Categoría', periodo: 'Junio 2026', generado: 'Hace 5 horas', estado: 'Procesando' },
-  { id: 'RPT-005', tipo: 'Clientes por Asesor', periodo: 'Mayo 2026', generado: 'Ayer', estado: 'Disponible' },
-  { id: 'RPT-006', tipo: 'Reporte de Devoluciones', periodo: 'Junio 2026', generado: 'Hace 1 hora', estado: 'Error' },
-];
-
-const reportStatuses: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default' | null> = {
-  Disponible: 'success',
-  Procesando: 'warning',
-  Error: 'danger',
-};
-
-const ventasPorCategoria = [
-  { label: 'Algodón', value: 42 },
-  { label: 'Lino', value: 28 },
-  { label: 'Seda', value: 18 },
-  { label: 'Poliéster', value: 12 },
-];
-
-const tendenciaMensual = [
-  { label: 'Ene', value: 25 },
-  { label: 'Feb', value: 32 },
-  { label: 'Mar', value: 28 },
-  { label: 'Abr', value: 35 },
-  { label: 'May', value: 42 },
-  { label: 'Jun', value: 48 },
-];
-
-const rankingAsesores = [
-  { label: 'Camila', value: 248 },
-  { label: 'Luis', value: 192 },
-  { label: 'Pedro', value: 156 },
-  { label: 'María', value: 94 },
-];
-
-const productosTop = [
-  { rank: 1, name: 'Tela Algodón Premium', sales: '$18.2M' },
-  { rank: 2, name: 'Lino Egipcio', sales: '$12.5M' },
-  { rank: 3, name: 'Poliéster Soft', sales: '$8.9M' },
-];
+function formatPeriod(report: Report): string {
+  if (report.fechaInicio && report.fechaFin) {
+    const start = new Date(report.fechaInicio);
+    const end = new Date(report.fechaFin);
+    const fmt = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format;
+    const startStr = fmt(start);
+    const endStr = fmt(end);
+    return startStr === endStr ? startStr : `${startStr} - ${endStr}`;
+  }
+  return adminContent.reports.states.noPeriod;
+}
 
 export const AdminReportes: React.FC = () => {
   const [search, setSearch] = useState('');
+  const [reports, setReports] = useState<Report[]>([]);
+  const [sales, setSales] = useState<SalesReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const reportsContent = adminContent.reports;
 
-  const filteredReportes = mockReportes.filter(r =>
-    r.tipo.toLowerCase().includes(search.toLowerCase()) ||
-    r.periodo.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchReports() {
+      try {
+        setLoading(true);
+        setError(null);
+        const [reportsData, salesData] = await Promise.all([
+          reportsApi.list(),
+          reportsApi.getSalesReport().catch(() => null),
+        ]);
+        if (!cancelled) {
+          setReports(reportsData);
+          setSales(salesData);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Error al cargar reportes');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchReports();
+    return () => { cancelled = true; };
+  }, []);
+
+  const reportStats = useMemo(() => {
+    if (!sales) return [];
+    return [
+      { label: reportsContent.stats.totalSales, value: formatCurrency(sales.totalSales), trend: '', trendUp: true, Icon: BarChart3, color: 'accent' as const },
+      { label: reportsContent.stats.completedOrders, value: sales.totalOrders.toLocaleString('es-CO'), trend: '', trendUp: true, Icon: TrendingUp, color: 'success' as const },
+      { label: reportsContent.stats.newCustomers, value: sales.totalCustomers.toLocaleString('es-CO'), trend: '', trendUp: true, Icon: PieChart, color: 'info' as const },
+      { label: reportsContent.stats.averageTicket, value: formatCurrency(sales.averageTicket), trend: '', trendUp: false, Icon: LineChart, color: 'warning' as const },
+    ];
+  }, [sales]);
+
+  const ventasPorCategoria = useMemo(
+    () => (sales?.salesByStatus ?? []).map(s => ({ label: s.estado, value: s.cantidad })),
+    [sales]
   );
+
+  const tendenciaMensual = useMemo(
+    () => (sales?.monthlyTrend ?? []).map(t => ({ label: t.mes, value: t.ventas })),
+    [sales]
+  );
+
+  const rankingAsesores = useMemo(
+    () => (sales?.salesByAsesor ?? []).map((a, i) => ({ label: a.asesorNombre || a.asesor || `Asesor ${i + 1}`, value: a.cantidad })),
+    [sales]
+  );
+
+  const productosTop = useMemo(
+    () => (sales?.topProducts ?? []).map((p, i) => ({ rank: i + 1, name: p.nombre, sales: formatCurrency(p.total) })),
+    [sales]
+  );
+
+  const filteredReportes = reports.filter(r =>
+    r.titulo.toLowerCase().includes(search.toLowerCase()) ||
+    r.tipo.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div>
+        <div className={s.header}>
+          <div>
+            <h1 className={s.pageTitle}>Reportes</h1>
+            <p className={s.pageSubtitle}>Análisis y reportes del sistema</p>
+          </div>
+        </div>
+        <div className={s.statsGrid}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={s.statCard}>
+              <div className={s.statIcon} style={{ opacity: 0.3 }}><BarChart3 size={22} /></div>
+              <div className={s.statValue} style={{ opacity: 0.3 }}>—</div>
+              <div className={s.statLabel} style={{ opacity: 0.3 }}>{reportsContent.states.loading}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <div className={s.header}>
+          <div>
+            <h1 className={s.pageTitle}>Reportes</h1>
+            <p className={s.pageSubtitle}>Análisis y reportes del sistema</p>
+          </div>
+        </div>
+        <div className={s.statCard} style={{ textAlign: 'center', color: 'var(--color-danger)' }}>
+          <p>{error}</p>
+          <button
+            className={s.filterBtn}
+            style={{ marginTop: 12, cursor: 'pointer' }}
+            onClick={() => window.location.reload()}
+          >
+            {reportsContent.states.retry}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className={s.header}>
         <div>
-          <h1 className={s.pageTitle}>Reportes</h1>
-          <p className={s.pageSubtitle}>Análisis y reportes del sistema</p>
+          <h1 className={s.pageTitle}>{reportsContent.title}</h1>
+          <p className={s.pageSubtitle}>{reportsContent.subtitle}</p>
         </div>
       </div>
 
-      <div className={s.statsGrid}>
-        {reportStats.map((stat, i) => (
-          <StatCard key={i} {...stat} />
-        ))}
-      </div>
+      {reportStats.length > 0 && (
+        <div className={s.statsGrid}>
+          {reportStats.map((stat, i) => (
+            <StatCard key={i} {...stat} />
+          ))}
+        </div>
+      )}
 
       <div className={s.toolbar}>
         <SearchInput
-          placeholder="Buscar reportes..."
+          placeholder={reportsContent.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onSearch={(value) => setSearch(value)}
@@ -99,59 +184,76 @@ export const AdminReportes: React.FC = () => {
         />
         <button className={s.filterBtn}>
           <Calendar size={14} />
-          Filtrar por fecha
+          {reportsContent.filterLabel}
         </button>
       </div>
 
-      <div className={s.reportGrid}>
-        <div className={s.chartCard}>
-          <PieChartComp data={ventasPorCategoria} title="Ventas por Categoría" />
+      {(ventasPorCategoria.length > 0 || tendenciaMensual.length > 0 || rankingAsesores.length > 0 || productosTop.length > 0) && (
+        <div className={s.reportGrid}>
+          {ventasPorCategoria.length > 0 && (
+            <div className={s.chartCard}>
+              <PieChartComp data={ventasPorCategoria} title={reportsContent.charts.salesByStatus} />
+            </div>
+          )}
+          {tendenciaMensual.length > 0 && (
+            <div className={s.chartCard}>
+              <LineChartComp data={tendenciaMensual} title={reportsContent.charts.monthlyTrend} />
+            </div>
+          )}
+          {rankingAsesores.length > 0 && (
+            <div className={s.chartCard}>
+              <BarChart data={rankingAsesores} title={reportsContent.charts.rankingAsesores} />
+            </div>
+          )}
+          {productosTop.length > 0 && (
+            <div className={s.chartCard}>
+              <TopProducts data={productosTop} title={reportsContent.charts.topProducts} />
+            </div>
+          )}
         </div>
-        <div className={s.chartCard}>
-          <LineChartComp data={tendenciaMensual} title="Tendencia Mensual" />
-        </div>
-        <div className={s.chartCard}>
-          <BarChart data={rankingAsesores} title="Ranking de Asesores" />
-        </div>
-        <div className={s.chartCard}>
-          <TopProducts data={productosTop} title="Productos Top" />
-        </div>
-      </div>
+      )}
 
       <div className={s.tableSection}>
-        <h2 className={s.sectionTitle}>Reportes Generados</h2>
+        <h2 className={s.sectionTitle}>{reportsContent.table.generatedReports}</h2>
         <div className={s.tableWrapper}>
           <table className={s.table}>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Tipo</th>
-                <th>Periodo</th>
-                <th>Generado</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <th>{reportsContent.table.id}</th>
+                <th>{reportsContent.table.title}</th>
+                <th>{reportsContent.table.period}</th>
+                <th>{reportsContent.table.generated}</th>
+                <th>{reportsContent.table.status}</th>
+                <th>{reportsContent.table.actions}</th>
               </tr>
             </thead>
             <tbody>
               {filteredReportes.map(reporte => (
                 <tr key={reporte.id}>
                   <td className={s.tdMono}>{reporte.id}</td>
-                  <td className={s.tdPrimary}>{reporte.tipo}</td>
-                  <td>{reporte.periodo}</td>
-                  <td>{reporte.generado}</td>
+                  <td className={s.tdPrimary}>{reporte.titulo}</td>
+                  <td>{formatPeriod(reporte)}</td>
+                  <td>{formatRelativeDate(reporte.createdAt)}</td>
                   <td>
-                    <Badge variant={reportStatuses[reporte.estado]}>
-                      {reporte.estado}
+                    <Badge variant={'success'}>
+                      {reportsContent.states.available}
                     </Badge>
                   </td>
                   <td>
-                    <button className={s.downloadBtn} disabled={reporte.estado !== 'Disponible'}>
+                    <button className={s.downloadBtn}>
                       <Download size={14} />
-                      Descargar
+                      {reportsContent.table.download}
                     </button>
                   </td>
                 </tr>
               ))}
+              {filteredReportes.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 32 }}>
+                    {reportsContent.table.empty}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

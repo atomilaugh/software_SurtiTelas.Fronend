@@ -8,24 +8,25 @@ import { DetailModal } from '@/shared/ui/DetailModal';
 import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
 import { Tooltip } from '@/shared/components/Tooltip';
 import { useClientes, usePedidos } from '@/core/stores';
+import { useAuthStore } from '@/core/stores/authStore';
 import type { Cliente } from '@/core/types';
-
-const asesorActual = 'Camila Torres';
 
 const emptyClienteForm: Omit<Cliente, 'id' | 'pedidos'> = {
   nombre: '',
   ciudad: '',
   tel: '',
-  asesor: asesorActual,
+  asesor: '',
   estado: 'Activo',
   nit: '',
-  cupoTotal: 5000000,
+  cupoTotal: 0,
   cupoUsado: 0,
   deudaVencida: 0,
   isTrustedCustomer: false,
 };
 
 export const AsesorClientes: React.FC = () => {
+  const user = useAuthStore((st) => st.user);
+  const asesorActual = user?.name || '';
   const { clientes, createCliente, updateCliente, deleteCliente } = useClientes();
   const { pedidos } = usePedidos();
   const [search, setSearch] = useState('');
@@ -37,7 +38,7 @@ export const AsesorClientes: React.FC = () => {
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState<Omit<Cliente, 'id' | 'pedidos'>>(emptyClienteForm);
 
-  const misClientes = useMemo(() => clientes.filter(c => c.asesor === asesorActual), [clientes]);
+  const misClientes = useMemo(() => clientes.filter(c => c.asesor === asesorActual), [clientes, asesorActual]);
 
   const filteredClientes = useMemo(() => {
     return misClientes.filter(c =>
@@ -48,7 +49,7 @@ export const AsesorClientes: React.FC = () => {
   }, [misClientes, search]);
 
   const resetForm = () => {
-    setForm(emptyClienteForm);
+    setForm({ ...emptyClienteForm, asesor: asesorActual });
     setEditingId(null);
     setFormError('');
   };
@@ -86,7 +87,7 @@ export const AsesorClientes: React.FC = () => {
     setIsDeleteOpen(true);
   };
 
-  const saveCliente = () => {
+  const saveCliente = async () => {
     setFormError('');
     if (!form.nombre.trim()) {
       setFormError('El nombre del cliente es obligatorio.');
@@ -99,10 +100,10 @@ export const AsesorClientes: React.FC = () => {
 
     try {
       if (editingId) {
-        const actualizado = updateCliente(editingId, form);
+        const actualizado = await updateCliente(editingId, form);
         toast.success(`${actualizado.nombre} actualizado correctamente`);
       } else {
-        const nuevo = createCliente(form);
+        const nuevo = await createCliente(form);
         toast.success(`${nuevo.nombre} registrado correctamente`);
       }
       setIsFormOpen(false);
@@ -112,9 +113,9 @@ export const AsesorClientes: React.FC = () => {
     }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!selectedCliente) return;
-    deleteCliente(selectedCliente.id);
+    await deleteCliente(selectedCliente.id);
     toast.success(`Cliente ${selectedCliente.nombre} eliminado`);
     setIsDeleteOpen(false);
     setSelectedCliente(null);

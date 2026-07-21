@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Save, Shield, Database, Bell, Building } from 'lucide-react';
+import { Save, Building } from 'lucide-react';
 import s from './AdminConfiguracion.module.css';
+import { companyApi } from '@/infrastructure/api/companyApi';
+import { adminContent } from '@/shared/config/adminContent';
 
 interface ConfigSection {
   id: string;
@@ -10,58 +12,63 @@ interface ConfigSection {
   fields: { label: string; value: string; type: 'text' | 'email' | 'tel' | 'number' | 'select'; options?: string[] }[];
 }
 
-const configSections: ConfigSection[] = [
-  {
-    id: 'empresa',
-    title: 'Datos de la Empresa',
-    icon: Building,
-    fields: [
-      { label: 'Nombre', value: 'Surtitelas', type: 'text' },
-      { label: 'NIT', value: '900.123.456-7', type: 'text' },
-      { label: 'Email', value: 'info@surtitelas.com', type: 'email' },
-      { label: 'Teléfono', value: '018000123456', type: 'tel' },
-    ],
-  },
-  {
-    id: 'notificaciones',
-    title: 'Notificaciones',
-    icon: Bell,
-    fields: [
-      { label: 'Email notificaciones', value: 'sí', type: 'select', options: ['sí', 'no'] },
-      { label: 'SMS recordatorios', value: 'no', type: 'select', options: ['sí', 'no'] },
-      { label: 'Recordatorio día anterior', value: '24', type: 'number' },
-    ],
-  },
-  {
-    id: 'seguridad',
-    title: 'Seguridad',
-    icon: Shield,
-    fields: [
-      { label: 'Contraseña mínima', value: '8', type: 'number' },
-      { label: 'Sesión máxima', value: '60', type: 'number' },
-      { label: 'Autenticación 2FA', value: 'requerida', type: 'select', options: ['requerida', 'opcional', 'desactivada'] },
-    ],
-  },
-  {
-    id: 'integraciones',
-    title: 'Integraciones',
-    icon: Database,
-    fields: [
-      { label: 'API WhatsApp', value: 'activada', type: 'select', options: ['activada', 'desactivada'] },
-      { label: 'API Domicilios', value: 'activada', type: 'select', options: ['activada', 'desactivada'] },
-    ],
-  },
-];
-
 export const AdminConfiguracion: React.FC = () => {
+  const [configSections, setConfigSections] = useState<ConfigSection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const configContent = adminContent.configuration;
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const company = await companyApi.get();
+        if (!active) return;
+        const empresa: ConfigSection = {
+          id: 'empresa',
+          title: configContent.sectionTitle,
+          icon: Building,
+          fields: [
+            { label: configContent.fields.nombre, value: company.nombre || configContent.fallbacks.unavailable, type: 'text' },
+            { label: configContent.fields.email, value: company.email || configContent.fallbacks.unavailable, type: 'email' },
+            { label: configContent.fields.telefono, value: company.telefono || configContent.fallbacks.unavailable, type: 'tel' },
+            { label: configContent.fields.direccion, value: company.direccion || configContent.fallbacks.unavailable, type: 'text' },
+            { label: configContent.fields.ciudad, value: company.ciudad || configContent.fallbacks.unavailable, type: 'text' },
+            { label: configContent.fields.nit, value: company.nit || configContent.fallbacks.unavailable, type: 'text' },
+            { label: configContent.fields.moneda, value: company.moneda || configContent.fallbacks.currency, type: 'text' },
+          ],
+        };
+        setConfigSections([empresa]);
+      } catch {
+        if (active) setConfigSections([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, []);
+
   return (
     <div>
       <div className={s.header}>
         <div>
-          <h1 className={s.pageTitle}>Configuración</h1>
-          <p className={s.pageSubtitle}>Ajustes del sistema y la empresa</p>
+          <h1 className={s.pageTitle}>{configContent.title}</h1>
+          <p className={s.pageSubtitle}>{configContent.subtitle}</p>
         </div>
       </div>
+
+      {loading && (
+        <div style={{ padding: 24, color: 'var(--color-text-muted)' }}>
+          {configContent.loading}
+        </div>
+      )}
+
+      {!loading && configSections.length === 0 && (
+        <div style={{ padding: 24, color: 'var(--color-text-muted)' }}>
+          {configContent.empty}
+        </div>
+      )}
 
       <div className={s.configGrid}>
         {configSections.map(section => (
@@ -82,6 +89,7 @@ export const AdminConfiguracion: React.FC = () => {
                     </select>
                   ) : (
                     <input
+                      id={`${section.id}-field-${i}`}
                       type={field.type}
                       className={s.input}
                       defaultValue={field.value}
@@ -96,9 +104,31 @@ export const AdminConfiguracion: React.FC = () => {
       </div>
 
       <div className={s.actionsBar}>
-        <button className={s.saveBtn} onClick={() => toast.success('Configuración guardada correctamente')}>
+        <button className={s.saveBtn} onClick={async () => {
+          const first = configSections[0];
+          if (!first) return;
+          const values: Record<string, string> = {};
+          first.fields.forEach((f, idx) => {
+            const input = document.querySelector<HTMLInputElement>(`#${first.id}-field-${idx}`);
+            if (input) values[f.label.toLowerCase()] = input.value;
+          });
+          try {
+            await companyApi.update({
+              nombre: values['nombre'] || undefined,
+              email: values['email'] || undefined,
+              telefono: values['teléfono'] || values['telefono'] || undefined,
+              direccion: values['dirección'] || values['direccion'] || undefined,
+              ciudad: values['ciudad'] || undefined,
+              nit: values['nit'] || undefined,
+              moneda: values['moneda'] || undefined,
+            });
+            toast.success(configContent.success);
+          } catch {
+            toast.error(configContent.error);
+          }
+        }}>
           <Save size={16} />
-          Guardar cambios
+          {configContent.save}
         </button>
       </div>
     </div>

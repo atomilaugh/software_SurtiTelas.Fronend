@@ -1,7 +1,9 @@
 import type { Producto } from '@/core/types';
+import { catalogApi } from '@/infrastructure/api/catalogApi';
+import { ApiError } from '@/infrastructure/api/httpClient';
 
 /* ──────────────────────────────────────────────
-   TIPOS DE RESPUESTA (simulación de API)
+   TIPOS DE RESPUESTA (envelope de la API)
    ────────────────────────────────────────────── */
 export interface ApiResponse<T> {
   success: boolean;
@@ -10,182 +12,95 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
-/* ──────────────────────────────────────────────
-   productService — métodos mock simulando API REST
-   Preparado para reemplazar llamadas sin acoplar
-   la lógica a los componentes.
-   ────────────────────────────────────────────── */
+const errMsg = (e: unknown): string =>
+  e instanceof ApiError ? e.message : 'Error de comunicación con el servidor';
 
+/* ──────────────────────────────────────────────
+   productService — ahora consume el backend real
+   (/catalog/products). Mantiene el contrato ApiResponse<T>
+   para no romper los componentes que lo usan.
+   ────────────────────────────────────────────── */
 export const productService = {
-  async getAll(): Promise<ApiResponse<Producto[]>> {
-    await delay(150);
-    const stored = localStorage.getItem('surti_productos');
-    if (!stored) return { success: true, data: [] };
+  async getAll(query?: Record<string, string | number | boolean | undefined | null>): Promise<ApiResponse<Producto[]>> {
     try {
-      const parsed = JSON.parse(stored) as Producto[];
-      return { success: true, data: parsed };
-    } catch {
-      return { success: false, error: 'Error parsing stored products' };
+      const result = await catalogApi.list(query);
+      return { success: true, data: result.data };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
     }
   },
 
   async getById(ref: string): Promise<ApiResponse<Producto | undefined>> {
-    await delay(100);
-    const stored = localStorage.getItem('surti_productos');
-    if (!stored) return { success: false, error: 'No products found' };
     try {
-      const parsed = JSON.parse(stored) as Producto[];
-      const found = parsed.find(p => p.ref === ref);
-      return { success: !!found, data: found, error: found ? undefined : 'Product not found' };
-    } catch {
-      return { success: false, error: 'Error parsing stored products' };
+      const found = await catalogApi.getByRef(ref);
+      return { success: !!found, data: found ?? undefined, error: found ? undefined : 'Producto no encontrado' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
     }
   },
 
   async create(data: Omit<Producto, 'ref'>): Promise<ApiResponse<Producto>> {
-    await delay(200);
-    const stored = localStorage.getItem('surti_productos');
-    let products: Producto[] = [];
-    if (stored) {
-      try { products = JSON.parse(stored) as Producto[]; } catch { /* ignore */ }
+    try {
+      const nuevo = await catalogApi.create(data as Partial<Producto>);
+      return { success: true, data: nuevo, message: 'Producto creado exitosamente' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
     }
-    const newRef = `REF-${String(products.length + 1).padStart(3, '0')}`;
-    const codigo = data.codigo || `PROD-${String(products.length + 1).padStart(3, '0')}`;
-    const nuevo: Producto = {
-      ref: newRef,
-      codigo,
-      nombre: data.nombre,
-      descripcion: data.descripcion || '',
-      descripcionCorta: data.descripcionCorta || data.descripcion || data.nombre,
-      categoria: data.categoria || 'General',
-      subcategoria: data.subcategoria || '',
-      marca: data.marca || 'SurtiTelas',
-      precio: data.precio,
-      precioAnterior: data.precioAnterior ?? data.precio,
-      descuento: data.descuento ?? 0,
-      stock: data.stock,
-      cantidadStock: data.cantidadStock,
-      estado: data.estado || 'Activo',
-      imagenes: data.imagenes,
-      imagenPrincipal: data.imagenPrincipal || (data.imagenes?.[0]) || '',
-      publicado: false,
-      destacado: data.destacado ?? false,
-      oferta: data.oferta ?? false,
-      nuevo: data.nuevo ?? false,
-      masVendido: data.masVendido ?? false,
-      tela: data.tela,
-      colores: data.colores,
-      tallas: data.tallas,
-    };
-    products = [...products, nuevo];
-    localStorage.setItem('surti_productos', JSON.stringify(products));
-    return { success: true, data: nuevo, message: 'Producto creado exitosamente' };
   },
 
   async update(ref: string, data: Partial<Producto>): Promise<ApiResponse<Producto | undefined>> {
-    await delay(180);
-    const stored = localStorage.getItem('surti_productos');
-    if (!stored) return { success: false, error: 'No products found' };
     try {
-      const products = JSON.parse(stored) as Producto[];
-      const idx = products.findIndex(p => p.ref === ref);
-      if (idx === -1) return { success: false, error: 'Product not found' };
-      const updated: Producto = { ...products[idx], ...data };
-      products[idx] = updated;
-      localStorage.setItem('surti_productos', JSON.stringify(products));
+      const updated = await catalogApi.update(ref, data);
       return { success: true, data: updated, message: 'Producto actualizado' };
-    } catch {
-      return { success: false, error: 'Error updating product' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
     }
   },
 
   async delete(ref: string): Promise<ApiResponse<boolean>> {
-    await delay(150);
-    const stored = localStorage.getItem('surti_productos');
-    if (!stored) return { success: false, error: 'No products found' };
     try {
-      const products = JSON.parse(stored) as Producto[];
-      const filtered = products.filter(p => p.ref !== ref);
-      if (filtered.length === products.length) return { success: false, error: 'Product not found' };
-      localStorage.setItem('surti_productos', JSON.stringify(filtered));
+      await catalogApi.remove(ref);
       return { success: true, data: true, message: 'Producto eliminado' };
-    } catch {
-      return { success: false, error: 'Error deleting product' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
     }
   },
 
   async publish(ref: string): Promise<ApiResponse<Producto | undefined>> {
-    await delay(200);
-    const stored = localStorage.getItem('surti_productos');
-    if (!stored) return { success: false, error: 'No products found' };
     try {
-      const products = JSON.parse(stored) as Producto[];
-      const idx = products.findIndex(p => p.ref === ref);
-      if (idx === -1) return { success: false, error: 'Product not found' };
-      const product = products[idx];
-      if (!product.nombre?.trim()) return { success: false, error: 'El nombre es obligatorio para publicar' };
-      if (!product.categoria?.trim()) return { success: false, error: 'La categoría es obligatoria para publicar' };
-      if (!product.precio || product.precio <= 0) return { success: false, error: 'El precio debe ser mayor a 0' };
-      const hasImage = (product.imagenPrincipal && product.imagenPrincipal.trim() !== '') ||
-                       (product.imagenes && product.imagenes.length > 0);
-      if (!hasImage) return { success: false, error: 'Debe tener al menos una imagen principal' };
-      const now = new Date().toISOString();
-      products[idx] = {
-        ...product,
-        publicado: true,
-        fechaPublicacion: product.fechaPublicacion || now,
-      };
-      localStorage.setItem('surti_productos', JSON.stringify(products));
-      return { success: true, data: products[idx], message: 'Producto publicado correctamente' };
-    } catch {
-      return { success: false, error: 'Error publishing product' };
+      const data = await catalogApi.publish(ref);
+      return { success: true, data, message: 'Producto publicado correctamente' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
     }
   },
 
   async unpublish(ref: string): Promise<ApiResponse<Producto | undefined>> {
-    await delay(180);
-    const stored = localStorage.getItem('surti_productos');
-    if (!stored) return { success: false, error: 'No products found' };
     try {
-      const products = JSON.parse(stored) as Producto[];
-      const idx = products.findIndex(p => p.ref === ref);
-      if (idx === -1) return { success: false, error: 'Product not found' };
-      products[idx] = { ...products[idx], publicado: false };
-      localStorage.setItem('surti_productos', JSON.stringify(products));
-      return { success: true, data: products[idx], message: 'Producto despublicado' };
-    } catch {
-      return { success: false, error: 'Error unpublishing product' };
+      const data = await catalogApi.unpublish(ref);
+      return { success: true, data, message: 'Producto despublicado' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
     }
   },
 };
 
 /* ──────────────────────────────────────────────
-   catalogService — métodos para Catálogo Digital
+   catalogService — catálogo digital (backend real)
    ────────────────────────────────────────────── */
-
 export const catalogService = {
   async getPublishedProducts(): Promise<ApiResponse<Producto[]>> {
-    await delay(120);
-    const stored = localStorage.getItem('surti_productos');
-    if (!stored) return { success: true, data: [] };
     try {
-      const parsed = JSON.parse(stored) as Producto[];
-      const published = parsed.filter(p => p.publicado === true && p.estado !== 'Inactivo');
-      return { success: true, data: published };
-    } catch {
-      return { success: false, error: 'Error fetching catalog' };
+      const result = await catalogApi.list();
+      return { success: true, data: result.data.filter((p) => p.publicado === true && p.estado !== 'Inactivo') };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
     }
   },
 
   async getFeaturedProducts(): Promise<ApiResponse<Producto[]>> {
-    await delay(100);
     const result = await catalogService.getPublishedProducts();
     if (!result.success || !result.data) return result;
-    const featured = result.data.filter(p => p.destacado === true || p.nuevo === true);
-    return { success: true, data: featured };
+    return { success: true, data: result.data.filter((p) => p.destacado === true || p.nuevo === true) };
   },
 };
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}

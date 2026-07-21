@@ -7,6 +7,9 @@ import { useAuth } from '@/app/providers/AppProviders';
 import { useDashboardTheme } from '@/core/hooks/useDashboardTheme';
 import { TopHeader } from '@/presentation/components/TopHeader';
 import { cn } from '@/shared/utils';
+import { useAuthStore } from '@/core/stores/authStore';
+import { authApi } from '@/infrastructure/api/authApi';
+import { notificationsApi } from '@/infrastructure/api/notificationsApi';
 import logoImg from '@/assets/images/logos/partner-logo-2-Photoroom.png';
 
 const domiciliarioMenu: SidebarItem[] = [
@@ -25,6 +28,43 @@ export const DomiciliarioLayout: React.FC = () => {
   });
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const storeUser = useAuthStore((s) => s.user);
+  const [sidebarUser, setSidebarUser] = useState({ name: 'Cargando...', role: 'domiciliario', initials: '' });
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const profile = await authApi.me();
+        if (!active) return;
+        const initials = profile.nombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+        setSidebarUser({ name: profile.nombre, role: 'domiciliario', initials });
+      } catch {
+        if (storeUser) {
+          const initials = storeUser.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() ?? '';
+          setSidebarUser({ name: storeUser.name ?? 'Domiciliario', role: 'domiciliario', initials });
+        }
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, [storeUser]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const notifs = await notificationsApi.list();
+        if (!active) return;
+        setNotificationCount(notifs.filter(n => !n.leida).length);
+      } catch {
+        setNotificationCount(0);
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem('surtitelas.sidebarCollapsed', String(isCollapsed));
@@ -36,7 +76,7 @@ export const DomiciliarioLayout: React.FC = () => {
       document.querySelectorAll<HTMLElement>('[data-dashboard-theme]').forEach(el => el.removeAttribute('data-theme'));
       document.documentElement.removeAttribute('data-theme');
       document.body?.removeAttribute('data-theme');
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
 
@@ -60,7 +100,7 @@ export const DomiciliarioLayout: React.FC = () => {
         logo={logoImg}
         brandName="SURTI CAMISETAS"
         panelLabel="Panel de Domiciliario"
-        user={{ name: 'Juan Pérez', role: 'domiciliario', initials: 'JP' }}
+        user={sidebarUser}
         onLogout={handleLogout}
         showCollapse={true}
         homeHref="/"
@@ -69,20 +109,15 @@ export const DomiciliarioLayout: React.FC = () => {
       <div className={s.mainContent}>
         <TopHeader
           user={{
-            name: 'Juan Pérez',
-            email: 'domiciliario@surticamisetas.com',
+            name: sidebarUser.name,
+            email: storeUser?.email ?? '',
             role: 'domiciliario',
-            initial: 'JP',
+            initial: sidebarUser.initials,
           }}
-          notificationCount={1}
+          notificationCount={notificationCount}
           onSearch={() => {}}
           onToggleTheme={toggleTheme}
           onNotificationClick={handleNotificationClick}
-          notifications={[
-            { id: '1', title: 'Nueva entrega', message: 'Tienes una nueva entrega asignada', time: 'Hace 5 min', type: 'order', read: false, path: '/domiciliario/entregas' },
-            { id: '2', title: 'Entrega retrasada', message: 'Una entrega presenta retraso', time: 'Hace 1 hora', type: 'stock', read: false, path: '/domiciliario/ruta' },
-            { id: '3', title: 'Mensaje', message: 'Tienes un nuevo mensaje de soporte', time: 'Hace 2 horas', type: 'message', read: true, path: '/domiciliario/dashboard' },
-          ]}
           darkMode={darkMode}
         />
         <main className={s.pageContent}><Outlet /></main>

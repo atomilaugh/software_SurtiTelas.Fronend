@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Download, Factory, CheckCircle, Clock, Package, BarChart3, TrendingUp, ChevronDown } from 'lucide-react';
 import s from './ReportesProduccion.module.css';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
-
-interface ProduccionData {
-  mes: string;
-  ordenes: number;
-  completadas: number;
-  pendientes: number;
-}
+import { reportsApi, type ProductionReport } from '@/infrastructure/api/reportsApi';
+import { PERIODOS_REPORTE_VENTAS, FILTROS_EFICIENCIA } from '@/shared/constants/options';
 
 interface ProduccionRep {
   id: string;
@@ -17,50 +12,72 @@ interface ProduccionRep {
   ordenesCompletadas: number;
   ordenesPendientes: number;
   eficiencia: number;
-  prendasProducidas: number;
-  valorProduccion: number;
-  promedioDias: number;
+  prendasProducidas: number | null;
+  valorProduccion: number | null;
+  promedioDias: number | null;
 }
-
-const produccionMensual: ProduccionData[] = [
-  { mes: 'Ene', ordenes: 12, completadas: 10, pendientes: 2 },
-  { mes: 'Feb', ordenes: 15, completadas: 13, pendientes: 2 },
-  { mes: 'Mar', ordenes: 18, completadas: 16, pendientes: 2 },
-  { mes: 'Abr', ordenes: 14, completadas: 12, pendientes: 2 },
-  { mes: 'May', ordenes: 20, completadas: 18, pendientes: 2 },
-  { mes: 'Jun', ordenes: 22, completadas: 19, pendientes: 3 },
-];
-
-const mockReportes: ProduccionRep[] = [
-  { id: 'R-001', taller: 'Taller Textil El Progreso', ordenesCompletadas: 45, ordenesPendientes: 3, eficiencia: 92, prendasProducidas: 8500, valorProduccion: 425000000, promedioDias: 4.2 },
-  { id: 'R-002', taller: 'Confección Martínez', ordenesCompletadas: 38, ordenesPendientes: 5, eficiencia: 85, prendasProducidas: 6200, valorProduccion: 310000000, promedioDias: 5.1 },
-  { id: 'R-003', taller: 'Taller San José', ordenesCompletadas: 52, ordenesPendientes: 2, eficiencia: 96, prendasProducidas: 9800, valorProduccion: 490000000, promedioDias: 3.5 },
-  { id: 'R-004', taller: 'Artesanías del Valle', ordenesCompletadas: 28, ordenesPendientes: 4, eficiencia: 78, prendasProducidas: 4100, valorProduccion: 205000000, promedioDias: 6.8 },
-  { id: 'R-005', taller: 'Taller Rápido', ordenesCompletadas: 15, ordenesPendientes: 8,eficiencia: 65, prendasProducidas: 2200, valorProduccion: 110000000, promedioDias: 8.2 },
-];
 
 export const AdminReportesProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroEficiencia, setFiltroEficiencia] = useState<string>('Todos');
+  const [report, setReport] = useState<ProductionReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const maxOrdenes = Math.max(...produccionMensual.map(d => d.ordenes));
-  // unused removed
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await reportsApi.getProductionReport();
+        setReport(data);
+      } catch {
+        setError('No se pudo cargar el reporte de producción');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
 
-  const reportesFiltrados = mockReportes.filter(r =>
-    (filtroEficiencia === 'Todos' ||
-      (filtroEficiencia === 'Alta' && r.eficiencia >= 90) ||
-      (filtroEficiencia === 'Media' && r.eficiencia >= 75 && r.eficiencia < 90) ||
-      (filtroEficiencia === 'Baja' && r.eficiencia < 75)) &&
+  type TallerNormalizado = { taller: string; ordenes: number };
+  const talleresSource = report?.porTaller ?? report?.ordersByWorkshop ?? [];
+  const talleres: TallerNormalizado[] = talleresSource.map((t: any) => ({
+    taller: t.taller ?? t.nombre ?? '',
+    ordenes: t.ordenes ?? t.cantidad ?? 0,
+  }));
+
+  const estados = report?.ordersByStatus ?? report?.ordersByEstado ?? [];
+
+  const reportes: ProduccionRep[] = talleres.map((w, index) => ({
+    id: `R-${String(index + 1).padStart(3, '0')}`,
+    taller: w.taller ?? '',
+    ordenesCompletadas: estados.find(s => s.estado === 'TERMINADO')?.cantidad || 0,
+    ordenesPendientes: estados.find(s => s.estado === 'PENDIENTE')?.cantidad || 0,
+    eficiencia: report!.averageProgress ?? report!.avancePromedio ?? 0,
+    prendasProducidas: null,
+    valorProduccion: null,
+    promedioDias: null,
+  }));
+
+  const produccionMensual = report ? [
+    { mes: 'Actual', ordenes: report.totalOrders, completadas: estados.find(s => s.estado === 'TERMINADO')?.cantidad || 0, pendientes: estados.find(s => s.estado === 'PENDIENTE')?.cantidad || 0 },
+  ] : [];
+
+  const maxOrdenes = Math.max(...produccionMensual.map(d => d.ordenes), 1);
+
+  const reportesFiltrados = reportes.filter((r: ProduccionRep) =>
+    (FILTROS_EFICIENCIA.find(f => f.value === filtroEficiencia)?.test(r.eficiencia) ?? true) &&
     (r.taller.toLowerCase().includes(search.toLowerCase()))
   );
 
   const stats = {
-    totalTalleres: mockReportes.length,
-    ordenesCompletadas: mockReportes.reduce((sum, r) => sum + r.ordenesCompletadas, 0),
-    ordenesPendientes: mockReportes.reduce((sum, r) => sum + r.ordenesPendientes, 0),
-    eficienciaPromedio: Math.round(mockReportes.reduce((sum, r) => sum + r.eficiencia, 0) / mockReportes.length),
-    prendasTotales: mockReportes.reduce((sum, r) => sum + r.prendasProducidas, 0),
-    valorTotal: mockReportes.reduce((sum, r) => sum + r.valorProduccion, 0),
+    totalTalleres: reportes.length,
+    ordenesCompletadas: reportes.reduce((sum, r) => sum + r.ordenesCompletadas, 0),
+    ordenesPendientes: reportes.reduce((sum, r) => sum + r.ordenesPendientes, 0),
+    eficienciaPromedio: reportes.length > 0 ? Math.round(reportes.reduce((sum, r) => sum + r.eficiencia, 0) / reportes.length) : 0,
+    prendasTotales: reportes.reduce((sum, r) => sum + (r.prendasProducidas ?? 0), 0),
+    valorTotal: reportes.reduce((sum, r) => sum + (r.valorProduccion ?? 0), 0),
   };
 
   const formatCurrency = (valor: number) => {
@@ -73,6 +90,14 @@ export const AdminReportesProduccion: React.FC = () => {
     return s.eficienciaBaja;
   };
 
+  if (loading) {
+    return <div className={s.header}><p>Cargando reporte de producción...</p></div>;
+  }
+
+  if (error) {
+    return <div className={s.header}><p className="text-red-500">{error}</p></div>;
+  }
+
   return (
     <div>
       <div className={s.header}>
@@ -83,9 +108,9 @@ export const AdminReportesProduccion: React.FC = () => {
         <div className={s.headerActions}>
           <div className={s.periodoSelect}>
             <select className={s.select} defaultValue="ultimos_6_meses">
-              <option value="ultimos_6_meses">Últimos 6 meses</option>
-              <option value="ultimo_ano">Último año</option>
-              <option value="todo">Todo el historial</option>
+              {PERIODOS_REPORTE_VENTAS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
             <ChevronDown size={16} className={s.selectIcon} />
           </div>
@@ -143,15 +168,14 @@ export const AdminReportesProduccion: React.FC = () => {
           </div>
           <div className={s.barChartContainer}>
             <div className={s.barChartYAxis}>
-              <span>25</span>
-              <span>20</span>
-              <span>15</span>
-              <span>10</span>
-              <span>5</span>
+              <span>{maxOrdenes}</span>
+              <span>{Math.round(maxOrdenes * 0.75)}</span>
+              <span>{Math.round(maxOrdenes * 0.5)}</span>
+              <span>{Math.round(maxOrdenes * 0.25)}</span>
               <span>0</span>
             </div>
             <div className={s.barChart}>
-              {produccionMensual.map(d => (
+              {produccionMensual.map((d: { mes: string; ordenes: number; completadas: number; pendientes: number }) => (
                 <div key={d.mes} className={s.barGroup}>
                   <div className={s.barStacked}>
                     <div
@@ -187,27 +211,22 @@ export const AdminReportesProduccion: React.FC = () => {
           <div className={s.chartHeader}>
             <h3 className={s.chartTitle}>
               <Factory size={18} className={s.chartIcon} />
-              Producción por Taller (Prendas Producidas)
+              Órdenes recientes
             </h3>
           </div>
           <div className={s.tallerChart}>
-            {(() => {
-              const maxPrendas = Math.max(...mockReportes.map(r => r.prendasProducidas));
-              return mockReportes.map(r => (
-                <div key={r.id} className={s.tallerBarRow}>
-                  <div className={s.tallerName}>{r.taller}</div>
-                  <div className={s.tallerBarTrack}>
-                    <div
-                      className={s.tallerBarFill}
-                      style={{ width: `${(r.prendasProducidas / maxPrendas) * 100}%` }}
-                    />
+            {report?.recentOrders && report.recentOrders.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {report.recentOrders.slice(0, 5).map((order) => (
+                  <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: 'var(--color-text-primary)' }}>
+                    <span>{order.referencia}</span>
+                    <span>{order.estado}</span>
                   </div>
-                  <div className={s.tallerBarValue}>
-                    {(r.prendasProducidas / 1000).toFixed(1)}K
-                  </div>
-                </div>
-              ));
-            })()}
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--color-text-muted)' }}>Sin información disponible</p>
+            )}
           </div>
         </div>
       </div>
@@ -217,13 +236,13 @@ export const AdminReportesProduccion: React.FC = () => {
           <h3 className={s.tableTitle}>Reporte por Taller</h3>
           <div className={s.tableFilters}>
             <div className={s.filterGroup}>
-              {['Todos', 'Alta (>=90)', 'Media (75-89)', 'Baja (<75)'].map(f => (
+              {FILTROS_EFICIENCIA.map(f => (
                 <button
-                  key={f}
-                  className={`${s.filterBtn} ${filtroEficiencia === f ? s.filterBtnActive : ''}`}
-                  onClick={() => setFiltroEficiencia(f)}
+                  key={f.value}
+                  className={`${s.filterBtn} ${filtroEficiencia === f.value ? s.filterBtnActive : ''}`}
+                  onClick={() => setFiltroEficiencia(f.value)}
                 >
-                  {f}
+                  {f.label}
                 </button>
               ))}
             </div>
@@ -243,7 +262,7 @@ export const AdminReportesProduccion: React.FC = () => {
         <DataTable<ProduccionRep>
           data={reportesFiltrados}
           pageSize={10}
-          emptyMessage="No se encontraron reportes"
+          emptyMessage="Sin resultados"
           maxVisibleColumns={5}
           detailPanel={{
             title: (r) => r.taller,
@@ -255,14 +274,14 @@ export const AdminReportesProduccion: React.FC = () => {
                     <div className={s.detailItem}><span className={s.detailLabel}>Completadas</span><span className={s.tdSuccess}>{r.ordenesCompletadas}</span></div>
                     <div className={s.detailItem}><span className={s.detailLabel}>Pendientes</span><span>{r.ordenesPendientes}</span></div>
                     <div className={s.detailItem}><span className={s.detailLabel}>Eficiencia</span><span>{r.eficiencia}%</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Prendas</span><span>{r.prendasProducidas.toLocaleString('es-CO')}</span></div>
+                    <div className={s.detailItem}><span className={s.detailLabel}>Prendas</span><span>{r.prendasProducidas !== null ? r.prendasProducidas.toLocaleString('es-CO') : '—'}</span></div>
                   </div>
                 </div>
                 <div className={s.detailSection}>
                   <h4 className={s.detailSectionTitle}>Financiero</h4>
                   <div className={s.detailGrid}>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Valor Producción</span><span className={s.tdBold}>{formatCurrency(r.valorProduccion)}</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Promedio Días</span><span>{r.promedioDias} días</span></div>
+                    <div className={s.detailItem}><span className={s.detailLabel}>Valor Producción</span><span className={s.tdBold}>{r.valorProduccion !== null ? formatCurrency(r.valorProduccion) : '—'}</span></div>
+                    <div className={s.detailItem}><span className={s.detailLabel}>Promedio Días</span><span>{r.promedioDias !== null ? `${r.promedioDias} días` : '—'}</span></div>
                   </div>
                 </div>
               </div>
@@ -287,10 +306,10 @@ export const AdminReportesProduccion: React.FC = () => {
               </div>
             )},
             { key: 'prendasProducidas', header: 'Prendas', width: '110px', sortable: true, render: (r) => (
-              <span className={s.tdCenter}>{r.prendasProducidas.toLocaleString('es-CO')}</span>
+              <span className={s.tdCenter}>{r.prendasProducidas !== null ? r.prendasProducidas.toLocaleString('es-CO') : '—'}</span>
             )},
             { key: 'valorProduccion', header: 'Valor Prod.', width: '140px', sortable: true, render: (r) => (
-              <span className={`${s.tdRight} ${s.tdBold}`}>{formatCurrency(r.valorProduccion)}</span>
+              <span className={`${s.tdRight} ${s.tdBold}`}>{r.valorProduccion !== null ? formatCurrency(r.valorProduccion) : '—'}</span>
             )},
           ]}
         />
@@ -298,4 +317,3 @@ export const AdminReportesProduccion: React.FC = () => {
     </div>
   );
 }
-

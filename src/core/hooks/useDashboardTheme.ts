@@ -11,7 +11,6 @@ export const useDashboardTheme = (): [boolean, () => void] => {
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
-    // Find scoped dashboard containers. If present, apply data-theme to them only.
     const scopedRoots = Array.from(document.querySelectorAll<HTMLElement>('[data-dashboard-theme]'));
     if (scopedRoots.length > 0) {
       scopedRoots.forEach(root => {
@@ -23,22 +22,19 @@ export const useDashboardTheme = (): [boolean, () => void] => {
       });
     }
 
-    // Remove any global data-theme attributes so public pages are not affected
     try {
       document.documentElement.removeAttribute('data-theme');
       document.body?.removeAttribute('data-theme');
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
 
-    // Persist choice for next visit
     window.localStorage.setItem(STORAGE_KEY, theme ? 'dark' : 'light');
 
-    // Dispatch a global event so portaled UI (modals, dropdowns) can update
     try {
       const ev = new CustomEvent('dashboard-theme-changed', { detail: theme ? 'dark' : 'light' });
       window.dispatchEvent(ev);
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   }, [theme]);

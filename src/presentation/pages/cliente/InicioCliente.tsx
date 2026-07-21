@@ -1,23 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../admin/StatCard';
-import { ShoppingBag, Clock, CheckCircle2, DollarSign, ArrowRight, Package, User, MapPin, MessageCircle, Archive } from 'lucide-react';
+import { ShoppingBag, Clock, CheckCircle2, DollarSign, ArrowRight, Package, User, MapPin, MessageCircle, Archive, Loader2, AlertCircle } from 'lucide-react';
 import s from './InicioCliente.module.css';
 import { Badge } from '@/shared/ui/Badge';
-import { useAppStore, usePedidos } from '@/core/stores';
+import { useAppStore } from '@/core/stores';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { Modal } from '@/shared/ui/Modal';
 import { Button } from '@/shared/ui/Button';
 import type { Pedido } from '@/core/types';
-
-const asesorAsignado = {
-  nombre: 'Camila Torres',
-  iniciales: 'CT',
-  email: 'camila.torres@surtitelas.com',
-  telefono: '310 234 5678',
-  whatsapp: '310 234 5678',
-};
+import { ordersApi } from '@/infrastructure/api/ordersApi';
+import { useAuthStore } from '@/core/stores/authStore';
 
 const statusVariant = (estado: Pedido['estado']) => {
   if (estado === 'Entregado') return 'success';
@@ -28,23 +22,59 @@ const statusVariant = (estado: Pedido['estado']) => {
 };
 
 export const InicioCliente: React.FC = () => {
-  const pedidos = usePedidos().pedidos;
+  const user = useAuthStore((s) => s.user);
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pedidoActivoState, setPedidoActivoState] = useState<Pedido | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const addNotificacion = useAppStore(s => s.addNotificacion);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const ordersResult = await ordersApi.list();
+        setPedidos(ordersResult.pedidos);
+      } catch {
+        setError('No se pudieron cargar tus datos. Intenta nuevamente.');
+        toast.error('Error al cargar el dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
 
   const pedidoActivo = pedidos.find(p => p.estado !== 'Entregado' && p.estado !== 'Cancelado') || pedidos[0] || null;
   const totalPedidos = pedidos.length;
   const pedidosEnProceso = pedidos.filter(p => p.estado === 'En producción' || p.estado === 'Listo' || p.estado === 'Despachado' || p.estado === 'En camino').length;
   const pedidosEntregados = pedidos.filter(p => p.estado === 'Entregado').length;
 
+  const totalComprado = pedidos.reduce((sum, p) => {
+    const n = Number(String(p.total).replace(/[^0-9]/g, ''));
+    return sum + (Number.isNaN(n) ? 0 : n);
+  }, 0);
+
   const stats = [
     { label: 'Pedidos Realizados', value: String(totalPedidos), trend: 'Total histórico', trendUp: true, Icon: ShoppingBag, color: 'accent' as const },
     { label: 'En Proceso', value: String(pedidosEnProceso), trend: 'Activos ahora', trendUp: true, Icon: Clock, color: 'warning' as const },
     { label: 'Entregados', value: String(pedidosEntregados), trend: 'Completados', trendUp: true, Icon: CheckCircle2, color: 'success' as const },
-    { label: 'Total Comprado', value: '$8.4M', trend: 'Acumulado', trendUp: true, Icon: DollarSign, color: 'info' as const },
+    { label: 'Total Comprado', value: `$${Math.round(totalComprado / 1_000_000 * 10) / 10}M`, trend: 'Acumulado', trendUp: true, Icon: DollarSign, color: 'info' as const },
   ];
+
+  const asesorNombre = pedidos.find(p => p.asesor)?.asesor ?? 'Sin asignar';
+  const asesorIniciales = asesorNombre !== 'Sin asignar'
+    ? asesorNombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    : '—';
+  const asesorAsignado = {
+    nombre: asesorNombre,
+    iniciales: asesorIniciales,
+    telefono: '',
+    email: '',
+  };
 
   const ultimosPedidos = pedidos.slice(0, 5);
 
@@ -65,6 +95,29 @@ export const InicioCliente: React.FC = () => {
 
   const openPedido = (pedido: Pedido) => setPedidoActivoState(pedido);
 
+  if (loading) {
+    return (
+      <div className={s.inicioLayout}>
+        <div className={s.loadingState}>
+          <Loader2 size={28} className={s.loadingSpinner} />
+          <span>Cargando tu dashboard…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={s.inicioLayout}>
+        <div className={s.errorState}>
+          <AlertCircle size={28} />
+          <span>{error}</span>
+          <Button variant="secondary" onClick={() => window.location.reload()}>Reintentar</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={s.inicioLayout}>
       <h1 className={s.pageTitle}>Dashboard</h1>
@@ -74,7 +127,7 @@ export const InicioCliente: React.FC = () => {
         <div className={s.welcomeText}>
           <div className={s.welcomeGreeting}>¡Bienvenido de vuelta!</div>
           <div className={s.welcomeName}>
-            Juan Martínez <span>▸ Almacén El Sol</span>
+            {user?.name || 'Cliente'} <span>▸ Tienda</span>
           </div>
           <div className={s.welcomeDesc}>
             Consulta nuestro catálogo de productos, haz seguimiento a tus pedidos y gestiona tu perfil desde un solo lugar.
@@ -160,14 +213,14 @@ export const InicioCliente: React.FC = () => {
           </div>
           <div className={s.asesorContactRow}>
             <MapPin size={14} className={s.asesorContactIcon} />
-            {asesorAsignado.telefono}
+            {asesorAsignado.telefono || 'Sin asignar'}
           </div>
           <div className={s.asesorContactRow}>
             <User size={14} className={s.asesorContactIcon} />
-            {asesorAsignado.email}
+            {asesorAsignado.email || 'Sin asignar'}
           </div>
           <button className={s.asesorChatBtn} type="button" onClick={() => setChatOpen(true)}>
-            💬 Chatear con {asesorAsignado.nombre.split(' ')[0]}
+            💬 Chatear con {asesorAsignado.nombre === 'Sin asignar' ? 'tu asesor' : asesorAsignado.nombre.split(' ')[0]}
           </button>
         </div>
       </div>

@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Eye, CheckCircle2, MapPin, Clock, Package } from 'lucide-react';
 import s from './MisEntregas.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DetailModal } from '@/shared/ui/DetailModal';
-import { Tooltip } from '@/shared/components/Tooltip';
+import { deliveriesApi } from '@/infrastructure/api/deliveriesApi';
+import { useAuthStore } from '@/core/stores/authStore';
 
 interface Entrega {
   id: string;
@@ -18,15 +19,14 @@ interface Entrega {
   estado: 'Pendiente' | 'En camino' | 'Entregado' | 'Fallido';
 }
 
-const entregasSeed: Entrega[] = [
-  { id: 'ENT-043', pedido: '#PD-2401', cliente: 'Almacén El Sol', direccion: 'Cra 15 #45-23', ciudad: 'Bogotá', barrio: 'Chapinero', horaEstimada: '09:30', estado: 'Entregado' },
-  { id: 'ENT-044', pedido: '#PD-2402', cliente: 'Boutique Moda+', direccion: 'Cl 80 #12-67', ciudad: 'Bogotá', barrio: 'Suba', horaEstimada: '10:15', estado: 'Entregado' },
-  { id: 'ENT-045', pedido: '#PD-2403', cliente: 'Moda Express SAS', direccion: 'Av 68 #34-10', ciudad: 'Bogotá', barrio: 'Teusaquillo', horaEstimada: '11:00', estado: 'En camino' },
-  { id: 'ENT-046', pedido: '#PD-2404', cliente: 'Textiles del Norte', direccion: 'Cra 7 #120-45', ciudad: 'Bogotá', barrio: 'Usaquén', horaEstimada: '11:45', estado: 'Pendiente' },
-  { id: 'ENT-047', pedido: '#PD-2405', cliente: 'La Casa del Denim', direccion: 'Cl 127 #20-33', ciudad: 'Bogotá', barrio: 'Cedritos', horaEstimada: '12:30', estado: 'Pendiente' },
-];
+const deliveryStatusMap: Record<string, Entrega['estado']> = {
+  'ENTREGADO': 'Entregado',
+  'EN_RUTA': 'En camino',
+  'ASIGNADO': 'Pendiente',
+  'FALLIDO': 'Fallido',
+};
 
-const deliveryStatuses: Record<Entrega['estado'], 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+const deliveryStatusVariant: Record<Entrega['estado'], 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
   'Pendiente': 'warning',
   'En camino': 'info',
   'Entregado': 'success',
@@ -34,23 +34,52 @@ const deliveryStatuses: Record<Entrega['estado'], 'success' | 'warning' | 'dange
 };
 
 export const DomiciliarioEntregas: React.FC = () => {
-  const [entregas, setEntregas] = useState<Entrega[]>(entregasSeed);
+  const user = useAuthStore((s) => s.user);
+  const [entregas, setEntregas] = useState<Entrega[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<Entrega['estado'] | 'Todas'>('Todas');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedEntrega, setSelectedEntrega] = useState<Entrega | null>(null);
   const [statusEntrega, setStatusEntrega] = useState<Entrega | null>(null);
   const [nextEstado, setNextEstado] = useState<Entrega['estado']>('Pendiente');
 
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await deliveriesApi.list(user?.uid ? { domiciliarioId: user.uid } : undefined);
+        const mapped: Entrega[] = result.map((d) => ({
+          id: d.orderId || d.id,
+          pedido: d.orderId || d.id,
+          cliente: d.clienteNombre || '',
+          direccion: d.direccion || '',
+          ciudad: d.ciudad || '',
+          barrio: d.ciudad || '',
+          horaEstimada: d.asignadoEn ? new Date(d.asignadoEn).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+          estado: deliveryStatusMap[d.estado] || 'Pendiente',
+        }));
+        setEntregas(mapped);
+      } catch {
+        setError('No se pudieron cargar las entregas');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user?.uid) void load();
+  }, [user?.uid]);
+
   const filteredEntregas = useMemo(() => {
     if (activeFilter === 'Todas') return entregas;
-    return entregas.filter(entrega => entrega.estado === activeFilter);
+    return entregas.filter((entrega) => entrega.estado === activeFilter);
   }, [entregas, activeFilter]);
 
   const counts = {
     Todas: entregas.length,
-    Pendiente: entregas.filter(e => e.estado === 'Pendiente').length,
-    'En camino': entregas.filter(e => e.estado === 'En camino').length,
-    Entregado: entregas.filter(e => e.estado === 'Entregado').length,
+    Pendiente: entregas.filter((e) => e.estado === 'Pendiente').length,
+    'En camino': entregas.filter((e) => e.estado === 'En camino').length,
+    Entregado: entregas.filter((e) => e.estado === 'Entregado').length,
   };
 
   const openStatus = (entrega: Entrega) => {
@@ -58,12 +87,36 @@ export const DomiciliarioEntregas: React.FC = () => {
     setNextEstado(entrega.estado === 'Pendiente' ? 'En camino' : entrega.estado === 'En camino' ? 'Entregado' : 'Fallido');
   };
 
-  const saveStatus = () => {
+  const saveStatus = async () => {
     if (!statusEntrega) return;
-    setEntregas(prev => prev.map(entrega => entrega.id === statusEntrega.id ? { ...entrega, estado: nextEstado } : entrega));
-    toast.success(`${statusEntrega.id} marcada como ${nextEstado}`);
-    setStatusEntrega(null);
+    try {
+      const backendEstado = nextEstado === 'Pendiente' ? 'ASIGNADO' : nextEstado === 'En camino' ? 'EN_RUTA' : nextEstado === 'Entregado' ? 'ENTREGADO' : 'FALLIDO';
+      await deliveriesApi.updateStatus(statusEntrega.id, backendEstado);
+      setEntregas((prev) => prev.map((entrega) => entrega.id === statusEntrega.id ? { ...entrega, estado: nextEstado } : entrega));
+      toast.success(`${statusEntrega.id} marcada como ${nextEstado}`);
+      setStatusEntrega(null);
+    } catch {
+      toast.error('No se pudo actualizar el estado de la entrega');
+    }
   };
+
+  if (loading) {
+    return (
+      <div>
+        <h1 className={s.pageTitle}>Entregas de Hoy</h1>
+        <p className={s.pageSubtitle}>Cargando...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h1 className={s.pageTitle}>Entregas de Hoy</h1>
+        <p className={s.pageSubtitle}>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -72,7 +125,7 @@ export const DomiciliarioEntregas: React.FC = () => {
 
       <div className={s.filterBar}>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {(['Todas', 'Pendiente', 'En camino', 'Entregado'] as const).map(filtro => (
+          {(['Todas', 'Pendiente', 'En camino', 'Entregado'] as const).map((filtro) => (
             <button
               key={filtro}
               className={`${s.filterBtn} ${activeFilter === filtro ? s.filterBtnActive : ''}`}
@@ -84,8 +137,8 @@ export const DomiciliarioEntregas: React.FC = () => {
           ))}
         </div>
         <div className={s.viewToggle}>
-          <Tooltip title="Vista grid"><button className={`${s.viewToggleBtn} ${viewMode === 'grid' ? s.viewToggleBtnActive : ''}`} onClick={() => setViewMode('grid')}>⊡</button></Tooltip>
-          <Tooltip title="Vista lista"><button className={`${s.viewToggleBtn} ${viewMode === 'list' ? s.viewToggleBtnActive : ''}`} onClick={() => setViewMode('list')}>☰</button></Tooltip>
+          <button className={`${s.viewToggleBtn} ${viewMode === 'grid' ? s.viewToggleBtnActive : ''}`} onClick={() => setViewMode('grid')}>⊡</button>
+          <button className={`${s.viewToggleBtn} ${viewMode === 'list' ? s.viewToggleBtnActive : ''}`} onClick={() => setViewMode('list')}>☰</button>
         </div>
       </div>
 
@@ -96,7 +149,7 @@ export const DomiciliarioEntregas: React.FC = () => {
               <div className={s.entregaNumero}>
                 <div className={s.entregaNumeroCircle}>{entrega.id.split('-')[1]}</div>
               </div>
-              <Badge variant={deliveryStatuses[entrega.estado]}>
+              <Badge variant={deliveryStatusVariant[entrega.estado]}>
                 {entrega.estado}
               </Badge>
             </div>
@@ -144,7 +197,7 @@ export const DomiciliarioEntregas: React.FC = () => {
         size="lg"
         header={{
           icon: <MapPin size={18} />,
-          status: selectedEntrega ? <Badge variant={deliveryStatuses[selectedEntrega.estado]}>{selectedEntrega.estado}</Badge> : undefined,
+          status: selectedEntrega ? <Badge variant={deliveryStatusVariant[selectedEntrega.estado]}>{selectedEntrega.estado}</Badge> : undefined,
         }}
         sections={[
           {
@@ -181,7 +234,7 @@ export const DomiciliarioEntregas: React.FC = () => {
             children: (
               <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                 Estado
-                <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={nextEstado} onChange={e => setNextEstado(e.target.value as Entrega['estado'])}>
+                <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={nextEstado} onChange={(e) => setNextEstado(e.target.value as Entrega['estado'])}>
                   <option value="Pendiente">Pendiente</option>
                   <option value="En camino">En camino</option>
                   <option value="Entregado">Entregado</option>

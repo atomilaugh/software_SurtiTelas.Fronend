@@ -1,8 +1,33 @@
-.pageTitle {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  margin: 0 0 8px 0;
+.loadingSpinner {
+  animation: pagosSpin 0.9s linear infinite;
+  color: var(--color-primary, #2563eb);
+}
+
+@keyframes pagosSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loadingText {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: var(--color-danger-bg, #fef2f2);
+  color: var(--color-danger, #dc2626);
+  margin-bottom: 24px;
+  font-size: 0.9rem;
+}
+
+.errorBanner button {
+  margin-left: auto;
 }
 
 .pageSubtitle {

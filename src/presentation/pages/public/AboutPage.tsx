@@ -16,6 +16,7 @@ import {
 
 import { useNavigate } from 'react-router-dom';
 import '../styles/AboutPage.css';
+import { appContent } from '@/shared/config/appContent';
 
 /* =========================================================
    HELPERS
@@ -62,79 +63,24 @@ interface TeamMember {
    DATA
 ========================================================= */
 
-const rolesData: RoleItem[] = [
-  {
-    title: 'Misión',
-    icon: <ShieldCheck size={26} />,
-    description:
-      'Confeccionamos prendas de alta calidad que reflejan compromiso, precisión y excelencia en cada detalle.',
-  },
-  {
-    title: 'Visión',
-    icon: <Eye size={26} />,
-    description:
-      'Ser una marca líder a nivel nacional para 2030, reconocida por innovación, diseño y confianza.',
-  },
-  {
-    title: 'Valores',
-    icon: <Gem size={26} />,
-    description:
-      'Calidad, innovación, transparencia y compromiso constante con cada cliente y proyecto.',
-  },
-];
+const rolesData: RoleItem[] = appContent.publicPages.about.roles.map((role, index) => ({
+  title: role.title,
+  icon: [<Eye size={26} />, <Gem size={26} />, <Palette size={26} />][index] ?? <ShieldCheck size={26} />,
+  description: role.description,
+}));
 
-const featuresData: FeatureItem[] = [
-  {
-    icon: <Smartphone size={22} />,
-    title: 'Experiencia Moderna',
-    description:
-      'Una plataforma intuitiva diseñada para facilitar tus compras y pedidos.',
-  },
-  {
-    icon: <Zap size={22} />,
-    title: 'Procesos ágiles',
-    description:
-      'Producción y distribución optimizadas para tiempos de entrega rápidos.',
-  },
-  {
-    icon: <ScanSearch size={22} />,
-    title: 'Seguimiento Transparente',
-    description:
-      'Control y visibilidad completa durante todo el proceso de producción.',
-  },
-];
+const featuresData: FeatureItem[] = appContent.publicPages.about.features.map((feature, index) => ({
+  icon: [<Sparkles size={22} />, <Zap size={22} />, <ScanSearch size={22} />][index] ?? <Smartphone size={22} />,
+  title: feature.title,
+  description: feature.description,
+}));
 
-const teamData: TeamMember[] = [
-  {
-    name: 'Carlos Mendoza',
-    role: 'Director General',
-    description:
-      'Especialista en dirección estratégica y desarrollo de marcas textiles.',
-    icon: <Crown size={22} />,
-  },
-  {
-    name: 'María González',
-    role: 'Diseñadora Creativa',
-
-    description:
-      'Experta en identidad visual, personalización y diseño de prendas.',
-    icon: <Palette size={22} />,
-  },
-  {
-    name: 'Juan Pérez',
-    role: 'Jefe de Producción',
-    description:
-      'Responsable del control de calidad y optimización de procesos.',
-    icon: <Settings2 size={22} />,
-  },
-  {
-    name: 'Ana López',
-    role: 'Atención al Cliente',
-    description:
-      'Enfocada en brindar una experiencia cercana y personalizada.',
-    icon: <Headphones size={22} />,
-  },
-];
+const teamData: TeamMember[] = appContent.publicPages.about.team.map((member) => ({
+  name: member.name,
+  role: member.role,
+  description: member.description,
+  icon: <Crown size={22} />,
+}));
 
 /* =========================================================
    ABOUT SECTION
@@ -146,14 +92,11 @@ export const AboutSection = memo(() => {
       <div className="about-container">
 
         <div className="modules-header">
-          <span className="top-badge">Identidad</span>
+          <span className="top-badge">{appContent.publicPages.about.identityLabel}</span>
 
-          <h2>Conocémonos</h2>
+          <h2>{appContent.publicPages.about.introTitle}</h2>
 
-          <p>
-            Nuestra costura representa compromiso, elegancia y precisión
-            para transformar cada proyecto en una experiencia premium.
-          </p>
+          <p>{appContent.publicPages.about.introDescription}</p>
         </div>
 
         <div className="roles-grid">
@@ -197,17 +140,15 @@ export const MobileSection = memo(() => {
         <div className="mobile-text-column">
 
           <span className="experience-badge">
-            Innovación Digital
+            {appContent.publicPages.contact.heroBadge}
           </span>
 
           <h1>
-            Tecnología y moda en un mismo lugar
+            {appContent.publicPages.contact.title}
           </h1>
 
           <p className="mobile-description">
-            En Surticamisetas combinamos diseño, innovación y procesos
-            inteligentes para ofrecer soluciones textiles modernas,
-            rápidas y totalmente personalizadas.
+            {appContent.publicPages.contact.description}
           </p>
 
           <div className="mobile-features-list">
@@ -265,15 +206,12 @@ export const TeamSection = memo(() => {
 
         <div className="team-header">
           <span className="top-badge">
-            Equipo Profesional
+            {appContent.publicPages.about.identityLabel}
           </span>
 
           <h2>Nuestro Equipo</h2>
 
-          <p>
-            Profesionales apasionados por crear prendas con calidad,
-            diseño y atención personalizada.
-          </p>
+          <p>{appContent.publicPages.about.introDescription}</p>
         </div>
 
         <div className="team-grid">

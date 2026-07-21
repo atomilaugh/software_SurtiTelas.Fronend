@@ -1,10 +1,15 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, ToggleLeft } from 'lucide-react';
+import { Plus, Edit, Trash2, ToggleLeft, Loader2 } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './GestionAcceso.module.css';
 import { Button } from '../../../shared/ui/Button';
 import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '../../../shared/ui/DataTable';
+import { accessApi, type AccessLog } from '@/infrastructure/api/accessApi';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import { authApi } from '@/infrastructure/api/authApi';
+import { rolesApi } from '@/infrastructure/api/rolesApi';
+import { TIPOS_PERMISO_ACCESO } from '@/shared/constants/options';
 
 interface Acceso {
   id: string;
@@ -17,19 +22,58 @@ interface Acceso {
   estado: 'Activo' | 'Expirado' | 'Pendiente';
 }
 
-const mockAccesosInicial: Acceso[] = [
-  { id: 'A-001', usuario: 'Carlos Martínez', rol: 'Administrador', modulo: 'Usuarios', permiso: 'Gestión completa', fechaAsignacion: '2024-01-15', expira: null, estado: 'Activo' },
-  { id: 'A-002', usuario: 'Ana López', rol: 'Asesor', modulo: 'Pedidos', permiso: 'Crear y editar', fechaAsignacion: '2024-02-20', expira: '2024-12-31', estado: 'Activo' },
-  { id: 'A-003', usuario: 'María González', rol: 'Producción', modulo: 'Talleres', permiso: 'Asignación', fechaAsignacion: '2024-03-10', expira: null, estado: 'Activo' },
-  { id: 'A-004', usuario: 'Luis Pérez', rol: 'Almacén', modulo: 'Inventario', permiso: 'Solo lectura', fechaAsignacion: '2024-01-25', expira: null, estado: 'Activo' },
-  { id: 'A-005', usuario: 'Jorge Ruiz', rol: 'Asesor', modulo: 'Reportes', permiso: 'Visualización', fechaAsignacion: '2023-11-05', expira: '2024-05-15', estado: 'Expirado' },
-];
+const formatFecha = (value: string): string => {
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return value;
+  return date.toISOString().slice(0, 10);
+};
+
+const toAcceso = (log: AccessLog): Acceso => ({
+  id: log.id,
+  usuario: log.usuario ?? '—',
+  rol: log.dispositivo ?? '—',
+  modulo: log.modulo ?? '—',
+  permiso: `${log.accion}${log.ip ? ` · ${log.ip}` : ''}`,
+  fechaAsignacion: formatFecha(log.createdAt),
+  expira: null,
+  estado: log.estado === 'Exitoso' ? 'Activo' : 'Expirado',
+});
 
 export const AdminGestionAcceso: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedAcceso, setSelectedAcceso] = useState<Acceso | null>(null);
-  const [items, setItems] = useState<Acceso[]>(mockAccesosInicial);
+  const [items, setItems] = useState<Acceso[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userOptions, setUserOptions] = useState<string[]>([]);
+  const [roleOptions, setRoleOptions] = useState<string[]>([]);
+  const [moduloOptions, setModuloOptions] = useState<string[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<Acceso | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [usersData, rolesData, accessData] = await Promise.all([
+          authApi.listUsers(),
+          rolesApi.list(),
+          accessApi.list(),
+        ]);
+        setUserOptions(usersData.data.map(u => u.nombre).filter(Boolean));
+        setRoleOptions(rolesData.map(r => r.nombre).filter(Boolean));
+        setModuloOptions([...new Set(accessData.map(a => a.modulo).filter(Boolean))] as string[]);
+        setItems(accessData.map(toAcceso));
+      } catch {
+        setError('No se pudieron cargar los registros de acceso');
+        toast.error('No se pudieron cargar los registros de acceso');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -46,7 +90,7 @@ export const AdminGestionAcceso: React.FC = () => {
     setSelectedAcceso(null);
   };
 
-  const handleSubmitAcceso = () => {
+  const handleSubmitAcceso = async () => {
     if (!formRef.current) return;
     const fd = new FormData(formRef.current);
     const usuario = String(fd.get('usuario') ?? '').trim();
@@ -55,24 +99,34 @@ export const AdminGestionAcceso: React.FC = () => {
     const permiso = String(fd.get('permiso') ?? '').trim();
     const expiraRaw = String(fd.get('expira') ?? '').trim();
     const expira = expiraRaw === '' ? null : expiraRaw;
-    if (selectedAcceso) {
-      setItems(prev => prev.map(it => it.id === selectedAcceso.id ? { ...it, usuario, rol, modulo, permiso, expira } : it));
-      toast.success('Acceso actualizado');
-    } else {
-      const nuevo: Acceso = {
-        id: `A-${String(items.length + 1).padStart(3, '0')}`,
-        usuario,
-        rol,
-        modulo,
-        permiso,
-        fechaAsignacion: new Date().toISOString().slice(0, 10),
-        expira,
-        estado: 'Activo',
-      };
-      setItems(prev => [nuevo, ...prev]);
-      toast.success('Acceso creado');
+    try {
+      if (selectedAcceso) {
+        await accessApi.update(selectedAcceso.id, { usuario, rol, modulo, accion: permiso, expira });
+        setItems(prev => prev.map(it => it.id === selectedAcceso.id ? { ...it, usuario, rol, modulo, permiso, expira } : it));
+        toast.success('Acceso actualizado');
+      } else {
+        const nuevo = await accessApi.create({ usuario, rol, modulo, accion: permiso, expira });
+        setItems(prev => [{
+          id: nuevo.id,
+          usuario: nuevo.usuario ?? usuario,
+          rol,
+          modulo: nuevo.modulo ?? modulo,
+          permiso: `${nuevo.accion}${nuevo.ip ? ` · ${nuevo.ip}` : ''}`,
+          fechaAsignacion: formatFecha(nuevo.createdAt),
+          expira: expira,
+          estado: nuevo.estado === 'Exitoso' ? 'Activo' : 'Expirado',
+        }, ...prev]);
+        toast.success('Acceso creado');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar acceso');
+    } finally {
+      handleCloseModal();
+      void (async () => {
+        const data = await accessApi.list();
+        setItems(data.map(toAcceso));
+      })();
     }
-    handleCloseModal();
   };
 
   const columns: DataTableColumn<Acceso>[] = [
@@ -97,8 +151,17 @@ export const AdminGestionAcceso: React.FC = () => {
 
   const actions: DataTableAction<Acceso>[] = [
     { label: 'Editar', icon: <Edit size={14} />, onClick: (item) => { setSelectedAcceso(item); setModalOpen(true); } },
-    { label: 'Desactivar', icon: <ToggleLeft size={14} />, onClick: (item) => toast.info(item.estado === 'Activo' ? 'Acceso desactivado' : 'Acceso activado') },
-    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: () => { if (confirm(`¿Eliminar acceso?`)) toast.success('Acceso eliminado'); } },
+    { label: 'Desactivar', icon: <ToggleLeft size={14} />, onClick: async (item) => {
+      try {
+        await accessApi.update(item.id, { usuario: item.usuario, rol: item.rol, modulo: item.modulo, accion: item.permiso });
+        toast.success(item.estado === 'Activo' ? 'Acceso desactivado' : 'Acceso activado');
+        const data = await accessApi.list();
+        setItems(data.map(toAcceso));
+      } catch {
+        toast.error('No se pudo cambiar el estado del acceso');
+      }
+    } },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => setDeleteConfirm(item) },
   ];
 
   return (
@@ -126,6 +189,15 @@ export const AdminGestionAcceso: React.FC = () => {
       </div>
 
       <div className={s.tableWrapper}>
+        {loading && (
+          <div className={s.loadingRow}>
+            <Loader2 size={18} className={s.spin} />
+            <span>Cargando registros de acceso...</span>
+          </div>
+        )}
+        {error && !loading && (
+          <div className={s.errorRow}>{error}</div>
+        )}
         <DataTable
           data={filteredAccesos}
           columns={columns}
@@ -141,7 +213,7 @@ export const AdminGestionAcceso: React.FC = () => {
       </div>
 
       {modalOpen && (
-        <div className={s.modalOverlay} onClick={handleCloseModal}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <h2 className={s.modalTitle}>
@@ -155,20 +227,17 @@ export const AdminGestionAcceso: React.FC = () => {
                   <div className={s.field}>
                     <label className={s.label}>Usuario</label>
                     <select className={s.select} name="usuario" defaultValue={selectedAcceso?.usuario}>
-                      <option>Carlos Martínez</option>
-                      <option>Ana López</option>
-                      <option>Luis Pérez</option>
-                      <option>María González</option>
+                      {userOptions.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
                     </select>
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Rol</label>
                     <select className={s.select} name="rol" defaultValue={selectedAcceso?.rol}>
-                      <option>Administrador</option>
-                      <option>Asesor</option>
-                      <option>Almacén</option>
-                      <option>Producción</option>
-                      <option>Reportes</option>
+                      {roleOptions.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -176,20 +245,17 @@ export const AdminGestionAcceso: React.FC = () => {
                   <div className={s.field}>
                     <label className={s.label}>Módulo</label>
                     <select className={s.select} name="modulo" defaultValue={selectedAcceso?.modulo}>
-                      <option>Usuarios</option>
-                      <option>Inventario</option>
-                      <option>Pedidos</option>
-                      <option>Reportes</option>
-                      <option>Producción</option>
+                      {moduloOptions.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
                     </select>
                   </div>
                   <div className={s.field}>
                     <label className={s.label}>Tipo de Permiso</label>
                     <select className={s.select} name="permiso" defaultValue={selectedAcceso?.permiso}>
-                      <option>Gestión completa</option>
-                      <option>Crear y editar</option>
-                      <option>Solo lectura</option>
-                      <option>Visualización</option>
+                      {TIPOS_PERMISO_ACCESO.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -210,6 +276,27 @@ export const AdminGestionAcceso: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            await accessApi.delete(deleteConfirm.id);
+            setItems(prev => prev.filter(it => it.id !== deleteConfirm.id));
+            toast.success('Acceso eliminado');
+          } catch {
+            toast.error('No se pudo eliminar el acceso');
+          } finally {
+            setDeleteConfirm(null);
+          }
+        }}
+        title="Eliminar acceso"
+        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.usuario}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };

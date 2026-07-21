@@ -1,4 +1,4 @@
-﻿import { Suspense } from 'react';
+﻿import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import ProtectedRoute from '@/presentation/routes/ProtectedRoute';
@@ -6,78 +6,77 @@ import Layout from '@/presentation/pages/layouts/Layout';
 import ScrollToTop from '@/presentation/components/ScrollToTop';
 import { Spinner } from '@/shared/ui';
 import ErrorBoundary from '@/shared/components/ErrorBoundary';
-import { AdminLayout } from '@/presentation/pages/admin/AdminLayout';
-import { AdminDashboard } from '@/presentation/pages/admin/Dashboard';
-import { AdminClientes } from '@/presentation/pages/admin/Clientes';
-import { AdminCatalogo } from '@/presentation/pages/admin/AdminCatalogo';
-import { AdminPedidos } from '@/presentation/pages/admin/Pedidos';
-import { AdminProduccion } from '@/presentation/pages/admin/Produccion';
-import { AdminInventario } from '@/presentation/pages/admin/Inventario';
-import { AdminAsesores } from '@/presentation/pages/admin/AdminAsesores';
-import { AdminReportes } from '@/presentation/pages/admin/AdminReportes';
-import { AdminConfiguracion } from '@/presentation/pages/admin/AdminConfiguracion';
-import { AdminDomicilios } from '@/presentation/pages/admin/AdminDomicilios';
-import { AdminRoles } from '@/presentation/pages/admin/Roles';
-import { AdminPermisos } from '@/presentation/pages/admin/Permisos';
-import { AdminGestionUsuarios } from '@/presentation/pages/admin/GestionUsuarios';
-import { AdminSeguridadUsuarios } from '@/presentation/pages/admin/SeguridadUsuarios';
-import { AdminProductosTerminados } from '@/presentation/pages/admin/ProductosTerminados';
-import { AdminInsumos } from '@/presentation/pages/admin/Insumos';
-import { AdminProveedores } from '@/presentation/pages/admin/Proveedores';
-import { AdminGestionAcceso } from '@/presentation/pages/admin/GestionAcceso';
-import { AdminAlertasStock } from '@/presentation/pages/admin/AlertasStock';
-import { AdminStockDevuelto } from '@/presentation/pages/admin/StockDevuelto';
-import { AdminRegistroTalleres } from '@/presentation/pages/admin/RegistroTalleres';
-import { AdminControlPrendas } from '@/presentation/pages/admin/ControlPrendas';
-import { AdminAsignacionProduccion } from '@/presentation/pages/admin/AsignacionProduccion';
-import { AdminSeguimientoProduccion } from '@/presentation/pages/admin/SeguimientoProduccion';
-import { AdminRecibos } from '@/presentation/pages/admin/Recibos';
-import { AdminPagos } from '@/presentation/pages/admin/Pagos';
-import { AdminReportesVentas } from '@/presentation/pages/admin/ReportesVentas';
-import { AdminReportesUsuarios } from '@/presentation/pages/admin/ReportesUsuarios';
-import { AdminReportesProduccion } from '@/presentation/pages/admin/ReportesProduccion';
-import { AdminReportesInventario } from '@/presentation/pages/admin/ReportesInventario';
-import { AsesorLayout } from '@/presentation/pages/asesor/AsesorLayout';
-import { AsesorDashboard } from '@/presentation/pages/asesor/Dashboard';
-import { AsesorClientes } from '@/presentation/pages/asesor/MisClientes';
-import { AtencionCliente } from '@/presentation/pages/asesor/Atencion-cliente';
-import { AsesorPedidos } from '@/presentation/pages/asesor/Pedidos';
-import { AsesorCatalogo } from '@/presentation/pages/asesor/Catalogo';
-import { AsesorComisiones } from '@/presentation/pages/asesor/Comisiones';
-import { AsesorPerfil } from '@/presentation/pages/asesor/PerfilAsesor';
-import { DomiciliarioLayout } from '@/presentation/pages/domiciliario/DomiciliarioLayout';
-import { DomiciliarioDashboard } from '@/presentation/pages/domiciliario/Dashboard';
-import { DomiciliarioEntregas } from '@/presentation/pages/domiciliario/MisEntregas';
-import { RutaDelDia } from '@/presentation/pages/domiciliario/RutaDelDia';
-import { DomiciliarioHistorial } from '@/presentation/pages/domiciliario/Historial';
-import { DomiciliarioPerfil } from '@/presentation/pages/domiciliario/PerfilDomiciliario';
-import { ClienteLayout } from '@/presentation/pages/cliente/ClienteLayout';
-import { InicioCliente } from '@/presentation/pages/cliente/InicioCliente';
-import { CatalogoCliente } from '@/presentation/pages/cliente/Catalogo';
-import { MisPedidos } from '@/presentation/pages/cliente/MisPedidos';
-import { PerfilCliente } from '@/presentation/pages/cliente/PerfilCliente';
-import { OrderTracking } from '@/presentation/pages/cliente/OrderTracking';
-import { Recibos } from '@/presentation/pages/cliente/Recibos';
-import { Favoritos } from '@/presentation/pages/cliente/Favoritos';
-
-// PUBLIC
-import HomePage from '@/presentation/pages/public/HomePage';
-import CatalogPage from '@/presentation/pages/features/CatalogPage';
-import CartPage from '@/presentation/pages/features/CartPage';
-import ContactPage from '@/presentation/pages/features/ContactPage';
-import AboutPage from '@/presentation/pages/public/AboutPage';
-import TooltipsDemo from '@/presentation/pages/public/TooltipsDemo';
-
-// AUTH
-import LoginPage from '@/presentation/pages/auth/LoginPage';
-import RegisterPage from '@/presentation/pages/auth/RegisterPage';
-import ForgotPasswordPage from '@/presentation/pages/auth/ForgotPasswordPage';
 
 const ProtectedLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
     <Spinner size="lg" />
   </div>
 );
+
+const AdminLayout = React.lazy(() => import('@/presentation/pages/admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
+const AdminDashboard = React.lazy(() => import('@/presentation/pages/admin/Dashboard').then(m => ({ default: m.AdminDashboard })));
+const AdminClientes = React.lazy(() => import('@/presentation/pages/admin/Clientes').then(m => ({ default: m.AdminClientes })));
+const AdminCatalogo = React.lazy(() => import('@/presentation/pages/admin/AdminCatalogo').then(m => ({ default: m.AdminCatalogo })));
+const AdminPedidos = React.lazy(() => import('@/presentation/pages/admin/Pedidos').then(m => ({ default: m.AdminPedidos })));
+const AdminProduccion = React.lazy(() => import('@/presentation/pages/admin/Produccion').then(m => ({ default: m.AdminProduccion })));
+const AdminInventario = React.lazy(() => import('@/presentation/pages/admin/Inventario').then(m => ({ default: m.AdminInventario })));
+const AdminAsesores = React.lazy(() => import('@/presentation/pages/admin/AdminAsesores').then(m => ({ default: m.AdminAsesores })));
+const AdminReportes = React.lazy(() => import('@/presentation/pages/admin/AdminReportes').then(m => ({ default: m.AdminReportes })));
+const AdminConfiguracion = React.lazy(() => import('@/presentation/pages/admin/AdminConfiguracion').then(m => ({ default: m.AdminConfiguracion })));
+const AdminDomicilios = React.lazy(() => import('@/presentation/pages/admin/AdminDomicilios').then(m => ({ default: m.AdminDomicilios })));
+const AdminRoles = React.lazy(() => import('@/presentation/pages/admin/Roles').then(m => ({ default: m.AdminRoles })));
+const AdminPermisos = React.lazy(() => import('@/presentation/pages/admin/Permisos').then(m => ({ default: m.AdminPermisos })));
+const AdminGestionUsuarios = React.lazy(() => import('@/presentation/pages/admin/GestionUsuarios').then(m => ({ default: m.AdminGestionUsuarios })));
+const AdminSeguridadUsuarios = React.lazy(() => import('@/presentation/pages/admin/SeguridadUsuarios').then(m => ({ default: m.AdminSeguridadUsuarios })));
+const AdminProductosTerminados = React.lazy(() => import('@/presentation/pages/admin/ProductosTerminados').then(m => ({ default: m.AdminProductosTerminados })));
+const AdminInsumos = React.lazy(() => import('@/presentation/pages/admin/Insumos').then(m => ({ default: m.AdminInsumos })));
+const AdminProveedores = React.lazy(() => import('@/presentation/pages/admin/Proveedores').then(m => ({ default: m.AdminProveedores })));
+const AdminGestionAcceso = React.lazy(() => import('@/presentation/pages/admin/GestionAcceso').then(m => ({ default: m.AdminGestionAcceso })));
+const AdminAlertasStock = React.lazy(() => import('@/presentation/pages/admin/AlertasStock').then(m => ({ default: m.AdminAlertasStock })));
+const AdminStockDevuelto = React.lazy(() => import('@/presentation/pages/admin/StockDevuelto').then(m => ({ default: m.AdminStockDevuelto })));
+const AdminRegistroTalleres = React.lazy(() => import('@/presentation/pages/admin/RegistroTalleres').then(m => ({ default: m.AdminRegistroTalleres })));
+const AdminControlPrendas = React.lazy(() => import('@/presentation/pages/admin/ControlPrendas').then(m => ({ default: m.AdminControlPrendas })));
+const AdminAsignacionProduccion = React.lazy(() => import('@/presentation/pages/admin/AsignacionProduccion').then(m => ({ default: m.AdminAsignacionProduccion })));
+const AdminSeguimientoProduccion = React.lazy(() => import('@/presentation/pages/admin/SeguimientoProduccion').then(m => ({ default: m.AdminSeguimientoProduccion })));
+const AdminRecibos = React.lazy(() => import('@/presentation/pages/admin/Recibos').then(m => ({ default: m.AdminRecibos })));
+const AdminPagos = React.lazy(() => import('@/presentation/pages/admin/Pagos').then(m => ({ default: m.AdminPagos })));
+const AdminReportesVentas = React.lazy(() => import('@/presentation/pages/admin/ReportesVentas').then(m => ({ default: m.AdminReportesVentas })));
+const AdminReportesUsuarios = React.lazy(() => import('@/presentation/pages/admin/ReportesUsuarios').then(m => ({ default: m.AdminReportesUsuarios })));
+const AdminReportesProduccion = React.lazy(() => import('@/presentation/pages/admin/ReportesProduccion').then(m => ({ default: m.AdminReportesProduccion })));
+const AdminReportesInventario = React.lazy(() => import('@/presentation/pages/admin/ReportesInventario').then(m => ({ default: m.AdminReportesInventario })));
+const AdminWebhooks = React.lazy(() => import('@/presentation/pages/admin/Webhooks').then(m => ({ default: m.AdminWebhooks })));
+const AsesorLayout = React.lazy(() => import('@/presentation/pages/asesor/AsesorLayout').then(m => ({ default: m.AsesorLayout })));
+const AsesorDashboard = React.lazy(() => import('@/presentation/pages/asesor/Dashboard').then(m => ({ default: m.AsesorDashboard })));
+const AsesorClientes = React.lazy(() => import('@/presentation/pages/asesor/MisClientes').then(m => ({ default: m.AsesorClientes })));
+const AtencionCliente = React.lazy(() => import('@/presentation/pages/asesor/Atencion-cliente').then(m => ({ default: m.AtencionCliente })));
+const AsesorPedidos = React.lazy(() => import('@/presentation/pages/asesor/Pedidos').then(m => ({ default: m.AsesorPedidos })));
+const AsesorCatalogo = React.lazy(() => import('@/presentation/pages/asesor/Catalogo').then(m => ({ default: m.AsesorCatalogo })));
+const AsesorComisiones = React.lazy(() => import('@/presentation/pages/asesor/Comisiones').then(m => ({ default: m.AsesorComisiones })));
+const AsesorPerfil = React.lazy(() => import('@/presentation/pages/asesor/PerfilAsesor').then(m => ({ default: m.AsesorPerfil })));
+const DomiciliarioLayout = React.lazy(() => import('@/presentation/pages/domiciliario/DomiciliarioLayout').then(m => ({ default: m.DomiciliarioLayout })));
+const DomiciliarioDashboard = React.lazy(() => import('@/presentation/pages/domiciliario/Dashboard').then(m => ({ default: m.DomiciliarioDashboard })));
+const DomiciliarioEntregas = React.lazy(() => import('@/presentation/pages/domiciliario/MisEntregas').then(m => ({ default: m.DomiciliarioEntregas })));
+const RutaDelDia = React.lazy(() => import('@/presentation/pages/domiciliario/RutaDelDia').then(m => ({ default: m.RutaDelDia })));
+const DomiciliarioHistorial = React.lazy(() => import('@/presentation/pages/domiciliario/Historial').then(m => ({ default: m.DomiciliarioHistorial })));
+const DomiciliarioPerfil = React.lazy(() => import('@/presentation/pages/domiciliario/PerfilDomiciliario').then(m => ({ default: m.DomiciliarioPerfil })));
+const ClienteLayout = React.lazy(() => import('@/presentation/pages/cliente/ClienteLayout').then(m => ({ default: m.ClienteLayout })));
+const InicioCliente = React.lazy(() => import('@/presentation/pages/cliente/InicioCliente').then(m => ({ default: m.InicioCliente })));
+const CatalogoCliente = React.lazy(() => import('@/presentation/pages/cliente/Catalogo').then(m => ({ default: m.CatalogoCliente })));
+const MisPedidos = React.lazy(() => import('@/presentation/pages/cliente/MisPedidos').then(m => ({ default: m.MisPedidos })));
+const PerfilCliente = React.lazy(() => import('@/presentation/pages/cliente/PerfilCliente').then(m => ({ default: m.PerfilCliente })));
+const OrderTracking = React.lazy(() => import('@/presentation/pages/cliente/OrderTracking').then(m => ({ default: m.OrderTracking })));
+const Recibos = React.lazy(() => import('@/presentation/pages/cliente/Recibos').then(m => ({ default: m.Recibos })));
+const Favoritos = React.lazy(() => import('@/presentation/pages/cliente/Favoritos').then(m => ({ default: m.Favoritos })));
+const HomePage = React.lazy(() => import('@/presentation/pages/public/HomePage'));
+const CatalogPage = React.lazy(() => import('@/presentation/pages/features/CatalogPage'));
+const CartPage = React.lazy(() => import('@/presentation/pages/features/CartPage'));
+const ContactPage = React.lazy(() => import('@/presentation/pages/features/ContactPage').then(m => ({ default: m.SurtitelaLayout })));
+const AboutPage = React.lazy(() => import('@/presentation/pages/public/AboutPage'));
+const TooltipsDemo = React.lazy(() => import('@/presentation/pages/public/TooltipsDemo'));
+const LoginPage = React.lazy(() => import('@/presentation/pages/auth/LoginPage'));
+const RegisterPage = React.lazy(() => import('@/presentation/pages/auth/RegisterPage'));
+const ForgotPasswordPage = React.lazy(() => import('@/presentation/pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = React.lazy(() => import('@/presentation/pages/auth/ResetPasswordPage'));
 
 const App: React.FC = () => (
   <BrowserRouter>
@@ -97,6 +96,7 @@ const App: React.FC = () => (
           <Route path="/login" element={<LoginPage />} />
           <Route path="/registro" element={<RegisterPage />} />
           <Route path="/olvide-contrasena" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* ADMIN - Protected routes for admin role */}
           <Route path="/admin" element={
@@ -136,6 +136,7 @@ const App: React.FC = () => (
             <Route path="reportes-usuarios" element={<AdminReportesUsuarios />} />
             <Route path="reportes-produccion" element={<AdminReportesProduccion />} />
             <Route path="reportes-inventario" element={<AdminReportesInventario />} />
+            <Route path="webhooks" element={<AdminWebhooks />} />
           </Route>
 
           {/* ASESOR - Protected routes for asesor role */}

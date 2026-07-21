@@ -2,9 +2,9 @@
 
 @import "tailwindcss";
 
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
 @import './styles/variables.css';
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* Base Reset */
 *, *::before, *::after { box-sizing: border-box; margin: 0; }

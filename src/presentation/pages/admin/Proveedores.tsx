@@ -1,24 +1,60 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Star, Phone, MapPin, Package } from 'lucide-react';
 import s from './Proveedores.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
-import { useAppStore } from '@/core/stores';
-import { DataTable } from '@/shared/ui/DataTable';
+import { DataTable, DataTableColumn } from '@/shared/ui/DataTable';
 import { Modal } from '@/shared/ui/Modal';
+import { stockApi } from '@/infrastructure/api/stockApi';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
 import type { Proveedor } from '@/core/types';
+import { isValidPhone } from '@/shared/utils/phone';
+import { isValidNit } from '@/shared/utils/document';
+import { useServerPagination } from '@/hooks/useServerPagination';
 
 export const AdminProveedores: React.FC = () => {
-  const [search, setSearch] = useState('');
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [selectedProveedor, setSelectedProveedor] = useState<Proveedor | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [pageData, setPageData] = useState<Proveedor[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<Proveedor | null>(null);
 
-  const proveedores = useAppStore(s => s.proveedores);
-  const createProveedor = useAppStore(s => s.createProveedor);
-  const updateProveedor = useAppStore(s => s.updateProveedor);
-  const deleteProveedor = useAppStore(s => s.deleteProveedor);
+  const pagination = useServerPagination(10);
+
+  const fetchProveedores = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const query: Record<string, string | number | boolean | undefined | null> = {
+        page: pagination.page,
+        limit: pagination.limit,
+        sort: 'nombre',
+        order: 'asc',
+      };
+      if (search.trim()) query.search = search.trim();
+      const result = await stockApi.suppliers.list(query);
+      setPageData(result.data);
+      pagination.setTotalRecords(result.meta.totalRecords);
+    } catch {
+      setError('No se pudieron cargar los proveedores');
+      toast.error('No se pudieron cargar los proveedores');
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, search, pagination.setTotalRecords]);
+
+  useEffect(() => {
+    void fetchProveedores();
+  }, [fetchProveedores]);
+
+  const handlePageChange = useCallback((newPage: number) => {
+    pagination.setPage(newPage);
+  }, [pagination]);
 
   const [formNombre, setFormNombre] = useState('');
   const [formNit, setFormNit] = useState('');
@@ -29,15 +65,6 @@ export const AdminProveedores: React.FC = () => {
   const [formMateriales, setFormMateriales] = useState('');
   const [formCalificacion, setFormCalificacion] = useState(3);
   const [formEstado, setFormEstado] = useState<Proveedor['estado']>('Activo');
-
-  const filtered = useMemo(() => {
-    return proveedores.filter(p =>
-      p.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      p.nit.toLowerCase().includes(search.toLowerCase()) ||
-      p.ciudad.toLowerCase().includes(search.toLowerCase()) ||
-      (p.email && p.email.toLowerCase().includes(search.toLowerCase()))
-    );
-  }, [proveedores, search]);
 
   const resetForm = () => {
     setFormNombre('');
@@ -78,7 +105,7 @@ export const AdminProveedores: React.FC = () => {
     resetForm();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
@@ -94,26 +121,47 @@ export const AdminProveedores: React.FC = () => {
       materiales: materialesArr,
       estado: formEstado,
       calificacion: formCalificacion,
-      pedidosRealizados: selectedProveedor?.pedidosRealizados ?? 0,
+      pedidosRealizados: selectedProveedor?.pedidosRealizados,
       ultimoPedido: selectedProveedor?.ultimoPedido,
     };
 
+    if (formTelefono && !isValidPhone(formTelefono)) {
+      toast.error('Teléfono inválido. Usa formato: 3001234567 o +573001234567');
+      setSaving(false);
+      return;
+    }
+    if (!formNit || !isValidNit(formNit)) {
+      toast.error('NIT inválido. Usa formato: 900123456 o 900123456-7');
+      setSaving(false);
+      return;
+    }
+
     try {
       if (selectedProveedor) {
-        updateProveedor(selectedProveedor.id, data);
+        const actualizado = await stockApi.suppliers.update(selectedProveedor.id, data);
+        setError(null);
+        toast.success('Proveedor actualizado');
+        if (pagination.page === 1) {
+          void fetchProveedores();
+        } else {
+          pagination.setPage(1);
+        }
       } else {
-        createProveedor(data);
+          const nuevo = await stockApi.suppliers.create(data);
+        setError(null);
+        toast.success('Proveedor creado');
+        pagination.setPage(1);
       }
       closeModals();
     } catch {
+      toast.error('No fue posible guardar el proveedor');
+    } finally {
       setSaving(false);
     }
   };
 
-  const handleEliminar = (id: string) => {
-    if (confirm('¿Está seguro de eliminar este proveedor?')) {
-      deleteProveedor(id);
-    }
+  const handleEliminar = async (proveedor: Proveedor) => {
+    setDeleteConfirm(proveedor);
   };
 
   const renderStars = (calificacion: number) => {
@@ -125,6 +173,38 @@ export const AdminProveedores: React.FC = () => {
       />
     ));
   };
+
+  const columns: DataTableColumn<Proveedor>[] = [
+    { key: 'nombre', header: 'Proveedor', sortable: true, filterable: true, render: (p: Proveedor) => (
+      <div className={s.proveedorCell}>
+        <span className={s.proveedorNombre}>{p.nombre}</span>
+      </div>
+    )},
+    { key: 'nit', header: 'NIT', width: '130px', render: (p: Proveedor) => <span className={s.tdMono}>{p.nit}</span> },
+    { key: 'ciudad', header: 'Ciudad', render: (p: Proveedor) => (
+      <div className={s.ubicacionCell}>
+        <MapPin size={12} />
+        <span>{p.ciudad}</span>
+      </div>
+    )},
+    { key: 'telefono', header: 'Teléfono', render: (p: Proveedor) => (
+      <div className={s.contactLine}>
+        <Phone size={12} />
+        <span>{p.telefono}</span>
+      </div>
+    )},
+    { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
+      { value: 'Activo', label: 'Activo' },
+      { value: 'Inactivo', label: 'Inactivo' },
+    ], render: (p: Proveedor) => (
+      <Badge variant={p.estado === 'Activo' ? 'success' : 'default'}>{p.estado}</Badge>
+    )},
+  ];
+
+  const actions = (p: Proveedor) => [
+    { label: 'Editar', icon: <Edit size={14} />, onClick: () => openEditModal(p) },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, onClick: () => handleEliminar(p), danger: true },
+  ];
 
   return (
     <div>
@@ -143,52 +223,29 @@ export const AdminProveedores: React.FC = () => {
           placeholder="Buscar por nombre, NIT, ciudad o email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onSearch={(value) => setSearch(value)}
+          onSearch={(value) => { setSearch(value); pagination.setPage(1); }}
           debounceMs={100}
           minChars={0}
         />
       </div>
 
       <DataTable<Proveedor>
-        data={filtered}
-        pageSize={10}
-        emptyMessage="No se encontraron proveedores"
+        data={pageData}
+        pageSize={pagination.limit}
+        emptyMessage={loading ? 'Cargando proveedores...' : error ? error : 'No se encontraron proveedores'}
         enableSorting
         enableColumnFilters
         enableRowSelection
         enableExport
         exportFileName="proveedores"
         maxVisibleColumns={5}
-        columns={[
-          { key: 'nombre', header: 'Proveedor', sortable: true, filterable: true, render: (p) => (
-            <div className={s.proveedorCell}>
-              <span className={s.proveedorNombre}>{p.nombre}</span>
-            </div>
-          )},
-          { key: 'nit', header: 'NIT', width: '130px', render: (p) => <span className={s.tdMono}>{p.nit}</span> },
-          { key: 'ciudad', header: 'Ciudad', render: (p) => (
-            <div className={s.ubicacionCell}>
-              <MapPin size={12} />
-              <span>{p.ciudad}</span>
-            </div>
-          )},
-          { key: 'telefono', header: 'Teléfono', render: (p) => (
-            <div className={s.contactLine}>
-              <Phone size={12} />
-              <span>{p.telefono}</span>
-            </div>
-          )},
-          { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-            { value: 'Activo', label: 'Activo' },
-            { value: 'Inactivo', label: 'Inactivo' },
-          ], render: (p) => (
-            <Badge variant={p.estado === 'Activo' ? 'success' : 'default'}>{p.estado}</Badge>
-          )},
-        ]}
-        actions={(p) => [
-          { label: 'Editar', icon: <Edit size={14} />, onClick: () => openEditModal(p) },
-          { label: 'Eliminar', icon: <Trash2 size={14} />, onClick: () => handleEliminar(p.id), danger: true },
-        ]}
+        serverMode
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.totalRecords}
+        onPageChange={handlePageChange}
+        columns={columns}
+        actions={actions}
         detailPanel={{
           title: (p) => `Proveedor: ${p.nombre}`,
           render: (p, onClose) => (
@@ -353,7 +410,27 @@ export const AdminProveedores: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            await stockApi.suppliers.remove(deleteConfirm.id);
+            toast.success('Proveedor eliminado');
+            void fetchProveedores();
+          } catch {
+            toast.error('No fue posible eliminar el proveedor');
+          } finally {
+            setDeleteConfirm(null);
+          }
+        }}
+        title="Eliminar proveedor"
+        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };
-

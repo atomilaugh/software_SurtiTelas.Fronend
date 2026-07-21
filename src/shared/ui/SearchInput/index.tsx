@@ -58,7 +58,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           className
         )}
       >
-        <Search size={15} className={s.icon} />
+        <Search size={15} className={s.icon} aria-hidden="true" focusable="false" />
         <input
           ref={ref}
           type="text"

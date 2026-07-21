@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import { Search, Download, Users, UserPlus, Activity, Mail, ShoppingBag, TrendingUp, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Download, Users, UserPlus, Activity, Mail, ShoppingBag, TrendingUp, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import s from './ReportesUsuarios.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { usersApi, type Usuario as User } from '@/infrastructure/api/usersApi';
+import { reportsApi } from '@/infrastructure/api/reportsApi';
+import { ROL_LABELS, ROL_COLORS, ROLES_SISTEMA } from '@/shared/constants/options';
 
 interface UsuarioData {
   mes: string;
   nuevos: number;
-  activos: number;
 }
 
 interface UsuarioRep {
@@ -21,38 +23,40 @@ interface UsuarioRep {
   pedidosRealizados: number;
 }
 
-const usuariosMensuales: UsuarioData[] = [
-  { mes: 'Ene', nuevos: 12, activos: 85 },
-  { mes: 'Feb', nuevos: 15, activos: 92 },
-  { mes: 'Mar', nuevos: 10, activos: 98 },
-  { mes: 'Abr', nuevos: 18, activos: 105 },
-  { mes: 'May', nuevos: 22, activos: 118 },
-  { mes: 'Jun', nuevos: 20, activos: 125 },
-];
+const mapRol = (rol: string): UsuarioRep['rol'] => {
+  if (rol === 'admin' || rol === 'asesor' || rol === 'domiciliario' || rol === 'cliente') return rol;
+  return 'cliente';
+};
 
-const mockUsuarios: UsuarioRep[] = [
-  { id: 'U-001', nombre: 'Admin User', email: 'admin@surtitelas.com', rol: 'admin', estado: 'Activo', fechaRegistro: '2023-01-15', pedidosRealizados: 0 },
-  { id: 'U-002', nombre: 'Juan Pérez', email: 'juan@asesor.com', rol: 'asesor', estado: 'Activo', fechaRegistro: '2023-06-20', pedidosRealizados: 145 },
-  { id: 'U-003', nombre: 'María Gómez', email: 'maria@asesor.com', rol: 'asesor', estado: 'Activo', fechaRegistro: '2023-08-10', pedidosRealizados: 132 },
-  { id: 'U-004', nombre: 'Carlos Ruiz', email: 'carlos@domiciliario.com', rol: 'domiciliario', estado: 'Activo', fechaRegistro: '2024-01-05', pedidosRealizados: 0 },
-  { id: 'U-005', nombre: 'Tienda La Esquina', email: 'contacto@laesquina.com', rol: 'cliente', estado: 'Activo', fechaRegistro: '2023-03-12', pedidosRealizados: 45 },
-  { id: 'U-006', nombre: 'Distribuidora Norte', email: 'pedidos@delnorte.com', rol: 'cliente', estado: 'Activo', fechaRegistro: '2023-05-18', pedidosRealizados: 38 },
-  { id: 'U-007', nombre: 'Ana López', email: 'ana@asesor.com', rol: 'asesor', estado: 'Inactivo', fechaRegistro: '2023-09-22', pedidosRealizados: 89 },
-  { id: 'U-008', nombre: 'Pedro Díaz', email: 'pedro@asesor.com', rol: 'asesor', estado: 'Pendiente', fechaRegistro: '2024-05-01', pedidosRealizados: 12 },
-];
+const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-const rolData = [
-  { rol: 'Administradores', cantidad: mockUsuarios.filter(u => u.rol === 'admin').length, color: '#f59e0b' },
-  { rol: 'Asesores', cantidad: mockUsuarios.filter(u => u.rol === 'asesor').length, color: '#3b82f6' },
-  { rol: 'Domiciliarios', cantidad: mockUsuarios.filter(u => u.rol === 'domiciliario').length, color: '#8b5cf6' },
-  { rol: 'Clientes', cantidad: mockUsuarios.filter(u => u.rol === 'cliente').length, color: '#10b981' },
-];
+/**
+ * Construye la serie de "usuarios nuevos por mes" a partir de las fechas de
+ * registro reales. Devuelve los últimos `months` meses hasta el mes actual.
+ */
+const buildUsuariosMensuales = (fechasRegistro: string[], months = 6): UsuarioData[] => {
+  const now = new Date();
+  const buckets: UsuarioData[] = [];
+  const index = new Map<string, number>();
 
-const estadoData = [
-  { estado: 'Activos', cantidad: mockUsuarios.filter(u => u.estado === 'Activo').length, color: '#10b981' },
-  { estado: 'Inactivos', cantidad: mockUsuarios.filter(u => u.estado === 'Inactivo').length, color: '#ef4444' },
-  { estado: 'Pendientes', cantidad: mockUsuarios.filter(u => u.estado === 'Pendiente').length, color: '#f59e0b' },
-];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    index.set(key, buckets.length);
+    buckets.push({ mes: MESES_CORTOS[d.getMonth()], nuevos: 0 });
+  }
+
+  for (const fecha of fechasRegistro) {
+    if (!fecha) continue;
+    const d = new Date(fecha);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const pos = index.get(key);
+    if (pos !== undefined) buckets[pos].nuevos += 1;
+  }
+
+  return buckets;
+};
 
 const DONUT_CX = 90;
 const DONUT_CY = 90;
@@ -143,18 +147,88 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, centerValue, centerLabel 
 export const AdminReportesUsuarios: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroRol, setFiltroRol] = useState<string>('Todos');
+  const [usuarios, setUsuarios] = useState<UsuarioRep[]>([]);
+  const [usuariosMensuales, setUsuariosMensuales] = useState<UsuarioData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const total = mockUsuarios.length;
-  const activos = mockUsuarios.filter(u => u.estado === 'Activo').length;
-  const nuevosMes = usuariosMensuales[usuariosMensuales.length - 1].nuevos;
-  const crecimiento = ((usuariosMensuales[usuariosMensuales.length - 1].activos - usuariosMensuales[usuariosMensuales.length - 2].activos) / usuariosMensuales[usuariosMensuales.length - 2].activos * 100).toFixed(1);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [users, usersReport] = await Promise.all([
+          usersApi.list(),
+          reportsApi.getUsersReport().catch(() => null),
+        ]);
+        if (!active) return;
+        const mapped: UsuarioRep[] = users.map((u: User) => ({
+          id: u.id,
+          nombre: u.nombre,
+          email: u.email,
+          rol: mapRol(u.rol),
+          estado: u.estado,
+          fechaRegistro: u.fechaRegistro,
+          pedidosRealizados: u.pedidosRealizados,
+        }));
+        setUsuarios(mapped.length > 0 ? mapped : (usersReport?.recentUsers ?? []).map(u => ({
+          id: u.id,
+          nombre: u.nombre,
+          email: u.email,
+          rol: mapRol(u.role),
+          estado: 'Activo',
+          fechaRegistro: u.fechaRegistro,
+          pedidosRealizados: 0,
+        })));
 
-  const filtrados = mockUsuarios.filter(u =>
+        const fechasRegistro = (mapped.length > 0
+          ? mapped.map(u => u.fechaRegistro)
+          : (usersReport?.recentUsers ?? []).map(u => u.fechaRegistro)
+        ).filter((f): f is string => Boolean(f));
+        setUsuariosMensuales(buildUsuariosMensuales(fechasRegistro));
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los reportes de usuarios');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
+  const total = usuarios.length;
+  const activos = usuarios.filter(u => u.estado === 'Activo').length;
+  const nuevosMes = usuariosMensuales.length > 0 ? usuariosMensuales[usuariosMensuales.length - 1].nuevos : 0;
+  const nuevosMesAnterior = usuariosMensuales.length > 1 ? usuariosMensuales[usuariosMensuales.length - 2].nuevos : 0;
+  const crecimiento = nuevosMesAnterior > 0
+    ? (((nuevosMes - nuevosMesAnterior) / nuevosMesAnterior) * 100).toFixed(1)
+    : '0.0';
+
+  const rolData = Object.entries(
+    usuarios.reduce<Record<string, number>>((acc, u) => {
+      acc[u.rol] = (acc[u.rol] ?? 0) + 1;
+      return acc;
+    }, {}),
+  ).map(([rol, cantidad]) => ({
+    rol: ROL_LABELS[rol] ?? rol,
+    cantidad,
+    color: ROL_COLORS[rol] ?? '#64748b',
+  }));
+
+  const estadoData = [
+    { estado: 'Activos', cantidad: usuarios.filter(u => u.estado === 'Activo').length, color: '#10b981' },
+    { estado: 'Inactivos', cantidad: usuarios.filter(u => u.estado === 'Inactivo').length, color: '#ef4444' },
+    { estado: 'Pendientes', cantidad: usuarios.filter(u => u.estado === 'Pendiente').length, color: '#f59e0b' },
+  ];
+
+  const filtrados = usuarios.filter(u =>
     (filtroRol === 'Todos' || u.rol === filtroRol) &&
     (u.nombre.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const maxNuevos = Math.max(...usuariosMensuales.map(d => d.nuevos));
+  const maxNuevos = usuariosMensuales.length > 0 ? Math.max(...usuariosMensuales.map(d => d.nuevos)) : 0;
 
   return (
     <div>
@@ -168,6 +242,20 @@ export const AdminReportesUsuarios: React.FC = () => {
         </div>
       </div>
 
+      {loading && (
+        <div className={s.stateBox}>
+          <Loader2 size={28} className={s.spin} />
+          <p>Cargando reportes de usuarios...</p>
+        </div>
+      )}
+      {error && (
+        <div className={s.errorBox}>
+          <AlertCircle size={28} />
+          <p>{error}</p>
+        </div>
+      )}
+      {!loading && !error && (
+      <div>
       <div className={s.statsRow}>
         <div className={s.statCard}>
           <Users size={20} className={s.statIcon} />
@@ -232,19 +320,19 @@ export const AdminReportesUsuarios: React.FC = () => {
           <h3 className={s.chartTitle}>Resumen</h3>
           <div className={s.summaryGrid}>
             <div className={s.summaryItem}>
-              <div className={s.summaryVal}>{mockUsuarios.filter(u => u.rol === 'asesor').length}</div>
+              <div className={s.summaryVal}>{usuarios.filter(u => u.rol === 'asesor').length}</div>
               <div className={s.summaryLbl}>Asesores</div>
             </div>
             <div className={s.summaryItem}>
-              <div className={s.summaryVal}>{mockUsuarios.filter(u => u.rol === 'cliente').length}</div>
+              <div className={s.summaryVal}>{usuarios.filter(u => u.rol === 'cliente').length}</div>
               <div className={s.summaryLbl}>Clientes</div>
             </div>
             <div className={s.summaryItem}>
-              <div className={s.summaryVal}>{mockUsuarios.filter(u => u.estado === 'Inactivo').length}</div>
+              <div className={s.summaryVal}>{usuarios.filter(u => u.estado === 'Inactivo').length}</div>
               <div className={s.summaryLbl}>Inactivos</div>
             </div>
             <div className={s.summaryItem}>
-              <div className={s.summaryVal}>{mockUsuarios.filter(u => u.rol === 'domiciliario').length}</div>
+              <div className={s.summaryVal}>{usuarios.filter(u => u.rol === 'domiciliario').length}</div>
               <div className={s.summaryLbl}>Domiciliarios</div>
             </div>
           </div>
@@ -256,9 +344,9 @@ export const AdminReportesUsuarios: React.FC = () => {
           <h3 className={s.tableTitle}>Usuarios Registrados</h3>
           <div className={s.tableFilters}>
             <div className={s.filterGroup}>
-              {['Todos', 'admin', 'asesor', 'domiciliario', 'cliente'].map(rol => (
+              {ROLES_SISTEMA.map(rol => (
                 <button key={rol} className={`${s.filterBtn} ${filtroRol === rol ? s.filterBtnActive : ''}`} onClick={() => setFiltroRol(rol)}>
-                  {rol === 'Todos' ? 'Todos' : rol.charAt(0).toUpperCase() + rol.slice(1)}
+                  {ROL_LABELS[rol] ?? rol}
                 </button>
               ))}
             </div>
@@ -271,7 +359,7 @@ export const AdminReportesUsuarios: React.FC = () => {
         <DataTable<UsuarioRep>
           data={filtrados}
           pageSize={10}
-          emptyMessage="No se encontraron usuarios"
+          emptyMessage="Sin resultados"
           enableSorting
           enableColumnFilters
           enableRowSelection
@@ -305,7 +393,7 @@ export const AdminReportesUsuarios: React.FC = () => {
                     <Calendar size={16} className="text-[var(--color-text-muted)]" />
                     <div className="flex-1">
                       <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Fecha Registro</p>
-                      <p className="text-sm font-medium text-[var(--color-text-primary)]">{new Date(item.fechaRegistro).toLocaleDateString('es-CO')}</p>
+                      <p className="text-sm font-medium text-[var(--color-text-primary)]">{item.fechaRegistro ? new Date(item.fechaRegistro).toLocaleDateString('es-CO') : '—'}</p>
                     </div>
                   </div>
 
@@ -372,6 +460,8 @@ export const AdminReportesUsuarios: React.FC = () => {
           ]}
         />
       </div>
+      </div>
+      )}
     </div>
   );
 };

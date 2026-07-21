@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, Package, Calendar, Factory, Hash, AlertTriangle, Truck, CheckCircle2, ClipboardCheck, User, Phone, MessageSquare, ShieldCheck } from 'lucide-react';
@@ -6,7 +6,8 @@ import s from './OrderTracking.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
-import { useAppStore, usePedidos, useProduccion } from '@/core/stores';
+import { ordersApi } from '@/infrastructure/api/ordersApi';
+import { productionApi, type ProductionOrder } from '@/infrastructure/api/productionApi';
 import type { Pedido } from '@/core/types';
 
 type TrackingStatus = 'Recibido / Pendiente' | 'En Taller' | 'En Camino (Despachado)' | 'Entregado' | 'Con Novedad';
@@ -25,12 +26,6 @@ const trackingSteps: TrackingStep[] = [
   { key: 'Con Novedad', label: 'Con Novedad', icon: <AlertTriangle size={18} /> },
 ];
 
-const domiciliarioAsignado = {
-  nombre: 'Juan Pérez',
-  telefono: '310 234 5678',
-  iniciales: 'JP',
-};
-
 const getTrackingState = (pedido: Pedido) => {
   const hasNovedad = /novedad|problema|reclamo|fall|daño|ausente|pendiente de revisión/i.test(pedido.observaciones || '');
   if (hasNovedad) return { status: 'Con Novedad' as TrackingStatus, hasNovedad: true };
@@ -45,55 +40,109 @@ export const OrderTracking: React.FC = () => {
   const navigate = useNavigate();
   const { orderId } = useParams();
   const [searchParams] = useSearchParams();
-  const { pedidos, updatePedido } = usePedidos();
-  const { ordenes } = useProduccion();
-  const addNotificacion = useAppStore(state => state.addNotificacion);
+  const [pedido, setPedido] = useState<Pedido | null>(null);
+  const [productionOrder, setProductionOrder] = useState<ProductionOrder | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [shipmentOpen, setShipmentOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [reportedNovedad, setReportedNovedad] = useState(false);
   const [supportForm, setSupportForm] = useState({ tipo: 'Entrega', detalle: '', contacto: '' });
 
-  const selectedOrderId = orderId ? decodeURIComponent(orderId) : searchParams.get('order');
-  const pedido = pedidos.find(item => item.id === selectedOrderId) || pedidos[0] || null;
-  const ordenProduccion = pedido ? ordenes.find(orden => orden.pedido === pedido.id) : null;
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const selectedOrderId = orderId ? decodeURIComponent(orderId) : searchParams.get('order');
+        if (selectedOrderId) {
+          const found = await ordersApi.getById(selectedOrderId);
+          setPedido(found);
+        } else {
+          const result = await ordersApi.list();
+          setPedido(result.pedidos[0] || null);
+        }
+      } catch {
+        setError('No se pudo cargar el pedido');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [orderId, searchParams]);
+
+  useEffect(() => {
+    let active = true;
+    const loadProduction = async () => {
+      if (!pedido?.id) return;
+      try {
+        const result = await productionApi.list();
+        if (!active) return;
+        const po = result.find((p) => p.pedidoNumero === pedido.id || p.pedidoId === pedido.id);
+        setProductionOrder(po ?? null);
+      } catch {
+        setProductionOrder(null);
+      }
+    };
+    void loadProduction();
+    return () => { active = false; };
+  }, [pedido?.id]);
+
   const trackingState = pedido ? getTrackingState(pedido) : { status: 'Recibido / Pendiente' as TrackingStatus, hasNovedad: false };
-  const currentStepIndex = trackingSteps.findIndex(step => step.key === trackingState.status);
+  const currentStepIndex = trackingSteps.findIndex((step) => step.key === trackingState.status);
   const hasNovedad = trackingState.hasNovedad || reportedNovedad;
   const totalPrendas = pedido?.itemsList?.reduce((sum, item) => sum + item.cantidad, 0) || pedido?.items || 0;
 
-  const submitSupport = () => {
+  const submitSupport = async () => {
     if (!pedido) return;
     if (!supportForm.detalle.trim()) {
       toast.error('Describe la novedad o problema del pedido.');
       return;
     }
     const observaciones = `${pedido.observaciones || ''}\nNovedad reportada el ${new Date().toLocaleDateString('es-CO')}: ${supportForm.detalle}`.trim();
-    updatePedido(pedido.id, { observaciones });
-    addNotificacion({
-      tipo: 'warning',
-      titulo: 'Novedad reportada',
-      mensaje: `El cliente reportó una novedad en ${pedido.id}`,
-    });
+    await ordersApi.updateStatus(pedido.id, pedido.estado);
+    setPedido((prev) => prev ? { ...prev, observaciones } : null);
     toast.success('Novedad reportada correctamente. El equipo de soporte revisará tu caso.');
     setReportedNovedad(true);
     setSupportOpen(false);
     setSupportForm({ tipo: 'Entrega', detalle: '', contacto: '' });
   };
 
+  const tallerNombre = productionOrder?.taller?.nombre || 'Pendiente de asignación';
+  const operarioNombre = productionOrder?.operario?.nombre;
+
+  const domiciliarioAsignado = {
+    nombre: operarioNombre || 'Sin asignar',
+    telefono: operarioNombre ? '' : 'Sin asignar',
+    iniciales: operarioNombre ? operarioNombre.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : '—',
+  };
+
   const resumenCards = useMemo(() => pedido ? [
     { label: 'Número de orden', value: pedido.id, icon: <Hash size={18} /> },
     { label: 'Fecha de compra', value: pedido.fecha, icon: <Calendar size={18} /> },
-    { label: 'Taller asignado', value: ordenProduccion?.operario || 'Pendiente de asignación', icon: <Factory size={18} /> },
+    { label: 'Taller asignado', value: tallerNombre, icon: <Factory size={18} /> },
     { label: 'Total prendas/unidades', value: String(totalPrendas), icon: <Package size={18} /> },
-  ] : [], [pedido, ordenProduccion, totalPrendas]);
+  ] : [], [pedido, totalPrendas, tallerNombre]);
 
-  if (!pedido) {
+  if (loading) {
     return (
       <div className={s.trackingPage}>
         <div className={s.emptyState}>
           <Package size={44} className={s.emptyIcon} />
           <h1 className={s.pageTitle}>Seguimiento de Pedido</h1>
-          <p className={s.pageSubtitle}>No encontramos un pedido para mostrar.</p>
+          <p className={s.pageSubtitle}>Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !pedido) {
+    return (
+      <div className={s.trackingPage}>
+        <div className={s.emptyState}>
+          <Package size={44} className={s.emptyIcon} />
+          <h1 className={s.pageTitle}>Seguimiento de Pedido</h1>
+          <p className={s.pageSubtitle}>{error || 'No encontramos un pedido para mostrar.'}</p>
           <Button onClick={() => navigate('/cliente/pedidos')}>
             <ArrowLeft size={16} />
             Volver a Mis Pedidos
@@ -128,7 +177,7 @@ export const OrderTracking: React.FC = () => {
       )}
 
       <div className={s.summaryGrid}>
-        {resumenCards.map(card => (
+        {resumenCards.map((card) => (
           <div key={card.label} className={s.summaryCard}>
             <div className={s.summaryIcon}>{card.icon}</div>
             <div>
@@ -233,7 +282,7 @@ export const OrderTracking: React.FC = () => {
             <ShieldCheck size={18} />
             <div>
               <h3>Soporte asignado</h3>
-              <p>Camila Torres te acompaña en el seguimiento comercial de esta orden.</p>
+              <p>{pedido?.asesor && pedido.asesor !== 'Sin asignar' ? `${pedido.asesor} te acompaña en el seguimiento comercial de esta orden.` : 'Tu asesor te acompaña en el seguimiento comercial de esta orden.'}</p>
             </div>
           </div>
         </aside>
@@ -246,15 +295,15 @@ export const OrderTracking: React.FC = () => {
             <div>
               <h3>Domiciliario asignado</h3>
               <p>{domiciliarioAsignado.nombre}</p>
-              <div className={s.infoRow}><Phone size={14} /> {domiciliarioAsignado.telefono}</div>
+              {domiciliarioAsignado.telefono && <div className={s.infoRow}><Phone size={14} /> {domiciliarioAsignado.telefono}</div>}
             </div>
           </div>
           <div className={s.infoBlock}>
             <Factory size={24} className={s.blockIcon} />
             <div>
               <h3>Taller asignado</h3>
-              <p>{ordenProduccion?.operario || 'Pendiente de asignación'}</p>
-              <div className={s.infoRow}><Package size={14} /> Estado: {ordenProduccion?.estado || 'Sin producción asignada'}</div>
+              <p>{tallerNombre}</p>
+              <div className={s.infoRow}><Package size={14} /> Estado: {productionOrder?.estado || 'Sin producción asignada'}</div>
             </div>
           </div>
           <div className={s.infoBlock}>
@@ -275,7 +324,7 @@ export const OrderTracking: React.FC = () => {
         <div className={s.supportForm}>
           <label className={s.field}>
             <span>Tipo de novedad</span>
-            <select value={supportForm.tipo} onChange={e => setSupportForm({ ...supportForm, tipo: e.target.value })}>
+            <select value={supportForm.tipo} onChange={(e) => setSupportForm({ ...supportForm, tipo: e.target.value })}>
               <option value="Entrega">Entrega</option>
               <option value="Producto">Producto / Prendas</option>
               <option value="Facturación">Facturación</option>
@@ -288,7 +337,7 @@ export const OrderTracking: React.FC = () => {
               className={s.textarea}
               placeholder="Ej: El pedido llegó con una referencia diferente..."
               value={supportForm.detalle}
-              onChange={e => setSupportForm({ ...supportForm, detalle: e.target.value })}
+              onChange={(e) => setSupportForm({ ...supportForm, detalle: e.target.value })}
             />
           </label>
           <label className={s.field}>
@@ -297,7 +346,7 @@ export const OrderTracking: React.FC = () => {
               className={s.input}
               placeholder="310 234 5678"
               value={supportForm.contacto}
-              onChange={e => setSupportForm({ ...supportForm, contacto: e.target.value })}
+              onChange={(e) => setSupportForm({ ...supportForm, contacto: e.target.value })}
             />
           </label>
         </div>

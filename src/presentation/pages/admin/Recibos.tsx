@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Download, FileText, Printer, Clock, CheckCircle, AlertTriangle, Plus, Edit, Send, DollarSign, ChevronDown, Calendar, Save, Trash2 } from 'lucide-react';
+import { Download, FileText, Printer, Clock, CheckCircle, AlertTriangle, Plus, Edit, Send, DollarSign, ChevronDown, Calendar, Save, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Recibos.module.css';
 import f from '@/styles/Form.module.css';
@@ -8,6 +8,7 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
 import { Modal } from '@/shared/ui/Modal';
+import { receiptsApi, type Receipt } from '@/infrastructure/api/receiptsApi';
 
 interface Recibo {
   id: string;
@@ -33,112 +34,6 @@ interface ItemRecibo {
   total: number;
 }
 
-const recibosIniciales: Recibo[] = [
-  {
-    id: 'REC-001',
-    numeroRecibo: 'R001-2024',
-    cliente: 'Tienda La Esquina',
-    nitCliente: '900123456-1',
-    fechaEmision: '2024-06-01',
-    fechaVencimiento: '2024-06-15',
-    subtotal: 4500000,
-    iva: 855000,
-    total: 5355000,
-    estado: 'Pagado',
-    metodoPago: 'Transferencia',
-    vendedor: 'Juan Pérez',
-    items: [
-      { id: 'I1', descripcion: 'Camisa manga larga x100', cantidad: 100, precioUnitario: 25000, total: 2500000 },
-      { id: 'I2', descripcion: 'Pantalón jean x80', cantidad: 80, precioUnitario: 25000, total: 2000000 },
-    ],
-  },
-  {
-    id: 'REC-002',
-    numeroRecibo: 'R002-2024',
-    cliente: 'Distribuidora del Norte',
-    nitCliente: '800234567-2',
-    fechaEmision: '2024-06-05',
-    fechaVencimiento: '2024-06-20',
-    subtotal: 6200000,
-    iva: 1178000,
-    total: 7378000,
-    estado: 'Enviado',
-    metodoPago: 'Credito',
-    vendedor: 'María Gómez',
-    items: [
-      { id: 'I1', descripcion: 'Blusa estampada x200', cantidad: 200, precioUnitario: 18000, total: 3600000 },
-      { id: 'I2', descripcion: 'Vestido casual x130', cantidad: 130, precioUnitario: 20000, total: 2600000 },
-    ],
-  },
-  {
-    id: 'REC-003',
-    numeroRecibo: 'R003-2024',
-    cliente: 'Almacén Central',
-    nitCliente: '701345678-3',
-    fechaEmision: '2024-05-20',
-    fechaVencimiento: '2024-06-05',
-    subtotal: 1800000,
-    iva: 342000,
-    total: 2142000,
-    estado: 'Vencido',
-    vendedor: 'Carlos Ruiz',
-    items: [
-      { id: 'I1', descripcion: 'Camiseta básica x360', cantidad: 360, precioUnitario: 5000, total: 1800000 },
-    ],
-  },
-  {
-    id: 'REC-004',
-    numeroRecibo: 'R004-2024',
-    cliente: 'Moda Express',
-    nitCliente: '902456789-4',
-    fechaEmision: '2024-06-08',
-    fechaVencimiento: '2024-06-22',
-    subtotal: 8900000,
-    iva: 1691000,
-    total: 10591000,
-    estado: 'Enviado',
-    metodoPago: 'Credito',
-    vendedor: 'Ana López',
-    items: [
-      { id: 'I1', descripcion: 'Conjunto deportivo x300', cantidad: 300, precioUnitario: 22000, total: 6600000 },
-      { id: 'I2', descripcion: 'Short deportivo x230', cantidad: 230, precioUnitario: 10000, total: 2300000 },
-    ],
-  },
-  {
-    id: 'REC-005',
-    numeroRecibo: 'R005-2024',
-    cliente: 'Boutique Elegante',
-    nitCliente: '803567890-5',
-    fechaEmision: '2024-06-10',
-    fechaVencimiento: '2024-06-25',
-    subtotal: 3200000,
-    iva: 608000,
-    total: 3808000,
-    estado: 'Borrador',
-    vendedor: 'Juan Pérez',
-    items: [
-      { id: 'I1', descripcion: 'Vestido gala x50', cantidad: 50, precioUnitario: 64000, total: 3200000 },
-    ],
-  },
-  {
-    id: 'REC-006',
-    numeroRecibo: 'R006-2024',
-    cliente: 'Ropa Deportiva Pro',
-    nitCliente: '904678901-6',
-    fechaEmision: '2024-05-28',
-    fechaVencimiento: '2024-06-10',
-    subtotal: 5500000,
-    iva: 1045000,
-    total: 6545000,
-    estado: 'Cancelado',
-    metodoPago: 'Efectivo',
-    vendedor: 'María Gómez',
-    items: [
-      { id: 'I1', descripcion: 'Chaqueta impermeable x110', cantidad: 110, precioUnitario: 50000, total: 5500000 },
-    ],
-  },
-];
-
 interface ItemForm {
   id: string;
   descripcion: string;
@@ -146,16 +41,58 @@ interface ItemForm {
   precioUnitario: string;
 }
 
+function toRecibo(dto: Receipt): Recibo {
+  const total = Number(dto.total) || 0;
+  return {
+    id: dto.id,
+    numeroRecibo: dto.numero,
+    cliente: 'Cliente',
+    nitCliente: dto.customerId,
+    fechaEmision: (dto.createdAt ?? new Date().toISOString()).slice(0, 10),
+    fechaVencimiento: (dto.createdAt ?? new Date().toISOString()).slice(0, 10),
+    subtotal: total,
+    iva: Math.round(total * 0.19),
+    total,
+    estado: 'Borrador',
+    vendedor: 'Sin asignar',
+    items: dto.pagos && dto.pagos.length > 0
+      ? dto.pagos.map((p, i) => ({ id: p.id ?? `I${i + 1}`, descripcion: p.method, cantidad: 1, precioUnitario: Number(p.amount) || 0, total: Number(p.amount) || 0 }))
+      : [{ id: 'I1', descripcion: 'Recibo', cantidad: 1, precioUnitario: total, total }],
+  };
+}
+
 const metodosPago: NonNullable<Recibo['metodoPago']>[] = ['Efectivo', 'Transferencia', 'Tarjeta', 'Credito'];
 
 export const AdminRecibos: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Borrador' | 'Enviado' | 'Pagado' | 'Vencido' | 'Cancelado'>('Todos');
-  const [recibos, setRecibos] = useState<Recibo[]>(recibosIniciales);
+  const [recibos, setRecibos] = useState<Recibo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await receiptsApi.list();
+        if (!active) return;
+        setRecibos(data.map(toRecibo));
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los recibos');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
 
   const [cliente, setCliente] = useState('');
   const [nitCliente, setNitCliente] = useState('');
@@ -401,6 +338,20 @@ export const AdminRecibos: React.FC = () => {
         </div>
       )}
 
+      <div className={s.tableWrapper}>
+        {loading && (
+          <div className={s.stateBox}>
+            <Loader2 size={28} className={s.spin} />
+            <p>Cargando recibos...</p>
+          </div>
+        )}
+        {error && (
+          <div className={s.errorBox}>
+            <AlertCircle size={28} />
+            <p>{error}</p>
+          </div>
+        )}
+        {!loading && !error && (
         <DataTable<Recibo>
           data={filteredRecibos}
           pageSize={10}
@@ -473,6 +424,8 @@ export const AdminRecibos: React.FC = () => {
             ),
           }}
         />
+        )}
+      </div>
 
       <Modal
         open={modalOpen}

@@ -411,3 +411,34 @@
     width: 100%;
   }
 }
+
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 16px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.errorBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 16px;
+  color: #ef4444;
+  text-align: center;
+}
+
+.spin {
+  animation: ruSpin 1s linear infinite;
+}
+
+@keyframes ruSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

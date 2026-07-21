@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Clock, Factory, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import s from './SeguimientoProduccion.module.css';
@@ -6,6 +6,8 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
 import { Modal } from '@/shared/ui/Modal';
+import { productionApi } from '@/infrastructure/api/productionApi';
+import { ESTADOS_PRODUCCION, PRIORIDADES } from '@/shared/constants/options';
 
 const getAvanceColor = (producido: number, total: number): string => {
   const pct = (producido / total) * 100;
@@ -17,8 +19,8 @@ const getAvanceColor = (producido: number, total: number): string => {
 
 const _getEstadoBadge = (estado: string): 'default' | 'primary' | 'warning' | 'success' | 'danger' => {
   if (estado === 'Pendiente') return 'default';
-  if (estado === 'Asignada') return 'warning';
-  if (estado === 'En produccion') return 'primary';
+  if (estado === 'Asignada') return 'primary';
+  if (estado === 'En produccion') return 'warning';
   if (estado === 'Completada') return 'success';
   return 'default';
 };
@@ -47,25 +49,50 @@ interface OrdenProduccion {
   avance: number;
 }
 
-const ordenesIniciales: OrdenProduccion[] = [
-  { id: 'OP-001', numeroOrden: 'ORD-2024-001', prenda: 'Camisa manga larga', referencia: 'REF-1001', cantidad: 200, cantidadProducida: 180, fechaInicio: '2024-06-01', fechaPrometida: '2024-06-15', estado: 'En produccion', tallerAsignado: 'Taller Textil El Progreso', prioridad: 'Alta', cliente: 'Cliente A', observaciones: 'Avance normal', avance: 90 },
-  { id: 'OP-002', numeroOrden: 'ORD-2024-002', prenda: 'Pantalón jean', referencia: 'REF-1002', cantidad: 150, cantidadProducida: 150, fechaInicio: '2024-05-28', fechaPrometida: '2024-06-18', estado: 'Completada', tallerAsignado: 'Confección Martínez', prioridad: 'Media', cliente: 'Cliente B', observaciones: 'Entregado completo', avance: 100 },
-  { id: 'OP-003', numeroOrden: 'ORD-2024-003', prenda: 'Blusa estampada', referencia: 'REF-1003', cantidad: 300, cantidadProducida: 75, fechaInicio: '2024-06-05', fechaPrometida: '2024-06-14', estado: 'En produccion', tallerAsignado: 'Taller Textil El Progreso', prioridad: 'Alta', cliente: 'Cliente C', observaciones: '25% completado', avance: 25 },
-  { id: 'OP-004', numeroOrden: 'ORD-2024-004', prenda: 'Vestido casual', referencia: 'REF-1004', cantidad: 100, cantidadProducida: 0, fechaInicio: '2024-06-08', fechaPrometida: '2024-06-20', estado: 'Asignada', tallerAsignado: 'Confección Martínez', prioridad: 'Media', cliente: 'Cliente D', observaciones: 'Esperando inicio', avance: 0 },
-  { id: 'OP-005', numeroOrden: 'ORD-2024-005', prenda: 'Short deportivo', referencia: 'REF-1005', cantidad: 250, cantidadProducida: 0, fechaInicio: '-', fechaPrometida: '2024-06-12', estado: 'Pendiente', prioridad: 'Alta', cliente: 'Cliente E', observaciones: 'Sin asignar', avance: 0 },
-  { id: 'OP-006', numeroOrden: 'ORD-2024-006', prenda: 'Camiseta básica', referencia: 'REF-1006', cantidad: 500, cantidadProducida: 500, fechaInicio: '2024-05-20', fechaPrometida: '2024-06-22', estado: 'Completada', tallerAsignado: 'Taller San José', prioridad: 'Baja', cliente: 'Cliente F', observaciones: 'Entregado a tiempo', avance: 100 },
-  { id: 'OP-007', numeroOrden: 'ORD-2024-007', prenda: 'Uniforme empresarial', referencia: 'REF-1007', cantidad: 120, cantidadProducida: 35, fechaInicio: '2024-06-03', fechaPrometida: '2024-06-13', estado: 'En produccion', tallerAsignado: 'Artesanías del Valle', prioridad: 'Alta', cliente: 'Cliente G', observaciones: 'Retraso por insumos', avance: 29 },
-  { id: 'OP-008', numeroOrden: 'ORD-2024-008', prenda: 'Chaqueta impermeable', referencia: 'REF-1008', cantidad: 80, cantidadProducida: 0, fechaInicio: '-', fechaPrometida: '2024-06-25', estado: 'Pendiente', prioridad: 'Media', cliente: 'Cliente H', observaciones: 'Por asignar', avance: 0 },
-];
-
 export const AdminSeguimientoProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Pendiente' | 'Asignada' | 'En produccion' | 'Completada'>('Todos');
-  const [filtroPrioridad, setFiltroPrioridad] = useState<'Todos' | 'Alta' | 'Media' | 'Baja'>('Todos');
-  const [ordenes, setOrdenes] = useState<OrdenProduccion[]>(ordenesIniciales);
+  const [filtroEstado, setFiltroEstado] = useState<'Todos' | (typeof ESTADOS_PRODUCCION)[number]>('Todos');
+  const [filtroPrioridad, setFiltroPrioridad] = useState<'Todos' | (typeof PRIORIDADES)[number]>('Todos');
+  const [ordenes, setOrdenes] = useState<OrdenProduccion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
   const [nuevoAvance, setNuevoAvance] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const orders = await productionApi.list();
+        const mapped: OrdenProduccion[] = orders.map((o) => ({
+          id: o.id,
+          numeroOrden: o.pedidoNumero || o.referencia,
+          prenda: o.pedidoItemNombre || o.referencia,
+          referencia: o.referencia,
+          cantidad: o.cantidad,
+          cantidadProducida: Math.round((o.avance / 100) * o.cantidad),
+          fechaInicio: o.fechaInicio,
+          fechaPrometida: o.fechaEstimada,
+          estado: o.estado === 'En proceso' ? 'En produccion' : o.estado === 'Terminado' ? 'Completada' : o.estado === 'Pendiente' ? 'Pendiente' : 'Asignada',
+          tallerAsignado: o.taller?.nombre,
+          prioridad: (o.pedidoPrioridad === 'ALTA' ? 'Alta' : o.pedidoPrioridad === 'MEDIA' ? 'Media' : o.pedidoPrioridad === 'BAJA' ? 'Baja' : 'Media') as OrdenProduccion['prioridad'],
+          cliente: o.pedidoCliente ?? '',
+          observaciones: o.notasTecnicas || '',
+          avance: o.avance,
+        }));
+        setOrdenes(mapped);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error cargando datos');
+        toast.error('Error cargando seguimiento de producción');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const filteredOrdenes = useMemo(() => {
     return ordenes.filter(o =>
@@ -78,50 +105,51 @@ export const AdminSeguimientoProduccion: React.FC = () => {
     );
   }, [ordenes, search, filtroEstado, filtroPrioridad]);
 
-  const getEstadoBadge = (estado: string) => {
-    switch (estado) {
-      case 'Pendiente': return 'default';
-      case 'Asignada': return 'primary';
-      case 'En produccion': return 'warning';
-      case 'Completada': return 'success';
-      default: return 'default';
-    }
-  };
-
-  const getDiasRestantes = (fechaPrometida: string) => {
-    const hoy = new Date('2024-06-10');
-    const fecha = new Date(fechaPrometida);
-    const diff = Math.ceil((fecha.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-    return diff;
-  };
-
   const abrirModal = (orden: OrdenProduccion) => {
     setSelectedOrden(orden);
     setNuevoAvance(String(orden.cantidadProducida));
     setModalOpen(true);
   };
 
-  const handleActualizarAvance = () => {
+  const handleActualizarAvance = async () => {
     if (!selectedOrden || !nuevoAvance) return;
-    const producidas = Number(nuevoAvance);
-    setOrdenes(prev => prev.map(o => {
-      if (o.id !== selectedOrden.id) return o;
-      if (producidas >= o.cantidad) {
-        return { ...o, cantidadProducida: o.cantidad, avance: 100, estado: 'Completada' as const };
+    try {
+      setSaving(true);
+      const producidas = Number(nuevoAvance);
+      const avance = Math.round((producidas / selectedOrden.cantidad) * 100);
+      if (avance >= 100) {
+        await productionApi.update(selectedOrden.id, { estado: 'Terminado' });
+      } else {
+        await productionApi.update(selectedOrden.id, { avance, estado: 'En proceso' });
       }
-      return { ...o, cantidadProducida: producidas, avance: Math.round((producidas / o.cantidad) * 100), estado: 'En produccion' as const };
-    }));
-    toast.success(`Avance actualizado para ${selectedOrden.numeroOrden}`);
-    setModalOpen(false);
-    setSelectedOrden(null);
+      setOrdenes(prev => prev.map(o => {
+        if (o.id !== selectedOrden.id) return o;
+        if (producidas >= o.cantidad) {
+          return { ...o, cantidadProducida: o.cantidad, avance: 100, estado: 'Completada' as const };
+        }
+        return { ...o, cantidadProducida: producidas, avance, estado: 'En produccion' as const };
+      }));
+      toast.success(`Avance actualizado para ${selectedOrden.numeroOrden}`);
+      setModalOpen(false);
+      setSelectedOrden(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error actualizando avance');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleCompletarOrden = (orden: OrdenProduccion) => {
-    setOrdenes(prev => prev.map(o => o.id === orden.id
-      ? { ...o, cantidadProducida: o.cantidad, avance: 100, estado: 'Completada' as const }
-      : o
-    ));
-    toast.success(`Orden ${orden.numeroOrden} marcada como entregada`);
+  const handleCompletarOrden = async (orden: OrdenProduccion) => {
+    try {
+      await productionApi.update(orden.id, { estado: 'Terminado' });
+      setOrdenes(prev => prev.map(o => o.id === orden.id
+        ? { ...o, cantidadProducida: o.cantidad, avance: 100, estado: 'Completada' as const }
+        : o
+      ));
+      toast.success(`Orden ${orden.numeroOrden} marcada como entregada`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error completando orden');
+    }
   };
 
   const stats = {
@@ -131,9 +159,17 @@ export const AdminSeguimientoProduccion: React.FC = () => {
     completadas: ordenes.filter(o => o.estado === 'Completada').length,
     retrasadas: ordenes.filter(o => {
       if (o.estado === 'Completada' || o.estado === 'Pendiente') return false;
-      return getDiasRestantes(o.fechaPrometida) < 0;
+      return _getDiasRestantes(o.fechaPrometida) < 0;
     }).length,
   };
+
+  if (loading) {
+    return <div className={s.header}><p>Cargando seguimiento de producción...</p></div>;
+  }
+
+  if (error) {
+    return <div className={s.header}><p className="text-red-500">{error}</p></div>;
+  }
 
   return (
     <div>
@@ -176,7 +212,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
 
       <div className={s.filters}>
         <div className={s.filterGroup}>
-          {['Todos', 'Pendiente', 'Asignada', 'En produccion', 'Completada'].map(estado => (
+          {['Todos', ...ESTADOS_PRODUCCION].map(estado => (
             <button
               key={estado}
               className={`${s.filterBtn} ${filtroEstado === estado ? s.filterBtnActive : ''}`}
@@ -187,7 +223,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
           ))}
         </div>
         <div className={s.filterGroup}>
-          {['Todos', 'Alta', 'Media', 'Baja'].map(prioridad => (
+          {['Todos', ...PRIORIDADES].map(prioridad => (
             <button
               key={prioridad}
               className={`${s.filterBtn} ${filtroPrioridad === prioridad ? s.filterBtnActive : ''}`}
@@ -212,7 +248,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
       <DataTable<OrdenProduccion>
         data={filteredOrdenes}
         pageSize={10}
-        emptyMessage="No se encontraron órdenes de producción"
+        emptyMessage="Sin resultados"
         enableSorting
         enableColumnFilters
         enableRowSelection
@@ -238,7 +274,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
           { key: 'clienteTaller', header: 'Cliente / Taller', width: '240px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar taller...', render: (o) => (
             <div className="flex flex-col gap-0.5">
               <span className="text-[var(--color-text-primary)]">{o.cliente}</span>
-              <span className="text-xs text-[var(--color-text-secondary)]">{o.tallerAsignado || 'Sin asignar'}</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">{o.tallerAsignado || '—'}</span>
             </div>
           )},
           { key: 'avance', header: 'Avance', width: '180px', sortable: true, render: (o) => {
@@ -254,12 +290,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
               </div>
             );
           }},
-          { key: 'estado', header: 'Estado', width: '120px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-            { value: 'Pendiente', label: 'Pendiente' },
-            { value: 'Asignada', label: 'Asignada' },
-            { value: 'En produccion', label: 'En producción' },
-            { value: 'Completada', label: 'Completada' },
-          ], render: (o) => <Badge variant={getEstadoBadge(o.estado)}>{o.estado}</Badge> },
+          { key: 'estado', header: 'Estado', width: '120px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_PRODUCCION.map(e => ({ value: e, label: e === 'En produccion' ? 'En producción' : e })), render: (o) => <Badge variant={_getEstadoBadge(o.estado)}>{o.estado}</Badge> },
         ]}
         detailPanel={{
           title: (o) => `Seguimiento - ${o.numeroOrden}`,
@@ -269,11 +300,11 @@ export const AdminSeguimientoProduccion: React.FC = () => {
               <div className={s.infoRow}><span className={s.infoLabel}>Prenda:</span><span className={s.infoValue}>{o.prenda}</span></div>
               <div className={s.infoRow}><span className={s.infoLabel}>Referencia:</span><span className={s.infoValue}>{o.referencia}</span></div>
               <div className={s.infoRow}><span className={s.infoLabel}>Cliente:</span><span className={s.infoValue}>{o.cliente}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Taller:</span><span className={s.infoValue}>{o.tallerAsignado || 'Sin asignar'}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Estado:</span><Badge variant={getEstadoBadge(o.estado)}>{o.estado}</Badge></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Taller:</span><span className={s.infoValue}>{o.tallerAsignado || '—'}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Estado:</span><Badge variant={_getEstadoBadge(o.estado)}>{o.estado}</Badge></div>
               <div className={s.infoRow}><span className={s.infoLabel}>Fecha inicio:</span><span className={s.infoValue}>{o.fechaInicio}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Fecha límite:</span><span className={`${s.infoValue} ${getDiasRestantes(o.fechaPrometida) < 0 && (o.estado !== 'Completada' && o.estado !== 'Pendiente') ? s.infoValueWarning : ''}`}>{o.fechaPrometida}{getDiasRestantes(o.fechaPrometida) < 0 && (o.estado !== 'Completada' && o.estado !== 'Pendiente') && <span className={s.retrasoBadge}> Retrasado +{Math.abs(getDiasRestantes(o.fechaPrometida))} días</span>}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Observaciones:</span><span className={s.infoValue}>{o.observaciones}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Fecha límite:</span><span className={`${s.infoValue} ${_getDiasRestantes(o.fechaPrometida) < 0 && (o.estado !== 'Completada' && o.estado !== 'Pendiente') ? s.infoValueWarning : ''}`}>{o.fechaPrometida}{_getDiasRestantes(o.fechaPrometida) < 0 && (o.estado !== 'Completada' && o.estado !== 'Pendiente') && <span className={s.retrasoBadge}> Retrasado +{Math.abs(_getDiasRestantes(o.fechaPrometida))} días</span>}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Observaciones:</span><span className={s.infoValue}>{o.observaciones || '—'}</span></div>
               <div className={s.avanceSection}>
                 <label className={s.label}>Unidades Producidas</label>
                 <div className={s.avanceInputRow}>
@@ -289,7 +320,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
               </div>
               <div className={s.formActions}>
                 <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleActualizarAvance}>Actualizar avance</Button>
+                <Button onClick={handleActualizarAvance} disabled={saving}>{saving ? 'Guardando...' : 'Actualizar avance'}</Button>
                 {Number(nuevoAvance) >= o.cantidad && <Button variant="success" onClick={() => o && handleCompletarOrden(o)}>Marcar como entregada</Button>}
               </div>
             </div>
@@ -309,7 +340,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
             <div className={s.ordenInfo}>
               <div className={s.infoRow}><span className={s.infoLabel}>Prenda:</span><span className={s.infoValue}>{selectedOrden.prenda}</span></div>
               <div className={s.infoRow}><span className={s.infoLabel}>Cliente:</span><span className={s.infoValue}>{selectedOrden.cliente}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Taller:</span><span className={s.infoValue}>{selectedOrden.tallerAsignado || 'Sin asignar'}</span></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Taller:</span><span className={s.infoValue}>{selectedOrden.tallerAsignado || '—'}</span></div>
             </div>
             <div className={s.avanceSection}>
               <label className={s.label}>Unidades Producidas</label>
@@ -326,7 +357,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
             </div>
             <div className={s.formActions}>
               <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
-              <Button onClick={handleActualizarAvance}>Actualizar avance</Button>
+              <Button onClick={handleActualizarAvance} disabled={saving}>{saving ? 'Guardando...' : 'Actualizar avance'}</Button>
             </div>
           </div>
         )}
@@ -334,5 +365,3 @@ export const AdminSeguimientoProduccion: React.FC = () => {
     </div>
   );
 };
-
-

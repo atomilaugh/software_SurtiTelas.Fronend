@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Shield, AlertTriangle, Clock, User, Globe } from 'lucide-react';
 import s from './SeguridadUsuarios.module.css';
 import { Badge } from '../../../shared/ui/Badge';
+import { auditApi, type AuditLog } from '../../../infrastructure/api/auditApi';
+import { ESTADOS_AUDITORIA } from '@/shared/constants/options';
+
+type EstadoAuditoria = (typeof ESTADOS_AUDITORIA)[number];
 
 interface Auditoria {
   id: string;
@@ -11,29 +15,64 @@ interface Auditoria {
   ip: string;
   fecha: string;
   hora: string;
-  estado: 'Éxito' | 'Fallido' | 'Alerta';
+  estado: EstadoAuditoria;
 }
 
-const mockAuditorias: Auditoria[] = [
-  { id: 'L-001', usuario: 'Carlos Martínez', accion: 'Login exitoso', modulo: 'Autenticación', ip: '192.168.1.10', fecha: '2024-06-10', hora: '08:23:45', estado: 'Éxito' },
-  { id: 'L-002', usuario: 'Ana López', accion: 'Login fallido', modulo: 'Autenticación', ip: '192.168.1.15', fecha: '2024-06-10', hora: '09:15:22', estado: 'Fallido' },
-  { id: 'L-003', usuario: 'Jorge Ruiz', accion: 'Intento de acceso no autorizado', modulo: 'Configuración', ip: '192.168.1.22', fecha: '2024-06-09', hora: '14:45:33', estado: 'Alerta' },
-  { id: 'L-004', usuario: 'Luis Pérez', accion: 'Cambio de contraseña', modulo: 'Perfil', ip: '192.168.1.12', fecha: '2024-06-09', hora: '11:30:12', estado: 'Éxito' },
-  { id: 'L-005', usuario: 'María González', accion: 'Login exitoso', modulo: 'Autenticación', ip: '192.168.1.18', fecha: '2024-06-08', hora: '16:22:55', estado: 'Éxito' },
-  { id: 'L-006', usuario: 'Ana López', accion: 'Creación de usuario', modulo: 'Usuarios', ip: '192.168.1.15', fecha: '2024-06-08', hora: '10:15:44', estado: 'Éxito' },
-  { id: 'L-007', usuario: 'Carlos Martínez', accion: 'Modificación de permiso', modulo: 'Configuración', ip: '192.168.1.10', fecha: '2024-06-07', hora: '14:33:21', estado: 'Éxito' },
-];
+function deriveEstado(accion: string): EstadoAuditoria {
+  const a = accion.toLowerCase();
+  if (a.includes('fallid') || a.includes('error') || a.includes('denegad') || a.includes('rechaz')) return 'Fallido';
+  if (a.includes('no autorizado') || a.includes('intento') || a.includes('alerta') || a.includes('sospech')) return 'Alerta';
+  return 'Éxito';
+}
+
+function toAuditoria(log: AuditLog): Auditoria {
+  const created = new Date(log.createdAt);
+  const validDate = !Number.isNaN(created.getTime());
+  return {
+    id: log.id,
+    usuario: log.usuario?.nombre ?? 'Sistema',
+    accion: log.accion,
+    modulo: log.modulo,
+    ip: log.ip ?? '—',
+    fecha: validDate ? created.toISOString().slice(0, 10) : '—',
+    hora: validDate ? created.toTimeString().slice(0, 8) : '—',
+    estado: deriveEstado(log.accion),
+  };
+}
 
 export const AdminSeguridadUsuarios: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [filtro, setFiltro] = useState<'Todos' | 'Éxito' | 'Fallido' | 'Alerta'>('Todos');
+  const [filtro, setFiltro] = useState<'Todos' | EstadoAuditoria>('Todos');
+  const [auditorias, setAuditorias] = useState<Auditoria[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredAuditorias = mockAuditorias.filter(a =>
-    (filtro === 'Todos' || a.estado === filtro) &&
-    (a.usuario.toLowerCase().includes(search.toLowerCase()) ||
-     a.accion.toLowerCase().includes(search.toLowerCase()) ||
-     a.modulo.toLowerCase().includes(search.toLowerCase()))
-  );
+  const fetchAuditorias = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await auditApi.list();
+      setAuditorias(data.map(toAuditoria));
+    } catch {
+      setError('No se pudieron cargar los registros de auditoría');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAuditorias();
+  }, [fetchAuditorias]);
+
+  const filteredAuditorias = useMemo(() => {
+    const q = search.toLowerCase();
+    return auditorias.filter(a =>
+      (filtro === 'Todos' || a.estado === filtro) &&
+      (a.usuario.toLowerCase().includes(q) ||
+       a.accion.toLowerCase().includes(q) ||
+       a.modulo.toLowerCase().includes(q))
+    );
+  }, [auditorias, filtro, search]);
 
   return (
     <div>
@@ -46,30 +85,37 @@ export const AdminSeguridadUsuarios: React.FC = () => {
           <div className={s.statCard}>
             <Shield size={20} className={s.statIcon} />
             <div>
-              <div className={s.statValue}>{mockAuditorias.filter(a => a.estado === 'Éxito').length}</div>
+              <div className={s.statValue}>{auditorias.filter(a => a.estado === 'Éxito').length}</div>
               <div className={s.statLabel}>Éxitos</div>
             </div>
           </div>
           <div className={s.statCard}>
             <AlertTriangle size={20} className={s.statIcon} />
             <div>
-              <div className={s.statValue}>{mockAuditorias.filter(a => a.estado === 'Alerta').length}</div>
+              <div className={s.statValue}>{auditorias.filter(a => a.estado === 'Alerta').length}</div>
               <div className={s.statLabel}>Alertas</div>
             </div>
           </div>
           <div className={s.statCard}>
             <Clock size={20} className={s.statIcon} />
             <div>
-              <div className={s.statValue}>7 días</div>
-              <div className={s.statLabel}>Período activo</div>
+              <div className={s.statValue}>{auditorias.length}</div>
+              <div className={s.statLabel}>Registros</div>
             </div>
           </div>
         </div>
       </div>
 
+      {error && (
+        <div className={s.errorBox}>
+          <span>{error}</span>
+          <button className={s.retryBtn} onClick={() => void fetchAuditorias()}>Reintentar</button>
+        </div>
+      )}
+
       <div className={s.filters}>
         <div className={s.filterGroup}>
-          {['Todos', 'Éxito', 'Fallido', 'Alerta'].map(f => (
+          {['Todos', ...ESTADOS_AUDITORIA].map(f => (
             <button
               key={f}
               className={`${s.filterBtn} ${filtro === f ? s.filterBtnActive : ''}`}
@@ -106,35 +152,47 @@ export const AdminSeguridadUsuarios: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredAuditorias.map(auditoria => (
-              <tr key={auditoria.id}>
-                <td className={s.tdMono}>{auditoria.id}</td>
-                <td className={s.tdPrimary}>
-                  <div className={s.usuarioCell}>
-                    <User size={14} />
-                    {auditoria.usuario}
-                  </div>
-                </td>
-                <td>{auditoria.accion}</td>
-                <td>{auditoria.modulo}</td>
-                <td>
-                  <div className={s.ipCell}>
-                    <Globe size={14} />
-                    {auditoria.ip}
-                  </div>
-                </td>
-                <td>{auditoria.fecha}</td>
-                <td>{auditoria.hora}</td>
-                <td>
-                  <Badge variant={
-                    auditoria.estado === 'Éxito' ? 'success' :
-                    auditoria.estado === 'Fallido' ? 'default' : 'warning'
-                  }>
-                    {auditoria.estado}
-                  </Badge>
+            {loading ? (
+              <tr>
+                <td colSpan={8} className={s.loadingBox}>Cargando auditoría...</td>
+              </tr>
+            ) : filteredAuditorias.length === 0 ? (
+              <tr>
+                <td colSpan={8} className={s.loadingBox}>
+                  {error ? error : 'No se encontraron registros de auditoría'}
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredAuditorias.map(auditoria => (
+                <tr key={auditoria.id}>
+                  <td className={s.tdMono}>{auditoria.id}</td>
+                  <td className={s.tdPrimary}>
+                    <div className={s.usuarioCell}>
+                      <User size={14} />
+                      {auditoria.usuario}
+                    </div>
+                  </td>
+                  <td>{auditoria.accion}</td>
+                  <td>{auditoria.modulo}</td>
+                  <td>
+                    <div className={s.ipCell}>
+                      <Globe size={14} />
+                      {auditoria.ip}
+                    </div>
+                  </td>
+                  <td>{auditoria.fecha}</td>
+                  <td>{auditoria.hora}</td>
+                  <td>
+                    <Badge variant={
+                      auditoria.estado === 'Éxito' ? 'success' :
+                      auditoria.estado === 'Fallido' ? 'default' : 'warning'
+                    }>
+                      {auditoria.estado}
+                    </Badge>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

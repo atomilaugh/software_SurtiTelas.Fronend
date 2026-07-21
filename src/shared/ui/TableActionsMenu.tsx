@@ -40,14 +40,21 @@ export const TableActionsMenu = ({
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
 
   const updatePosition = useCallback(() => {
     if (!triggerRef.current) return;
+
     const rect = triggerRef.current.getBoundingClientRect();
     const menuWidth = 260;
-    const top = rect.bottom + window.scrollY + 8;
+    const menuHeight = menuRef.current?.offsetHeight ?? 280;
+    const viewportTop = window.scrollY;
+    const viewportBottom = viewportTop + window.innerHeight;
+    const maxMenuHeight = Math.max(160, window.innerHeight - 32);
+
+    let top = rect.bottom + viewportTop + 8;
     let left = rect.right + window.scrollX - menuWidth;
 
     if (align === 'left') {
@@ -57,6 +64,20 @@ export const TableActionsMenu = ({
     const vw = window.innerWidth;
     if (left + menuWidth > vw - 16) left = vw - menuWidth - 16;
     if (left < 16) left = 16;
+
+    const fitsBelow = top + menuHeight <= viewportBottom - 16;
+    const fitsAbove = rect.top + viewportTop - menuHeight - 8 >= viewportTop + 16;
+
+    if (!fitsBelow && fitsAbove) {
+      top = rect.top + viewportTop - menuHeight - 8;
+    }
+
+    if (top + menuHeight > viewportBottom - 16) {
+      top = viewportBottom - maxMenuHeight - 16;
+    }
+    if (top < viewportTop + 12) {
+      top = viewportTop + 12;
+    }
 
     setCoords({ top, left });
   }, [align]);
@@ -101,13 +122,35 @@ export const TableActionsMenu = ({
     };
   }, [open, close, updatePosition]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    requestAnimationFrame(() => {
+      updatePosition();
+    });
+
+    if (menuRef.current && 'ResizeObserver' in window) {
+      resizeObserverRef.current = new ResizeObserver(() => {
+        updatePosition();
+      });
+      resizeObserverRef.current.observe(menuRef.current);
+    }
+
+    return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
+    };
+  }, [open, updatePosition]);
+
   // Ensure portaled table actions menu uses dashboard theme when opened
   useEffect(() => {
     const applyTheme = (value?: string | null) => {
       try {
         const val = value ?? (typeof window !== 'undefined' ? window.localStorage.getItem('dashboard-theme') : null) ?? 'light';
         if (menuRef.current) menuRef.current.setAttribute('data-theme', val);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
     };
@@ -167,7 +210,7 @@ export const TableActionsMenu = ({
               tabIndex={-1}
               onKeyDown={handleKeyDown}
             >
-              <div className={s.inner}>
+              <div className={s.menuInner}>
                 {/* Primary action (View Detail) */}
                 {primaryAction && (
                   <Tooltip title={primaryAction.tooltip ?? primaryAction.label} as="div" tabIndex={-1}>

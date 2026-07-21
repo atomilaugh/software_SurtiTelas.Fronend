@@ -5,21 +5,18 @@ import { ArrowLeft, CreditCard, Upload, BadgePercent } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCart, useAuth } from '@/app/providers/AppProviders';
 import { useClientes } from '@/core/stores';
+import { ordersApi } from '@/infrastructure/api/ordersApi';
+import type { PedidoItem } from '@/core/types';
+import { appContent } from '@/shared/config/appContent';
 import './CheckoutPage.css';
 
 const formatCurrency = (value: number) => `$${value.toLocaleString('es-CO')}`;
 
 type PaymentType = 'immediate' | 'installments';
 
-const bankOptions = [
-  'Bancolombia',
-  'Davivienda',
-  'BBVA',
-  'Banco de Bogotá',
-  'Nequi',
-];
+const bankOptions = appContent.checkout.paymentBanks;
 
-const installmentOptions = [2, 3, 4, 6, 12];
+const installmentOptions = appContent.checkout.installmentOptions;
 
 const CheckoutPage: React.FC = () => {
   const { user } = useAuth();
@@ -110,10 +107,37 @@ const CheckoutPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 850));
-    clearCart();
-    setIsSubmitting(false);
-    toast.success('Pago registrado. Tu pedido será confirmado en breve.');
+    try {
+      const itemsList: PedidoItem[] = items.map((item) => ({
+        nombre: item.nombre,
+        precio: item.precio,
+        cantidad: item.quantity,
+      }));
+
+      const observaciones = [
+        `Banco: ${selectedBank}`,
+        proofFile ? `Comprobante: ${proofFile.name}` : null,
+        paymentType === 'installments' ? `Pago por abonos: ${installments} cuotas` : 'Pago inmediato',
+        clienteActual?.asesorId ? `Asesor: ${clienteActual.asesorId}` : null,
+      ]
+        .filter(Boolean)
+        .join(' | ');
+
+      await ordersApi.create({
+        clienteId: clienteActual?.id ?? user?.email ?? 'cliente',
+        asesorId: clienteActual?.asesorId,
+        itemsList,
+        observaciones,
+        comprobantePago: proofFile ?? undefined,
+      });
+
+      clearCart();
+      toast.success('Pago registrado. Tu pedido será confirmado en breve.');
+    } catch {
+      toast.error('No se pudo registrar el pedido. Intenta nuevamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (items.length === 0) {

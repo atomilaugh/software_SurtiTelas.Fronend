@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Search, Plus, Archive, CreditCard, Package, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import s from '../admin/Pedidos.module.css';
@@ -7,10 +7,12 @@ import { Button } from '@/shared/ui/Button';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
 import { Tooltip } from '@/shared/components/Tooltip';
-import { usePedidos } from '@/core/stores';
+import { ordersApi } from '@/infrastructure/api/ordersApi';
+import { authApi } from '@/infrastructure/api/authApi';
+import { useAuthStore } from '@/core/stores/authStore';
+import { useClientes } from '@/core/stores';
 import type { Pedido } from '@/core/types';
-
-const asesoresAsignados = ['Camila Torres', 'Luis Herrera'];
+import type { BackendAuthUser } from '@/infrastructure/api/authApi';
 
 const orderStatuses: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default' | null> = {
   'Nuevo': 'default',
@@ -24,20 +26,24 @@ const orderStatuses: Record<string, 'success' | 'warning' | 'danger' | 'info' | 
 
 const emptyPedidoForm: Omit<Pedido, 'id'> = {
   cliente: '',
-  asesor: 'Camila Torres',
+  asesor: '',
   fecha: new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }),
   items: 1,
-  total: '$0',
+  total: '0',
   estado: 'Nuevo',
   prioridad: 'Estándar',
   observaciones: '',
   itemsList: [],
 };
 
-const parseCurrency = (value: string) => Number(String(value).replace(/[^0-9]/g, '')) || 0;
+import { parseCurrency } from '@/shared/utils/number';
 
 export const AsesorPedidos: React.FC = () => {
-  const { pedidos, createPedido, updatePedido, deletePedido } = usePedidos();
+  const user = useAuthStore((s) => s.user);
+  const { clientes } = useClientes();
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [asesores, setAsesores] = useState<BackendAuthUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -48,18 +54,43 @@ export const AsesorPedidos: React.FC = () => {
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState<Omit<Pedido, 'id'>>(emptyPedidoForm);
   const [statusValue, setStatusValue] = useState<Pedido['estado']>('Nuevo');
+  const asesorInicialRef = useRef(false);
 
-  const misPedidos = useMemo(() => pedidos.filter(p => asesoresAsignados.includes(p.asesor)), [pedidos]);
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [ordersResult, usersResult] = await Promise.all([
+          ordersApi.list({ asesorId: user?.uid }),
+          authApi.listUsers(),
+        ]);
+        setPedidos(ordersResult.pedidos);
+        setAsesores(usersResult.data.filter((u) => u.role === 'ASESOR'));
+        if (!asesorInicialRef.current && usersResult.data.some((u) => u.role === 'ASESOR')) {
+          const asesor = usersResult.data.find((u) => u.role === 'ASESOR');
+          setForm((prev) => ({ ...prev, asesor: asesor?.nombre ?? '' }));
+          asesorInicialRef.current = true;
+        }
+      } catch {
+        toast.error('No se pudieron cargar los pedidos');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [user?.uid]);
+
+  const misPedidos = pedidos;
 
   const filteredPedidos = useMemo(() => {
-    return misPedidos.filter(p =>
+    return misPedidos.filter((p) =>
       p.id.toLowerCase().includes(search.toLowerCase()) ||
       p.cliente.toLowerCase().includes(search.toLowerCase())
     );
   }, [misPedidos, search]);
 
   const resetForm = () => {
-    setForm(emptyPedidoForm);
+    setForm({ ...emptyPedidoForm, asesor: user?.name || '' });
     setEditingId(null);
     setFormError('');
   };
@@ -102,7 +133,7 @@ export const AsesorPedidos: React.FC = () => {
     setIsDeleteOpen(true);
   };
 
-  const savePedido = () => {
+  const savePedido = async () => {
     setFormError('');
     const items = Number(form.items) || 0;
     const total = parseCurrency(form.total);
@@ -120,22 +151,40 @@ export const AsesorPedidos: React.FC = () => {
       return;
     }
 
-    const data: Omit<Pedido, 'id'> = {
-      ...form,
-      items,
-      total: `$${total.toLocaleString()}`,
-      itemsList: form.itemsList && form.itemsList.length > 0
-        ? form.itemsList
-        : [{ nombre: 'Solicitud personalizada', precio: Math.round(total / items), cantidad: items }],
-    };
-
     try {
       if (editingId) {
-        const actualizado = updatePedido(editingId, data);
+        const cliente = clientes.find((c) => c.nombre.toLowerCase() === form.cliente.toLowerCase());
+        const actualizado = await ordersApi.updateOrderFull(editingId, {
+          clienteId: cliente?.id || form.cliente,
+          asesorId: user?.uid,
+          prioridad: form.prioridad,
+          observaciones: form.observaciones,
+        });
+        setPedidos((prev) => prev.map((p) => (p.id === editingId ? { ...actualizado, cliente: form.cliente, asesor: form.asesor, items, total: form.total, fecha: form.fecha } : p)));
         toast.success(`Pedido ${actualizado.id} actualizado`);
       } else {
-        const nuevo = createPedido(data);
-        toast.success(`Pedido ${nuevo.id} creado correctamente`);
+        const cliente = clientes.find((c) => c.nombre.toLowerCase() === form.cliente.toLowerCase());
+        if (!cliente) {
+          setFormError('Cliente no encontrado. Registra el cliente primero.');
+          return;
+        }
+        const data: Omit<Pedido, 'id'> = {
+          ...form,
+          items,
+          total: `$${total.toLocaleString()}`,
+          itemsList: form.itemsList && form.itemsList.length > 0
+            ? form.itemsList
+            : [{ nombre: 'Solicitud personalizada', precio: Math.round(total / items), cantidad: items }],
+        };
+        const resultado = await ordersApi.create({
+          clienteId: cliente.id,
+          asesorId: user?.uid,
+          itemsList: data.itemsList || [],
+          prioridad: data.prioridad,
+          observaciones: data.observaciones,
+        });
+        setPedidos((prev) => [resultado.pedido, ...prev]);
+        toast.success(`Pedido ${resultado.pedido.id} creado correctamente`);
       }
       setIsFormOpen(false);
       resetForm();
@@ -144,20 +193,27 @@ export const AsesorPedidos: React.FC = () => {
     }
   };
 
-  const saveStatus = () => {
+  const saveStatus = async () => {
     if (!selectedPedido) return;
-    const actualizado = updatePedido(selectedPedido.id, { estado: statusValue });
+    const actualizado = await ordersApi.updateStatus(selectedPedido.id, statusValue);
+    setPedidos((prev) => prev.map((p) => (p.id === selectedPedido.id ? actualizado : p)));
     toast.success(`Pedido ${actualizado.id} marcado como ${statusValue}`);
     setIsStatusOpen(false);
     setSelectedPedido(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!selectedPedido) return;
-    deletePedido(selectedPedido.id);
-    toast.success(`Pedido ${selectedPedido.id} eliminado`);
-    setIsDeleteOpen(false);
-    setSelectedPedido(null);
+    try {
+      await ordersApi.delete(selectedPedido.id);
+      setPedidos((prev) => prev.filter((p) => p.id !== selectedPedido.id));
+      toast.success(`Pedido ${selectedPedido.id} eliminado`);
+    } catch {
+      toast.error('No se pudo eliminar el pedido');
+    } finally {
+      setIsDeleteOpen(false);
+      setSelectedPedido(null);
+    }
   };
 
   return (
@@ -180,7 +236,7 @@ export const AsesorPedidos: React.FC = () => {
             type="text"
             placeholder="Buscar pedidos..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             className={s.searchInput}
           />
         </div>
@@ -203,11 +259,11 @@ export const AsesorPedidos: React.FC = () => {
             {filteredPedidos.length === 0 ? (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.5)' }}>
-                  No hay pedidos
+                  {loading ? 'Cargando pedidos...' : 'No hay pedidos'}
                 </td>
               </tr>
             ) : (
-              filteredPedidos.map(pedido => (
+              filteredPedidos.map((pedido) => (
                 <tr key={pedido.id}>
                   <td className={s.tdMono}>{pedido.id}</td>
                   <td className={s.tdPrimary}>{pedido.cliente}</td>
@@ -313,35 +369,42 @@ export const AsesorPedidos: React.FC = () => {
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                     Cliente
-                    <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.cliente} onChange={e => setForm({ ...form, cliente: e.target.value })} placeholder="Nombre del cliente" />
+                    <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.cliente} onChange={(e) => setForm({ ...form, cliente: e.target.value })} placeholder="Nombre del cliente" />
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                     Fecha
-                    <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
+                    <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                     Asesor
-                    <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.asesor} onChange={e => setForm({ ...form, asesor: e.target.value })}>
-                      {asesoresAsignados.map(asesor => <option key={asesor} value={asesor}>{asesor}</option>)}
+                    <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.asesor} onChange={(e) => setForm({ ...form, asesor: e.target.value })}>
+                      <option value="">Selecciona un asesor</option>
+                      {asesores.map((u) => (
+                        <option key={u.id} value={u.nombre}>
+                          {u.nombre}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                     Estado
-                    <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value as Pedido['estado'] })}>
-                      {Object.keys(orderStatuses).map(estado => <option key={estado} value={estado}>{estado}</option>)}
+                    <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as Pedido['estado'] })}>
+                      {(['Nuevo', 'En producción', 'Listo', 'Despachado', 'En camino', 'Entregado', 'Cancelado'] as Pedido['estado'][]).map((es) => (
+                        <option key={es} value={es}>{es}</option>
+                      ))}
                     </select>
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                     Cantidad de artículos
-                    <input type="number" min="1" className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.items} onChange={e => setForm({ ...form, items: Number(e.target.value) })} />
+                    <input type="number" min="1" className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.items} onChange={(e) => setForm({ ...form, items: Number(e.target.value) })} />
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                     Total
-                    <input type="number" min="1" className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={parseCurrency(form.total)} onChange={e => setForm({ ...form, total: `$${Number(e.target.value || 0).toLocaleString()}` })} />
+                    <input type="number" min="1" className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={parseCurrency(form.total)} onChange={(e) => setForm({ ...form, total: `$${Number(e.target.value || 0).toLocaleString()}` })} />
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                     Prioridad
-                    <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.prioridad} onChange={e => setForm({ ...form, prioridad: e.target.value as Pedido['prioridad'] })}>
+                    <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value as Pedido['prioridad'] })}>
                       <option value="Estándar">Estándar</option>
                       <option value="Prioritario">Prioritario</option>
                     </select>
@@ -349,7 +412,7 @@ export const AsesorPedidos: React.FC = () => {
                 </div>
                 <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                   Observaciones
-                  <textarea className="min-h-24 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.observaciones} onChange={e => setForm({ ...form, observaciones: e.target.value })} />
+                  <textarea className="min-h-24 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
                 </label>
               </div>
             ),
@@ -375,8 +438,8 @@ export const AsesorPedidos: React.FC = () => {
             children: (
               <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                 Estado
-                <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={statusValue} onChange={e => setStatusValue(e.target.value as Pedido['estado'])}>
-                  {Object.keys(orderStatuses).map(estado => <option key={estado} value={estado}>{estado}</option>)}
+                <select className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={statusValue} onChange={(e) => setStatusValue(e.target.value as Pedido['estado'])}>
+                  {Object.keys(orderStatuses).map((estado) => <option key={estado} value={estado}>{estado}</option>)}
                 </select>
               </label>
             ),

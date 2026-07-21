@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import partnerLogo from '@/assets/images/logos/partner-logo-2-Photoroom.png';
+import { authApi } from '@/infrastructure/api/authApi';
 import './AuthPage.css';
 
 const ForgotPasswordPage: React.FC = () => {
@@ -28,12 +29,16 @@ const ForgotPasswordPage: React.FC = () => {
     setLoading(true);
     setError('');
     
-    // Simulación de envío de email
-    await new Promise(r => setTimeout(r, 1500));
-    
-    setLoading(false);
-    setSuccess(true);
-    toast.success('Correo de recuperación enviado');
+    try {
+      await authApi.forgotPassword({ email });
+      setSuccess(true);
+      toast.success('Correo de recuperación enviado');
+    } catch {
+      setError('No se pudo enviar el correo. Intenta nuevamente.');
+      toast.error('Error al enviar correo');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

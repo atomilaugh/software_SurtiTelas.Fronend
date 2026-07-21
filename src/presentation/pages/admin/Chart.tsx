@@ -37,6 +37,7 @@ function ChartWrapper({
   title,
   children,
 }: ChartWrapperProps) {
+  const description = title ? `Gráfico: ${title}` : 'Gráfico';
   return (
     <div className={s.chartContainer}>
       {title && (
@@ -45,7 +46,9 @@ function ChartWrapper({
         </h4>
       )}
 
-      {children}
+      <div role="img" aria-label={description} style={{ width: '100%', height: 300 }}>
+        {children}
+      </div>
     </div>
   );
 }

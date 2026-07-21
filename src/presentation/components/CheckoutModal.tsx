@@ -3,6 +3,7 @@ import { X, Upload, CreditCard, BadgePercent, ShieldCheck, BadgeCheck } from 'lu
 import { toast } from 'sonner'
 import { useCart, useAuth } from '@/app/providers/AppProviders'
 import { AuthRequiredModal } from './AuthRequiredModal'
+import { appContent } from '@/shared/config/appContent'
 import './CheckoutModal.css'
 
 interface CheckoutModalProps {
@@ -12,15 +13,9 @@ interface CheckoutModalProps {
 
 type PaymentType = 'immediate' | 'installments'
 
-const bankOptions = [
-  'Bancolombia',
-  'Davivienda',
-  'BBVA',
-  'Banco de Bogotá',
-  'Nequi',
-]
+const bankOptions = appContent.checkout.paymentBanks
 
-const installmentOptions = [2, 3, 4, 6, 12]
+const installmentOptions = appContent.checkout.installmentOptions
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   const { subtotal, discount, tax, shipping, total, clearCart, items } = useCart()
@@ -168,14 +163,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
               </div>
 
               <div className="ch-trust-badges">
-                <div className="ch-trust-item">
-                  <ShieldCheck size={14} strokeWidth={2} />
-                  <span>Pago seguro</span>
-                </div>
-                <div className="ch-trust-item">
-                  <BadgeCheck size={14} strokeWidth={2} />
-                  <span>Compra protegida</span>
-                </div>
+                {appContent.checkout.trustBadges.map((item) => (
+                  <div className="ch-trust-item" key={item.label}>
+                    <ShieldCheck size={14} strokeWidth={2} />
+                    <span>{item.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </aside>

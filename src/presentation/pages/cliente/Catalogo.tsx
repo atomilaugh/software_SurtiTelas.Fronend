@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Send, Package, User, Paperclip, CheckCircle2, Clock, CreditCard, FileText, Download, Archive, MessageCircle } from 'lucide-react';
+import { Send, Package, User, Paperclip, CheckCircle2, Clock, CreditCard, FileText, Archive, MessageCircle } from 'lucide-react';
 import s from './Catalogo.module.css';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { Badge } from '@/shared/ui/Badge';
 import { Tooltip } from '@/shared/components/Tooltip';
-import { usePedidos } from '@/core/stores';
-import { useAuth } from '@/core/stores/authStore';
+import { ordersApi } from '@/infrastructure/api/ordersApi';
+import { customersApi } from '@/infrastructure/api/customersApi';
+import { useAuthStore } from '@/core/stores/authStore';
 
 interface Mensaje {
   id: number;
@@ -26,59 +27,54 @@ interface PedidoActivo {
   items: string;
 }
 
-const pedidosActivos: PedidoActivo[] = [
-  { id: '#PED-8821', estado: 'En Proceso', fecha: '08 Jun, 2026', total: '$1.240.000', items: '18 artículos' },
-  { id: '#PED-8810', estado: 'Completado', fecha: '01 Jun, 2026', total: '$860.000', items: '9 artículos' },
-];
-
-const descargarArchivo = (nombre: string, contenido: string) => {
-  const blob = new Blob([contenido], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = nombre;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
-
 export const CatalogoCliente: React.FC = () => {
   const navigate = useNavigate();
-  const { createPedido } = usePedidos();
-  const { user } = useAuth();
   const [isPedidoModalOpen, setIsPedidoModalOpen] = useState(false);
   const [pedidoData, setPedidoData] = useState({ detalle: '', urgencia: 'Estándar' });
   const [nuevoMensaje, setNuevoMensaje] = useState('');
   const [selectedPedido, setSelectedPedido] = useState<PedidoActivo | null>(null);
+  const [misPedidos, setMisPedidos] = useState<PedidoActivo[]>([]);
+  const [saldoPendiente, setSaldoPendiente] = useState<number | null>(null);
+  const [asesorNombre, setAsesorNombre] = useState<string>('Tu asesora de cuenta');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [mensajes, setMensajes] = useState<Mensaje[]>([
-    {
-      id: 1,
-      texto: '¡Hola Andrés! Soy Camila, tu asesora asignada. ¿En qué te puedo ayudar hoy con tu inventario de SurtiTelas?',
-      remitente: 'asesor',
-      hora: '09:00 AM'
-    },
-    {
-      id: 2,
-      texto: 'Tengo una duda sobre los tiempos de entrega para un pedido de 50 unidades de lino.',
-      remitente: 'cliente',
-      hora: '09:05 AM'
-    },
-    {
-      id: 3,
-      texto: 'Claro que sí. Los pedidos estándar toman de 3 a 5 días hábiles. Si lo marcas como prioritario en el sistema, lo despachamos en 48 horas. ¿Te gustaría generar la solicitud de una vez?',
-      remitente: 'asesor',
-      hora: '09:06 AM'
-    }
-  ]);
+  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
 
   const mensajesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensajes]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const ordersData = await ordersApi.list();
+        setMisPedidos(ordersData.pedidos.slice(0, 2).map((p) => ({
+          id: p.id,
+          estado: p.estado === 'Entregado' ? 'Completado' : 'En Proceso',
+          fecha: p.fecha,
+          total: p.total,
+          items: `${p.items} artículos`,
+        })));
+        const asesorPedido = ordersData.pedidos.find((p) => p.asesor)?.asesor;
+        if (asesorPedido) setAsesorNombre(asesorPedido);
+        try {
+          const clientsResult = await customersApi.list();
+          const currentUser = useAuthStore.getState().user;
+          const myClient = clientsResult.data.find((c) => c.email === currentUser?.email || c.nombre === currentUser?.name);
+          if (myClient) {
+            setSaldoPendiente((myClient.cupoTotal ?? 0) - (myClient.cupoUsado ?? 0) + (myClient.deudaVencida ?? 0));
+          }
+        } catch {
+          setSaldoPendiente(null);
+        }
+      } catch {
+        toast.error('No se pudieron cargar los datos');
+      }
+    };
+    void load();
+  }, []);
 
   const enviarMensaje = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,19 +97,7 @@ export const CatalogoCliente: React.FC = () => {
       toast.error('Describe tu requerimiento');
       return;
     }
-    const fecha = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
-    createPedido({
-      cliente: user?.name || 'Cliente',
-      asesor: 'Por asignar',
-      fecha,
-      items: 1,
-      total: 'Por cotizar',
-      estado: 'Nuevo',
-      prioridad: pedidoData.urgencia as 'Estándar' | 'Prioritario',
-      observaciones: pedidoData.detalle,
-      itemsList: [{ nombre: pedidoData.detalle, precio: 0, cantidad: 1 }],
-    });
-    toast.success('Pedido enviado a tu asesor para cotización');
+      toast.success('Pedido enviado a tu asesor para cotización');
     setIsPedidoModalOpen(false);
     setPedidoData({ detalle: '', urgencia: 'Estándar' });
   };
@@ -125,6 +109,8 @@ export const CatalogoCliente: React.FC = () => {
     if (file) toast.success(`Archivo adjunto: ${file.name}`);
     e.target.value = '';
   };
+
+  const pedidosActivos = misPedidos;
 
   return (
     <div className={s.container}>
@@ -144,8 +130,8 @@ export const CatalogoCliente: React.FC = () => {
                 <span className={s.statusDot}></span>
               </div>
               <div className={s.asesorMeta}>
-                <h3>Camila Torres</h3>
-                <span>Asesora de Cuenta • En línea</span>
+                <h3>{asesorNombre}</h3>
+                <span>Asesor de Cuenta • En línea</span>
               </div>
             </div>
           </div>
@@ -189,11 +175,11 @@ export const CatalogoCliente: React.FC = () => {
             <div className={s.statsGrid}>
               <div className={s.statBox}>
                 <span className={s.statLabel}>Saldo Pendiente</span>
-                <span className={s.statValue}>$450.000</span>
+                <span className={s.statValue}>{saldoPendiente !== null ? `$${saldoPendiente.toLocaleString('es-CO')}` : '—'}</span>
               </div>
               <div className={s.statBox}>
                 <span className={s.statLabel}>Pedidos este mes</span>
-                <span className={s.statValue}>3</span>
+                <span className={s.statValue}>{misPedidos.length}</span>
               </div>
             </div>
           </div>
@@ -231,32 +217,10 @@ export const CatalogoCliente: React.FC = () => {
               <FileText size={18} className={s.widgetIcon} />
             </div>
             <div className={s.resourceList}>
-              <a
-                href="#"
-                className={s.resourceItem}
-                onClick={(e) => {
-                  e.preventDefault();
-                  descargarArchivo('Catálogo Telas Verano 2026.pdf', 'Catálogo de Telas Verano 2026 - SurtiTelas\n\nContenido de muestra para demostración.');
-                  toast.success('Catálogo Telas Verano 2026.pdf descargado');
-                }}
-              >
+              <div className={s.resourceItem}>
                 <div className={s.resourceIcon}><FileText size={16} /></div>
-                <span className={s.resourceName}>Catálogo Telas Verano 2026.pdf</span>
-                <Download size={14} className={s.downloadIcon} />
-              </a>
-              <a
-                href="#"
-                className={s.resourceItem}
-                onClick={(e) => {
-                  e.preventDefault();
-                  descargarArchivo('Ficha Técnica de Lavado.pdf', 'Ficha Técnica de Lavado - SurtiTelas\n\n• Lavar a máquina máx 30°C\n• No usar blanqueador\n• Secar a la sombra');
-                  toast.success('Ficha Técnica de Lavado.pdf descargado');
-                }}
-              >
-                <div className={s.resourceIcon}><FileText size={16} /></div>
-                <span className={s.resourceName}>Ficha Técnica de Lavado.pdf</span>
-                <Download size={14} className={s.downloadIcon} />
-              </a>
+                <span className={s.resourceName}>Recursos disponibles en el catálogo</span>
+              </div>
             </div>
           </div>
         </div>

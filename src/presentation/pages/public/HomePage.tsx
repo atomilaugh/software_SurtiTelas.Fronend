@@ -18,12 +18,15 @@ import {
   CheckCircle2,
   Package,
   PackageCheck,
-  Palette
+  Palette,
+  Layout,
+  MousePointer
 } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
 
 import '../styles/App.css';
+import { appContent } from '@/shared/config/appContent';
 
 /* =========================
    TYPES
@@ -63,88 +66,35 @@ interface TrackingStep {
    DATA
 ========================= */
 
-const challenges: ChallengeItem[] = [
-  {
-    id: 'inventory',
-    icon: <AlertCircle size={24} color="#E53E3E" />,
-    bg: '#FFF5F5',
-    title: 'Desorden en inventario',
-    desc: 'No sabes cuántas telas o productos tienes disponibles.'
-  },
-  {
-    id: 'whatsapp-sales',
-    icon: <MessageSquare size={24} color="#DD6B20" />,
-    bg: '#FFFAF0',
-    title: 'Ventas por WhatsApp',
-    desc: 'Pedidos desordenados, sin historial ni control.'
-  },
-  {
-    id: 'production-control',
-    icon: <ClipboardList size={24} color="#D69E2E" />,
-    bg: '#FFFFF0',
-    title: 'Falta de control',
-    desc: 'No sabes el estado de producción de tus talleres.'
-  },
-  {
-    id: 'data-loss',
-    icon: <Clock size={24} color="#3182CE" />,
-    bg: '#EBF8FF',
-    title: 'Pérdida de información',
-    desc: 'Datos dispersos en cuadernos y hojas de cálculo.'
-  }
-];
+const challenges: ChallengeItem[] = appContent.home.challenges.map((item) => ({
+  id: item.id,
+  icon: <AlertCircle size={24} color="#E53E3E" />,
+  bg: '#FFF5F5',
+  title: item.title,
+  desc: item.desc,
+}));
 
-const slides: SlideItem[] = [
-  {
-    id: 'quality',
-    title: 'Calidad que se siente',
-    phrase: 'Textiles seleccionados bajo los más altos estándares de durabilidad.',
-    img: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=800',
-    tag: 'Premium'
-  },
-  {
-    id: 'production',
-    title: 'Producción óptima',
-    phrase: 'Procesos transparentes que garantizan confianza en cada costura.',
-    img: 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=800',
-    tag: 'Compromiso'
-  },
-  {
-    id: 'technology',
-    title: 'Tecnología Textil',
-    phrase: 'Innovación aplicada a la gestión y fabricación de tus prendas.',
-    img: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=800',
-    tag: 'Innovación'
-  }
-];
+const slides: SlideItem[] = appContent.home.slides.map((slide, index) => ({
+  id: slide.id,
+  title: slide.title,
+  phrase: slide.phrase,
+  img: ['https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=800', 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=800', 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=800'][index] ?? 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=800',
+  tag: slide.tag,
+}));
 
-const features: FeatureItem[] = [
-  {
-    id: 'responsive',
-    icon: <Smartphone size={20} />,
-    title: 'Diseño responsive',
-    desc: 'Perfecta en cualquier dispositivo.'
-  },
-  {
-    id: 'fast',
-    icon: <Zap size={20} />,
-    title: 'Carga ultrarrápida',
-    desc: 'Optimizado para conexiones lentas.'
-  },
-  {
-    id: 'ui',
-    icon: <Eye size={20} />,
-    title: 'Interfaz intuitiva',
-    desc: 'Fácil de usar para cualquier persona.'
-  }
-];
+const features: FeatureItem[] = appContent.home.features.map((feature, index) => ({
+  id: feature.id,
+  icon: [<Layout size={20} />, <Zap size={20} />, <MousePointer size={20} />][index] ?? <Smartphone size={20} />,
+  title: feature.title,
+  desc: feature.desc,
+}));
 
-const trackingSteps: TrackingStep[] = [
-  { id: 1, label: 'Recibido', icon: <CheckCircle2 size={22} />, status: 'completed' },
-  { id: 2, label: 'En producción', icon: <Package size={22} />, status: 'completed' },
-  { id: 3, label: 'Enviado', icon: <Truck size={22} />, status: 'completed' },
-  { id: 4, label: 'Entregado', icon: <PackageCheck size={22} />, status: 'upcoming' }
-];
+const trackingSteps: TrackingStep[] = appContent.home.trackingSteps.map((step, index) => ({
+  id: step.id,
+  label: step.label,
+  icon: [<CheckCircle2 size={22} />, <Package size={22} />, <Truck size={22} />, <PackageCheck size={22} />][index] ?? <CheckCircle2 size={22} />,
+  status: index < 3 ? 'completed' : 'upcoming',
+}));
 
 /* =========================
    COMPONENTS
@@ -291,7 +241,6 @@ const CategoriesGridSection = () => {
               </div>
               <div className="minimal-card-info">
                 <span className="category-tag">Pantalonetas</span>
-                <span className="price-tag">Desde $45.000</span>
               </div>
             </div>
 
@@ -301,7 +250,6 @@ const CategoriesGridSection = () => {
               </div>
               <div className="minimal-card-info">
                 <span className="category-tag">Camisas de Marca</span>
-                <span className="price-tag">Desde $35.000</span>
               </div>
             </div>
 
@@ -437,20 +385,7 @@ const HomePage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="hero-stats">
-                <div className="stat">
-                  <strong>+500</strong>
-                  <span>Clientes activos</span>
-                </div>
-                <div className="stat">
-                  <strong>99.9%</strong>
-                  <span>Calidad garantizada</span>
-                </div>
-                <div className="stat">
-                  <strong>24/7</strong>
-                  <span>Soporte experto</span>
-                </div>
-              </div>
+
             </div>
 
             <div className="hero-visual">

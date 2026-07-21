@@ -11,8 +11,8 @@
   --tan-soft: #D4CFC4;
   --tan-extra-light: #E8E4DD;
   --bg-white: #FFFFFF;
-  --bg-base: #F7F5F2;
-  --bg-off: #F7F5F2;
+  --bg-base: #FFFFFF;
+  --bg-off: #FFFFFF;
   --bg-elevated: #FFFFFF;
 }
 
@@ -32,6 +32,7 @@ body {
   background: #ffffff;
   border-bottom: 1px solid var(--gray-border);
   padding: 16px 0;
+  overflow: hidden;
 }
 
 .header-container {
@@ -41,9 +42,18 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 40px;
+  overflow: hidden;
 }
 
-.main-logo { height: 45px; width: auto; }
+.main-logo { height: 45px; width: auto; max-width: 180px; object-fit: contain; flex-shrink: 0; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  height: 45px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
 
 .site-nav { display: flex; gap: 35px; }
 .site-nav a {
@@ -72,13 +82,13 @@ body {
 .btn-login:hover { background: var(--tan-extra-light); border-color: var(--tan-soft); }
 
 .btn-primary {
-  background: #1a1a1a; color: #ffffff; border: none;
+  background: #8B8173; color: #ffffff; border: none;
   padding: 14px 28px; border-radius: 12px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
   transition: all 0.3s ease; text-decoration: none;
 }
 .btn-primary:hover {
-  background: #333;
+  background: #6D5D52;
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0,0,0,0.2);
 }
@@ -644,7 +654,7 @@ section {
     --notice-red: #ef4444; /* Rojo de aviso */
     --hover-light-gray: #f7fafc;
 
-    background-color: #fafafa; /* Fondo sutil general */
+    background-color: #ffffff; /* Fondo blanco puro */
     padding: 100px 24px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     line-height: 1.5;
@@ -1086,7 +1096,7 @@ section {
 :root {
   --azul-surtitela: #3b82f6;
   --negro-surtitela: #0f172a;
-  --gris-fondo: #f8fafc;
+  --gris-fondo: #ffffff;
   --gris-suave: #e2e8f0;
   --gris-texto: #64748b;
   --blanco: #ffffff;
@@ -1097,13 +1107,13 @@ section {
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--gris-fondo);
+  background-color: #ffffff;
   color: var(--negro-surtitela);
 }
 
 /* Botones Base */
 .btn-primary {
-  background: var(--azul-surtitela);
+  background: #8B8173;
   color: white;
   border: none;
   padding: 10px 20px;
@@ -1118,7 +1128,7 @@ body {
 }
 
 .btn-primary:hover {
-  background: var(--negro-surtitela);
+  background: #1a1a1a;
 }
 
 .full-width { width: 100%; }
@@ -1366,9 +1376,9 @@ body {
 
 .m-feature-item:hover .m-icon-box {
   transform: translateY(-4px);
-  background: #2563eb;
-  border-color: #2563eb;
-  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.35);
+  background: #8B8173;
+  border-color: #8B8173;
+  box-shadow: 0 10px 30px rgba(139, 129, 115, 0.35);
 }
 
 /* TEXTO */

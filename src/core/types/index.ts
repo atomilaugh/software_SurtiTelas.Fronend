@@ -29,15 +29,31 @@ export interface Producto {
 
 export type PublicationStatus = 'Publicado' | 'Borrador' | 'Oculto';
 
+export interface ProductoDetalle {
+  id?: string;
+  nombre: string;
+  precio: number;
+  imagen?: string;
+  categoria?: string;
+  descripcion?: string;
+  tallas?: string[];
+  colores?: string[];
+  rating?: number;
+  reviews?: number;
+}
+
 export interface Cliente {
   id: string;
   nombre: string;
   ciudad: string;
   tel: string;
   asesor: string;
+  asesorId?: string;
   pedidos: number;
   estado: 'Activo' | 'Inactivo';
   nit?: string;
+  email?: string;
+  direccion?: string;
   cupoTotal?: number;
   cupoUsado?: number;
   deudaVencida?: number;
@@ -52,6 +68,7 @@ export interface PedidoItem {
 
 export interface Pedido {
   id: string;
+  numero?: string;
   cliente: string;
   asesor: string;
   fecha: string;

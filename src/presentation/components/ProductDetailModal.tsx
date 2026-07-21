@@ -16,22 +16,10 @@ import './ProductDetailModal.css'
 
 import { sanitizeImageUrl } from '@shared/utils/image-utils'
 import { useCart } from '@/app/providers/AppProviders'
-
-type DetailProduct = {
-  id: string
-  nombre: string
-  precio: number
-  imagen?: string
-  categoria?: string
-  descripcion?: string
-  tallas?: string[]
-  colores?: string[]
-  rating?: number
-  reviews?: number
-}
+import type { ProductoDetalle } from '@/core/types'
 
 type Props = {
-  product: DetailProduct | null
+  product: ProductoDetalle | null
   isOpen: boolean
   onClose: () => void
 }

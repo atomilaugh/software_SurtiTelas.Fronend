@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Map, MapPin, Clock, CheckCircle2, Navigation } from 'lucide-react';
 import s from './RutaDelDia.module.css';
 import { Button } from '@/shared/ui/Button';
 import { Badge } from '@/shared/ui/Badge';
 import { DetailModal } from '@/shared/ui/DetailModal';
+import { deliveriesApi } from '@/infrastructure/api/deliveriesApi';
+import { useAuthStore } from '@/core/stores/authStore';
 
 interface Entrega {
   id: string;
@@ -15,13 +17,12 @@ interface Entrega {
   estado: 'Pendiente' | 'En camino' | 'Entregado' | 'Fallido';
 }
 
-const entregasSeed: Entrega[] = [
-  { id: 'ENT-043', cliente: 'Almacén El Sol', direccion: 'Cra 15 #45-23', barrio: 'Chapinero', horaEstimada: '09:30', estado: 'Entregado' },
-  { id: 'ENT-044', cliente: 'Boutique Moda+', direccion: 'Cl 80 #12-67', barrio: 'Suba', horaEstimada: '10:15', estado: 'Entregado' },
-  { id: 'ENT-045', cliente: 'Moda Express SAS', direccion: 'Av 68 #34-10', barrio: 'Teusaquillo', horaEstimada: '11:00', estado: 'En camino' },
-  { id: 'ENT-046', cliente: 'Textiles del Norte', direccion: 'Cra 7 #120-45', barrio: 'Usaquén', horaEstimada: '11:45', estado: 'Pendiente' },
-  { id: 'ENT-047', cliente: 'La Casa del Denim', direccion: 'Cl 127 #20-33', barrio: 'Cedritos', horaEstimada: '12:30', estado: 'Pendiente' },
-];
+const deliveryStatusMap: Record<string, Entrega['estado']> = {
+  'ENTREGADO': 'Entregado',
+  'EN_RUTA': 'En camino',
+  'ASIGNADO': 'Pendiente',
+  'FALLIDO': 'Fallido',
+};
 
 const statusVariant = (estado: Entrega['estado']) => {
   if (estado === 'Entregado') return 'success';
@@ -31,10 +32,35 @@ const statusVariant = (estado: Entrega['estado']) => {
 };
 
 export const RutaDelDia: React.FC = () => {
-  const [entregas, setEntregas] = useState<Entrega[]>(entregasSeed);
-  const [selectedEntrega, setSelectedEntrega] = useState<Entrega | null>(entregasSeed[2]);
+  const user = useAuthStore((s) => s.user);
+  const [entregas, setEntregas] = useState<Entrega[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedEntrega, setSelectedEntrega] = useState<Entrega | null>(null);
   const [statusEntrega, setStatusEntrega] = useState<Entrega | null>(null);
   const [nextEstado, setNextEstado] = useState<Entrega['estado']>('Pendiente');
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const result = await deliveriesApi.list(user?.uid ? { domiciliarioId: user.uid } : undefined);
+        const mapped: Entrega[] = result.map((d) => ({
+          id: d.orderId || d.id,
+          cliente: d.clienteNombre || '',
+          direccion: d.direccion || '',
+          barrio: d.ciudad || '',
+          horaEstimada: d.asignadoEn ? new Date(d.asignadoEn).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+          estado: deliveryStatusMap[d.estado] || 'Pendiente',
+        }));
+        setEntregas(mapped);
+      } catch {
+        toast.error('No se pudieron cargar las entregas');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user?.uid) void load();
+  }, [user?.uid]);
 
   const completed = entregas.filter(e => e.estado === 'Entregado').length;
   const pending = entregas.length - completed;
@@ -51,12 +77,18 @@ export const RutaDelDia: React.FC = () => {
     setNextEstado(entrega.estado === 'Pendiente' ? 'En camino' : entrega.estado === 'En camino' ? 'Entregado' : 'Fallido');
   };
 
-  const saveStatus = () => {
+  const saveStatus = async () => {
     if (!statusEntrega) return;
-    setEntregas(prev => prev.map(entrega => entrega.id === statusEntrega.id ? { ...entrega, estado: nextEstado } : entrega));
-    setSelectedEntrega(prev => prev?.id === statusEntrega.id ? { ...prev, estado: nextEstado } : prev);
-    toast.success(`${statusEntrega.id} marcada como ${nextEstado}`);
-    setStatusEntrega(null);
+    try {
+      const backendEstado = nextEstado === 'Pendiente' ? 'ASIGNADO' : nextEstado === 'En camino' ? 'EN_RUTA' : nextEstado === 'Entregado' ? 'ENTREGADO' : 'FALLIDO';
+      await deliveriesApi.updateStatus(statusEntrega.id, backendEstado);
+      setEntregas(prev => prev.map(entrega => entrega.id === statusEntrega.id ? { ...entrega, estado: nextEstado } : entrega));
+      setSelectedEntrega(prev => prev?.id === statusEntrega.id ? { ...prev, estado: nextEstado } : prev);
+      toast.success(`${statusEntrega.id} marcada como ${nextEstado}`);
+      setStatusEntrega(null);
+    } catch {
+      toast.error('No se pudo actualizar el estado');
+    }
   };
 
   const optimizarRuta = () => {
@@ -72,10 +104,19 @@ export const RutaDelDia: React.FC = () => {
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank', 'noopener');
   };
 
+  if (loading) {
+    return (
+      <div>
+        <h1 className={s.pageTitle}>Ruta del Día</h1>
+        <p className={s.pageSubtitle}>Cargando entregas...</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h1 className={s.pageTitle}>Ruta del Día</h1>
-      <p className={s.pageSubtitle}>{entregas.length} entregas programadas — 125 km totales</p>
+      <p className={s.pageSubtitle}>{entregas.length} entregas programadas</p>
 
       <div className={s.rutaLayout}>
         <div className={s.rutaPanel}>

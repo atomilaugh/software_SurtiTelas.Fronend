@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, Moon, Download, Sun, Package, ShoppingCart, AlertTriangle, MessageSquare } from 'lucide-react';
+import { Search, Bell, Moon, Download, Sun, Package, ShoppingCart, AlertTriangle, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
 import s from './TopHeader.module.css';
 import { cn } from '@/shared/utils';
 import { Tooltip } from '@/shared/components/Tooltip';
+import { alertsApi, type Alert } from '@/infrastructure/api/alertsApi';
+import { tokenStorage } from '@/infrastructure/api/tokenStorage';
 
 interface Notification {
   id: string;
@@ -30,11 +32,24 @@ interface TopHeaderProps {
   darkMode?: boolean;
 }
 
-const mockNotifications: Notification[] = [
-  { id: '1', title: 'Nuevo pedido', message: 'Pedido #12345 ha sido creado', time: 'Hace 5 min', type: 'order', read: false, path: '/admin/pedidos' },
-  { id: '2', title: 'Stock bajo', message: 'Producto "Camiseta Negra" tiene stock bajo', time: 'Hace 1 hora', type: 'stock', read: false, path: '/admin/alertas-stock' },
-  { id: '3', title: 'Mensaje', message: 'Tienes un nuevo mensaje de soporte', time: 'Hace 2 horas', type: 'message', read: true, path: '/admin/alertas-stock' },
-];
+const mapAlertToNotification = (alert: Alert): Notification => {
+  const typeMap: Record<string, Notification['type']> = {
+    STOCK: 'stock',
+    PEDIDO: 'order',
+    MENSAJE: 'message',
+    PEDIDO_NUEVO: 'order',
+    STOCK_BAJO: 'stock',
+  };
+  return {
+    id: alert.id,
+    title: alert.tipo.replace(/_/g, ' '),
+    message: alert.mensaje,
+    time: new Date(alert.createdAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }),
+    type: typeMap[alert.tipo] ?? 'info',
+    read: alert.leida,
+    path: alert.modulo ? `/admin/${alert.modulo.toLowerCase()}` : '/admin/alertas-stock',
+  };
+};
 
 const getNotificationIcon = (type: Notification['type']) => {
   switch (type) {
@@ -52,10 +67,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onToggleTheme,
   onExport,
   onNotificationClick,
-  notifications = mockNotifications,
+  notifications,
   darkMode = false,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [fetchedNotifications, setFetchedNotifications] = useState<Notification[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState<boolean>(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const showExport = user.role === 'admin' || typeof onExport === 'function';
 
@@ -68,6 +86,30 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      if (!tokenStorage.getAccessToken()) return;
+      setLoadingNotifications(true);
+      setNotificationsError(null);
+      try {
+        const unread = await alertsApi.list({ leida: false });
+        if (!active) return;
+        setFetchedNotifications(unread.map(mapAlertToNotification));
+      } catch (err) {
+        if (!active) return;
+        setNotificationsError(err instanceof Error ? err.message : 'No se pudieron cargar las alertas');
+      } finally {
+        if (active) setLoadingNotifications(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
+  const notificationsList = notifications ?? fetchedNotifications;
+  const effectiveCount = notificationCount > 0 ? notificationCount : notificationsList.filter(n => !n.read).length;
 
   return (
     <header className={s.header}>
@@ -94,17 +136,29 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               <Bell size={20} />
             </button>
           </Tooltip>
-          {notificationCount > 0 && (
-            <span className={s.badge}>{notificationCount}</span>
+          {effectiveCount > 0 && (
+            <span className={s.badge}>{effectiveCount}</span>
           )}
           {showNotifications && (
             <div className={s.notificationsDropdown}>
               <div className={s.notificationsHeader}>
                 <h3>Notificaciones</h3>
-                <span className={s.notificationsCount}>{notificationCount} nuevas</span>
+                <span className={s.notificationsCount}>{effectiveCount} nuevas</span>
               </div>
               <div className={s.notificationsList}>
-                {notifications.map((notification) => (
+                {loadingNotifications && (
+                  <div className={cn(s.emptyNotifications, s.loadingState)}>
+                    <Loader2 size={32} className={cn(s.emptyIcon, s.spin)} />
+                    <p>Cargando notificaciones...</p>
+                  </div>
+                )}
+                {notificationsError && (
+                  <div className={cn(s.emptyNotifications, s.errorState)}>
+                    <AlertCircle size={32} className={s.emptyIcon} />
+                    <p>{notificationsError}</p>
+                  </div>
+                )}
+                {!loadingNotifications && !notificationsError && notificationsList.map((notification) => (
                   <div
                     key={notification.id}
                     className={cn(s.notificationItem, !notification.read && s.unread)}
@@ -123,7 +177,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     {!notification.read && <div className={s.unreadDot} />}
                   </div>
                 ))}
-                {notifications.length === 0 && (
+                {!loadingNotifications && !notificationsError && notificationsList.length === 0 && (
                   <div className={s.emptyNotifications}>
                     <Bell size={32} className={s.emptyIcon} />
                     <p>No hay notificaciones nuevas</p>

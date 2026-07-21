@@ -3,6 +3,32 @@
   gap: 24px;
 }
 
+.loadingState,
+.errorState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 16px;
+  border-radius: 16px;
+  background: var(--color-bg-elevated, #f8fafc);
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.errorState {
+  color: var(--color-danger, #dc2626);
+}
+
+.loadingSpinner {
+  animation: favSpin 0.9s linear infinite;
+  color: var(--color-primary, #2563eb);
+}
+
+@keyframes favSpin {
+  to { transform: rotate(360deg); }
+}
+
 .pageHeader {
   display: flex;
   align-items: flex-start;

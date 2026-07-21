@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import s from './PerfilCliente.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
-import { Edit2, Building, MapPin, Lock, Plus, Trash2, User, CreditCard, Phone } from 'lucide-react';
-import { DetailModal } from '@/shared/ui/DetailModal';
+import { Modal } from '@/shared/ui/Modal';
 import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import { Tooltip } from '@/shared/components/Tooltip';
+import { Edit2, Plus } from 'lucide-react';
+import { authApi } from '@/infrastructure/api/authApi';
+import { useAuthStore } from '@/core/stores/authStore';
+import { isValidPhone } from '@/shared/utils/phone';
 
 interface Direccion {
   id: number;
@@ -16,46 +20,13 @@ interface Direccion {
   indicaciones: string;
 }
 
-interface ClienteForm {
-  nombre: string;
-  nit: string;
-  telefono: string;
-  ciudad: string;
-  empresa: string;
-  sector: string;
-  cargo: string;
-  passwordActual: string;
-  passwordNueva: string;
-  passwordConfirm: string;
-}
-
-const perfilData = {
-  nombre: 'Juan Pablo Martínez',
-  iniciales: 'JM',
-  empresa: 'Almacén El Sol',
-  nit: '900.123.456-7',
-  email: 'juan.martinez@almacenelsol.com',
-  telefono: '310 234 5678',
-  ciudad: 'Bogotá',
-  sector: 'Comercio al por menor',
-  cargo: 'Gerente de Compras',
-  asesor: {
-    nombre: 'Camila Torres',
-    iniciales: 'CT',
-    email: 'camila.torres@surtitelas.com',
-    telefono: '315 678 9012',
-  },
-  estadisticas: {
-    pedidos: 24,
-    entregados: 21,
-    totalComprado: '$8.4M',
-    mesesActivo: 14,
-  },
-  direcciones: [
-    { id: 1, label: 'Principal', texto: 'Cra 15 #45-23', ciudad: 'Bogotá', barrio: 'Chapinero', indicaciones: 'Edificio azul, local 102' },
-    { id: 2, label: 'Secundaria', texto: 'Cl 80 #20-15', ciudad: 'Bogotá', barrio: 'Suba', indicaciones: 'Cerca al parque' },
-  ],
-};
+const DOCUMENT_TYPES = [
+  'DNI',
+  'Cédula',
+  'Pasaporte',
+  'RUC',
+  'Carné de extranjería',
+];
 
 const emptyDireccion: Omit<Direccion, 'id'> = {
   label: '',
@@ -66,38 +37,45 @@ const emptyDireccion: Omit<Direccion, 'id'> = {
 };
 
 export const PerfilCliente: React.FC = () => {
-  const [form, setForm] = useState<ClienteForm>({
-    nombre: perfilData.nombre,
-    nit: perfilData.nit,
-    telefono: perfilData.telefono,
-    ciudad: perfilData.ciudad,
-    empresa: perfilData.empresa,
-    sector: perfilData.sector,
-    cargo: perfilData.cargo,
-    passwordActual: '',
-    passwordNueva: '',
-    passwordConfirm: '',
-  });
-  const [direcciones, setDirecciones] = useState<Direccion[]>(perfilData.direcciones);
+  const user = useAuthStore((s) => s.user);
+  const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [direccionPerfil, setDireccionPerfil] = useState('');
+  const [tipoDocumento, setTipoDocumento] = useState('');
+  const [numeroDocumento, setNumeroDocumento] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [direccionModal, setDireccionModal] = useState<{ open: boolean; mode: 'crear' | 'editar'; direccion?: Direccion }>({ open: false, mode: 'crear' });
   const [direccionDraft, setDireccionDraft] = useState<Omit<Direccion, 'id'>>(emptyDireccion);
   const [deleteDireccion, setDeleteDireccion] = useState<Direccion | null>(null);
-  const [asesorModalOpen, setAsesorModalOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const [avatarDraft, setAvatarDraft] = useState('');
 
-  const abrirEditarAvatar = () => {
-    setAvatarDraft(avatarUrl);
-    setAvatarModalOpen(true);
-  };
-
-  const guardarAvatar = () => {
-    setAvatarUrl(avatarDraft.trim());
-    setAvatarModalOpen(false);
-    toast.success('Foto de perfil actualizada');
-  };
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const profile = await authApi.me();
+        setNombre(profile.nombre);
+        setTelefono(profile.telefono ?? '');
+        setDireccionPerfil(profile.direccion ?? '');
+        setTipoDocumento(profile.tipoDocumento ?? '');
+        setNumeroDocumento(profile.numeroDocumento ?? '');
+        setEmail(profile.email);
+      } catch {
+        toast.error('No se pudo cargar el perfil');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
 
   const abrirCrearDireccion = () => {
     setDireccionDraft(emptyDireccion);
@@ -140,330 +118,320 @@ export const PerfilCliente: React.FC = () => {
     setDeleteDireccion(null);
   };
 
-  const guardarCambios = () => {
+  const validarPerfil = () => {
     setFormError('');
-    if (!form.nombre.trim() || !form.nit.trim() || !form.telefono.trim() || !form.ciudad.trim()) {
-      setFormError('Nombre, NIT, teléfono y ciudad son obligatorios.');
-      return;
+    if (!nombre.trim()) {
+      setFormError('El nombre y apellido son obligatorios.');
+      return false;
     }
-
-    const hayCambiosPassword = form.passwordActual || form.passwordNueva || form.passwordConfirm;
-    if (hayCambiosPassword) {
-      if (!form.passwordActual || !form.passwordNueva || !form.passwordConfirm) {
-        setFormError('Completa todos los campos de contraseña.');
-        return;
-      }
-      if (form.passwordNueva.length < 8) {
-        setFormError('La nueva contraseña debe tener al menos 8 caracteres.');
-        return;
-      }
-      if (form.passwordNueva !== form.passwordConfirm) {
-        setFormError('La nueva contraseña no coincide con la confirmación.');
-        return;
-      }
+    if (!email.trim()) {
+      setFormError('El correo electrónico es obligatorio.');
+      return false;
     }
-
-    toast.success('Cambios guardados correctamente');
-    setForm({ ...form, passwordActual: '', passwordNueva: '', passwordConfirm: '' });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setFormError('Ingresa un correo válido.');
+      return false;
+    }
+    if (!tipoDocumento.trim()) {
+      setFormError('El tipo de documento es obligatorio.');
+      return false;
+    }
+    if (!numeroDocumento.trim()) {
+      setFormError('El número de documento es obligatorio.');
+      return false;
+    }
+    if (!isValidPhone(telefono)) {
+      setFormError('Ingresa un teléfono válido.');
+      return false;
+    }
+    if (password && password !== passwordConfirm) {
+      setFormError('La contraseña y su confirmación deben coincidir.');
+      return false;
+    }
+    return true;
   };
 
+  const guardarCambios = async () => {
+    if (!validarPerfil()) return;
+    setSaving(true);
+    try {
+      const payload: Parameters<typeof authApi.updateProfile>[0] = {
+        nombre,
+        telefono,
+        email,
+        direccion: direccionPerfil,
+        tipoDocumento,
+        numeroDocumento,
+      };
+      if (password) {
+        payload.password = password;
+      }
+      const updated = await authApi.updateProfile(payload);
+      if (user) {
+        useAuthStore.setState({ user: { ...user, nombre: updated.nombre, email: updated.email } });
+      }
+      toast.success('Cambios guardados correctamente');
+      setPassword('');
+      setPasswordConfirm('');
+    } catch {
+      toast.error('No fue posible guardar los cambios');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const abrirEditarAvatar = () => {
+    setAvatarDraft(avatarUrl);
+    setAvatarModalOpen(true);
+  };
+
+  const guardarAvatar = () => {
+    setAvatarUrl(avatarDraft.trim());
+    setAvatarModalOpen(false);
+    toast.success('Foto de perfil actualizada');
+  };
+
+  if (loading) {
+    return <div className={s.pageTitle}>Cargando perfil...</div>;
+  }
+
   return (
-    <div className={s.perfilLayout}>
-      <div className={s.perfilCard}>
-        <div className={s.avatar}>
-          {avatarUrl ? <img src={avatarUrl} alt="Avatar" className={s.avatarImg} /> : perfilData.iniciales}
-          <button className={s.avatarEditBtn} type="button" onClick={abrirEditarAvatar} aria-label="Cambiar foto de perfil">
-            <Edit2 size={14} />
-          </button>
+    <div className={s.pageContainer}>
+      <div className={s.pageHeader}>
+        <div>
+          <h1 className={s.pageTitle}>Mi perfil</h1>
+          <p className={s.pageSubtitle}>Actualiza tu información personal y administra tus direcciones.</p>
         </div>
-
-        <div className={s.perfilNombre}>{form.nombre}</div>
-        <div className={s.perfilEmpresa}>{form.empresa}</div>
-
-        <div className={s.rolTag}>
-          <Badge variant="success" dot>
-            Cliente
-          </Badge>
-        </div>
-
-        <div className={s.perfilDivider} />
-
-        <div className={s.perfilStats}>
-          <div className={s.perfilStat}>
-            <div className={s.perfilStatValue}>{perfilData.estadisticas.pedidos}</div>
-            <div className={s.perfilStatLabel}>Pedidos</div>
-          </div>
-          <div className={s.perfilStat}>
-            <div className={s.perfilStatValue}>{perfilData.estadisticas.entregados}</div>
-            <div className={s.perfilStatLabel}>Entregas</div>
-          </div>
-          <div className={s.perfilStat}>
-            <div className={s.perfilStatValue}>{perfilData.estadisticas.totalComprado}</div>
-            <div className={s.perfilStatLabel}>Total</div>
-          </div>
-          <div className={s.perfilStat}>
-            <div className={s.perfilStatValue}>{perfilData.estadisticas.mesesActivo}</div>
-            <div className={s.perfilStatLabel}>Meses</div>
-          </div>
-        </div>
-
-        <div className={s.asesorSection}>
-          <div className={s.asesorSectionTitle}>Asesor asignado</div>
-          <button type="button" className={s.asesorMiniCard} onClick={() => setAsesorModalOpen(true)}>
-            <div className={s.asesorMiniAvatar}>{perfilData.asesor.iniciales}</div>
-            <div>
-              <div className={s.asesorMiniName}>{perfilData.asesor.nombre}</div>
-              <div className={s.asesorMiniRole}>Asesor de Ventas</div>
-            </div>
-          </button>
-          <div className={s.asesorReadOnlyNote}>
-            Tu asesor es asignado por el sistema y no puede ser modificado
-          </div>
+        <div className={s.headerBadgeRow}>
+          <Badge variant="success" dot>Cliente</Badge>
         </div>
       </div>
 
-      <div className={s.perfilFormContainer}>
-        <div className={s.perfilSection}>
-          <div className={s.perfilSectionHeader}>
-            <h2 className={s.perfilSectionTitle}>
-              <Edit2 size={16} className={s.perfilSectionIcon} />
-              Datos personales
-            </h2>
+      <div className={s.perfilLayout}>
+        <aside className={s.perfilCard}>
+          <div className={s.avatar}>
+            {nombre ? nombre.charAt(0).toUpperCase() : 'U'}
+            <Tooltip title="Cambiar foto">
+              <button className={s.avatarEditBtn} type="button" onClick={abrirEditarAvatar}>
+                <Edit2 size={14} />
+              </button>
+            </Tooltip>
           </div>
-          <div className={s.perfilSectionBody}>
-            <div className={s.formGrid2}>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Nombre completo</label>
-                <input className={s.formInput} value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} />
-              </div>
-              <div className={s.formField}>
-                <label className={s.formLabel}>NIT / CC</label>
-                <input className={s.formInput} value={form.nit} onChange={e => setForm({ ...form, nit: e.target.value })} />
-              </div>
+          <div className={s.perfilName}>{nombre}</div>
+          <div className={s.perfilEmail}>{email}</div>
+          <div className={s.rolTag}>
+            <Badge variant="success" dot>Cliente</Badge>
+          </div>
+          <div className={s.cardSummary}>
+            <div className={s.summaryItem}>
+              <span>Teléfono</span>
+              <strong>{telefono || '-'}</strong>
             </div>
-            <div className={s.formGrid2}>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Teléfono</label>
-                <input className={s.formInput} value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />
-              </div>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Ciudad</label>
-                <input className={s.formInput} value={form.ciudad} onChange={e => setForm({ ...form, ciudad: e.target.value })} />
-              </div>
+            <div className={s.summaryItem}>
+              <span>Documento</span>
+              <strong>{tipoDocumento ? `${tipoDocumento} · ${numeroDocumento}` : '-'}</strong>
             </div>
-            <div className={s.formField}>
-              <label className={s.formLabel}>Email</label>
-              <input className={s.formInputReadOnly} value={perfilData.email} readOnly />
-              <span className={s.readOnlyHint}>No se puede modificar el email</span>
+            <div className={s.summaryItem}>
+              <span>Dirección</span>
+              <strong>{direccionPerfil || '-'}</strong>
             </div>
           </div>
-        </div>
+        </aside>
 
-        <div className={s.perfilSection}>
-          <div className={s.perfilSectionHeader}>
-            <h2 className={s.perfilSectionTitle}>
-              <Building size={16} className={s.perfilSectionIcon} />
-              Datos de la empresa
-            </h2>
-          </div>
-          <div className={s.perfilSectionBody}>
-            <div className={s.formGrid3}>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Nombre empresa</label>
-                <input className={s.formInput} value={form.empresa} onChange={e => setForm({ ...form, empresa: e.target.value })} />
+        <section className={s.perfilForm}>
+          <div className={s.perfilSection}>
+            <div className={s.perfilSectionHeader}>
+              <div className={s.perfilSectionTitle}>Información personal</div>
+              <div className={s.sectionNote}>Tus datos se utilizan para tus pedidos y factura.</div>
+            </div>
+            <div className={s.perfilSectionBody}>
+              <div className={s.formGrid2}>
+                <div className={s.formField}>
+                  <label className={s.formLabel}>Nombre completo</label>
+                  <input
+                    type="text"
+                    className={s.formInput}
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                  />
+                </div>
+                <div className={s.formField}>
+                  <label className={s.formLabel}>Correo electrónico</label>
+                  <input
+                    type="email"
+                    className={s.formInput}
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Sector</label>
-                <input className={s.formInput} value={form.sector} onChange={e => setForm({ ...form, sector: e.target.value })} />
+              <div className={s.formGrid2}>
+                <div className={s.formField}>
+                  <label className={s.formLabel}>Teléfono</label>
+                  <input
+                    type="text"
+                    className={s.formInput}
+                    value={telefono}
+                    onChange={e => setTelefono(e.target.value)}
+                  />
+                </div>
+                <div className={s.formField}>
+                  <label className={s.formLabel}>Dirección</label>
+                  <input
+                    type="text"
+                    className={s.formInput}
+                    value={direccionPerfil}
+                    onChange={e => setDireccionPerfil(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Cargo contacto</label>
-                <input className={s.formInput} value={form.cargo} onChange={e => setForm({ ...form, cargo: e.target.value })} />
+              <div className={s.formGrid2}>
+                <div className={s.formField}>
+                  <label className={s.formLabel}>Tipo de documento</label>
+                  <select
+                    className={s.formInput}
+                    value={tipoDocumento}
+                    onChange={e => setTipoDocumento(e.target.value)}
+                  >
+                    <option value="">Selecciona un documento</option>
+                    {DOCUMENT_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={s.formField}>
+                  <label className={s.formLabel}>Número de documento</label>
+                  <input
+                    type="text"
+                    className={s.formInput}
+                    value={numeroDocumento}
+                    onChange={e => setNumeroDocumento(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className={s.formGrid2}>
+                <div className={s.formField}>
+                  <label className={s.formLabel}>Contraseña nueva</label>
+                  <input
+                    type="password"
+                    className={s.formInput}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Dejar en blanco para no cambiar"
+                  />
+                </div>
+                <div className={s.formField}>
+                  <label className={s.formLabel}>Confirmar contraseña</label>
+                  <input
+                    type="password"
+                    className={s.formInput}
+                    value={passwordConfirm}
+                    onChange={e => setPasswordConfirm(e.target.value)}
+                    placeholder="Repite la nueva contraseña"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className={s.perfilSection}>
-          <div className={s.perfilSectionHeader}>
-            <h2 className={s.perfilSectionTitle}>
-              <MapPin size={16} className={s.perfilSectionIcon} />
-              Direcciones de entrega
-            </h2>
-            <Button variant="secondary" size="sm" onClick={abrirCrearDireccion}>
-              <Plus size={14} />
-              Agregar
+          <div className={s.perfilSection}>
+            <div className={s.perfilSectionHeader}>
+              <div className={s.perfilSectionTitle}>Direcciones</div>
+              <Button variant="secondary" size="sm" leftIcon={<Plus size={16} />} onClick={abrirCrearDireccion}>
+                Agregar dirección
+              </Button>
+            </div>
+            <div className={s.perfilSectionBody}>
+              {direcciones.length === 0 ? (
+                <div className={s.emptyState}>No hay direcciones registradas aún.</div>
+              ) : (
+                <div className={s.direccionesList}>
+                  {direcciones.map(direccion => (
+                    <div key={direccion.id} className={s.direccionCard}>
+                      <div className={s.direccionInfo}>
+                        <div className={s.direccionLabel}>{direccion.label}</div>
+                        <div className={s.direccionText}>{direccion.texto}</div>
+                        <div className={s.direccionMeta}>{direccion.barrio} · {direccion.ciudad}</div>
+                        {direccion.indicaciones && <div className={s.direccionMeta}>{direccion.indicaciones}</div>}
+                      </div>
+                      <div className={s.direccionActions}>
+                        <Button variant="secondary" size="sm" onClick={() => abrirEditarDireccion(direccion)}>Editar</Button>
+                        <Button variant="danger" size="sm" onClick={() => setDeleteDireccion(direccion)}>Eliminar</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {formError && (
+            <div className={s.formError}>{formError}</div>
+          )}
+
+          <div className={s.formActions}>
+            <Button onClick={guardarCambios} loading={saving}>
+              Guardar cambios
             </Button>
           </div>
-          <div className={s.direccionesSection}>
-            {direcciones.map(dir => (
-              <div key={dir.id} className={`${s.direccionCard} ${dir.label === 'Principal' ? s.direccionCardPrincipal : ''}`}>
-                <div className={s.direccionInfo}>
-                  <div className={s.direccionLabel}>{dir.label}</div>
-                  <div className={s.direccionText}>{dir.texto}</div>
-                  <div className={s.direccionMeta}>{dir.barrio}, {dir.ciudad} • {dir.indicaciones}</div>
-                </div>
-                <div className={s.direccionActions}>
-                  <button className="btn btn--secondary btn--sm" style={{ padding: '6px' }} type="button" onClick={() => abrirEditarDireccion(dir)}>
-                    <Edit2 size={14} />
-                  </button>
-                  <button className="btn btn--ghost btn--sm" style={{ padding: '6px' }} type="button" onClick={() => setDeleteDireccion(dir)}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={s.perfilSection}>
-          <div className={s.perfilSectionHeader}>
-            <h2 className={s.perfilSectionTitle}>
-              <Lock size={16} className={s.perfilSectionIcon} />
-              Cambiar contraseña
-            </h2>
-          </div>
-          <div className={s.perfilSectionBody}>
-            <div className={s.formGrid2}>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Contraseña actual</label>
-                <input type="password" className={s.formInput} placeholder="••••••••" value={form.passwordActual} onChange={e => setForm({ ...form, passwordActual: e.target.value })} />
-              </div>
-              <div className={s.formField}>
-                <label className={s.formLabel}>Nueva contraseña</label>
-                <input type="password" className={s.formInput} placeholder="••••••••" value={form.passwordNueva} onChange={e => setForm({ ...form, passwordNueva: e.target.value })} />
-              </div>
-            </div>
-            <div className={s.formField}>
-              <label className={s.formLabel}>Confirmar nueva contraseña</label>
-              <input type="password" className={s.formInput} placeholder="••••••••" value={form.passwordConfirm} onChange={e => setForm({ ...form, passwordConfirm: e.target.value })} />
-            </div>
-          </div>
-          <div className={s.perfilSectionFooter}>
-            <Button variant="primary" onClick={guardarCambios}>Guardar cambios</Button>
-          </div>
-        </div>
-
-        {formError && (
-          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-            {formError}
-          </div>
-        )}
+        </section>
       </div>
 
-      <DetailModal
-        children={null}
-        open={direccionModal.open}
-        onClose={() => setDireccionModal({ open: false, mode: 'crear' })}
-        title={direccionModal.mode === 'editar' ? 'Editar dirección' : 'Agregar dirección'}
-        subtitle="Información para entregas"
-        size="md"
-        sections={[
-          {
-            title: 'Datos de dirección',
-            children: (
-              <div className="grid gap-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
-                    Etiqueta
-                    <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={direccionDraft.label} onChange={e => setDireccionDraft({ ...direccionDraft, label: e.target.value })} placeholder="Casa, Bodega, Principal..." />
-                  </label>
-                  <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
-                    Ciudad
-                    <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={direccionDraft.ciudad} onChange={e => setDireccionDraft({ ...direccionDraft, ciudad: e.target.value })} />
-                  </label>
-                </div>
-                <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
-                  Dirección
-                  <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={direccionDraft.texto} onChange={e => setDireccionDraft({ ...direccionDraft, texto: e.target.value })} />
-                </label>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
-                    Barrio
-                    <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={direccionDraft.barrio} onChange={e => setDireccionDraft({ ...direccionDraft, barrio: e.target.value })} />
-                  </label>
-                  <label className="grid gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
-                    Indicaciones
-                    <input className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" value={direccionDraft.indicaciones} onChange={e => setDireccionDraft({ ...direccionDraft, indicaciones: e.target.value })} />
-                  </label>
-                </div>
-              </div>
-            ),
-          },
-        ]}
-        footer={
+      <Modal open={direccionModal.open} onClose={() => setDireccionModal({ open: false, mode: 'crear' })} title={direccionModal.mode === 'editar' ? 'Editar dirección' : 'Nueva dirección'} size="md">
+        <div className="grid gap-4">
+          <div className={s.field}>
+            <label className={s.label}>Label</label>
+            <input className={s.input} value={direccionDraft.label} onChange={e => setDireccionDraft(prev => ({ ...prev, label: e.target.value }))} />
+          </div>
+          <div className={s.field}>
+            <label className={s.label}>Dirección</label>
+            <input className={s.input} value={direccionDraft.texto} onChange={e => setDireccionDraft(prev => ({ ...prev, texto: e.target.value }))} />
+          </div>
+          <div className={s.field}>
+            <label className={s.label}>Ciudad</label>
+            <input className={s.input} value={direccionDraft.ciudad} onChange={e => setDireccionDraft(prev => ({ ...prev, ciudad: e.target.value }))} />
+          </div>
+          <div className={s.field}>
+            <label className={s.label}>Barrio</label>
+            <input className={s.input} value={direccionDraft.barrio} onChange={e => setDireccionDraft(prev => ({ ...prev, barrio: e.target.value }))} />
+          </div>
+          <div className={s.field}>
+            <label className={s.label}>Indicaciones</label>
+            <textarea className={s.textarea} value={direccionDraft.indicaciones} onChange={e => setDireccionDraft(prev => ({ ...prev, indicaciones: e.target.value }))} />
+          </div>
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setDireccionModal({ open: false, mode: 'crear' })}>Cancelar</Button>
-            <Button onClick={guardarDireccion}>Guardar dirección</Button>
+            <Button onClick={guardarDireccion}>Guardar</Button>
           </div>
-        }
-      />
-
-      <DetailModal
-        children={null}
-        open={Boolean(asesorModalOpen)}
-        onClose={() => setAsesorModalOpen(false)}
-        title="Asesor asignado"
-        subtitle="Contacto comercial de tu cuenta"
-        sections={[
-          {
-            title: 'Información de contacto',
-            fields: [
-              { label: 'Nombre', value: perfilData.asesor.nombre, icon: <User size={16} /> },
-              { label: 'Email', value: perfilData.asesor.email, icon: <User size={16} /> },
-              { label: 'Teléfono', value: perfilData.asesor.telefono, icon: <Phone size={16} /> },
-              { label: 'Rol', value: 'Asesor de Ventas', icon: <User size={16} /> },
-            ],
-          },
-          {
-            title: 'Datos de cuenta',
-            fields: [
-              { label: 'NIT', value: perfilData.nit, icon: <CreditCard size={16} /> },
-              { label: 'Empresa', value: perfilData.empresa, icon: <Building size={16} /> },
-            ],
-          },
-        ]}
-      />
-
-      <DetailModal
-        children={null}
-        open={avatarModalOpen}
-        onClose={() => setAvatarModalOpen(false)}
-        title="Cambiar foto de perfil"
-        subtitle="Pega la URL de una imagen"
-        sections={[
-          {
-            title: 'Imagen',
-            children: (
-              <div className="flex flex-col gap-3">
-                <input
-                  className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2 text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]"
-                  placeholder="https://..."
-                  value={avatarDraft}
-                  onChange={e => setAvatarDraft(e.target.value)}
-                />
-                {avatarDraft && <img src={avatarDraft} alt="Vista previa" className="h-24 w-24 rounded-full object-cover border border-[var(--color-border)]" />}
-              </div>
-            ),
-          },
-        ]}
-        footer={
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setAvatarModalOpen(false)}>Cancelar</Button>
-            <Button onClick={guardarAvatar}>Guardar foto</Button>
-          </div>
-        }
-      />
+        </div>
+      </Modal>
 
       <ConfirmationModal
-        open={Boolean(deleteDireccion)}
+        open={!!deleteDireccion}
         onClose={() => setDeleteDireccion(null)}
         onConfirm={confirmarEliminarDireccion}
         title="Eliminar dirección"
-        description={`¿Eliminar la dirección ${deleteDireccion?.label}? Esta acción no se puede deshacer.`}
-        variant="danger"
-        confirmLabel="Eliminar"
+        description={deleteDireccion ? `¿Estás seguro de eliminar la dirección "${deleteDireccion.label}"?` : ''}
       />
+
+      <Modal open={avatarModalOpen} onClose={() => setAvatarModalOpen(false)} title="Cambiar foto de perfil" size="sm">
+        <div className="grid gap-4">
+          <div className="flex items-center gap-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-5">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[var(--color-accent)] text-3xl font-bold text-white">
+              {nombre.charAt(0)}
+            </div>
+            <div>
+              <div className="font-semibold text-[var(--color-text-primary)]">Imagen actual</div>
+              <div className="text-sm text-[var(--color-text-secondary)]">{avatarUrl || 'No hay imagen cargada en esta sesión'}</div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setAvatarModalOpen(false)}>Cancelar</Button>
+            <Button onClick={guardarAvatar}>Aplicar foto</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

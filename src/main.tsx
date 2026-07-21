@@ -6,6 +6,16 @@ import "./styles/variables.css";
 
 import { AppProviders } from "@/app/providers/AppProviders";
 
+if (import.meta.env.DEV) {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    if (typeof args[0] === "string" && args[0].includes("Download the React DevTools")) {
+      return;
+    }
+    originalError.apply(console, args);
+  };
+}
+
 ReactDOM.createRoot(
   document.getElementById("root")!
 ).render(

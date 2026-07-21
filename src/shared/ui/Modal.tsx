@@ -44,7 +44,7 @@ export const BaseModal = ({
   className,
   bodyClassName,
   footerClassName,
-  closeOnOverlay = true,
+  closeOnOverlay = false,
 }: BaseModalProps) => {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +68,7 @@ export const BaseModal = ({
       try {
         const val = value ?? window.localStorage.getItem('dashboard-theme') ?? 'light';
         if (overlayRef.current) overlayRef.current.setAttribute('data-theme', val);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
     };

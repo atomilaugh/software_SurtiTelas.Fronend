@@ -1,15 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import s from './Produccion.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
 import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '@/shared/ui/DataTable';
+import { productionApi, type ProductionOrder } from '@/infrastructure/api/productionApi';
+import { authApi } from '@/infrastructure/api/authApi';
 
 interface OrdenProduccion {
   id: string;
   pedido: string;
-  operario: string;
+  operarioId: string;
+  operarioNombre: string;
   referencia: string;
   cantidad: number;
   fechaInicio: string;
@@ -18,19 +21,72 @@ interface OrdenProduccion {
   estado: 'Pendiente' | 'En proceso' | 'Terminado';
 }
 
-const mockOrdenesInicial: OrdenProduccion[] = [
-  { id: 'OP-001', pedido: '#PD-2401', operario: 'Juan Pérez', referencia: 'CAM-001', cantidad: 50, fechaInicio: '05 Jun', fechaEstimada: '10 Jun', avance: 65, estado: 'En proceso' },
-  { id: 'OP-002', pedido: '#PD-2400', operario: 'María López', referencia: 'CAM-002', cantidad: 30, fechaInicio: '04 Jun', fechaEstimada: '09 Jun', avance: 100, estado: 'Terminado' },
-  { id: 'OP-003', pedido: '#PD-2399', operario: 'Carlos Ruiz', referencia: 'CAM-003', cantidad: 80, fechaInicio: '03 Jun', fechaEstimada: '12 Jun', avance: 25, estado: 'En proceso' },
-  { id: 'OP-004', pedido: '#PD-2398', operario: 'Ana Martínez', referencia: 'CAM-004', cantidad: 20, fechaInicio: '', fechaEstimada: '08 Jun', avance: 0, estado: 'Pendiente' },
-];
+interface UsuarioOption {
+  id: string;
+  nombre: string;
+}
 
+function toOrden(o: ProductionOrder, operarios: UsuarioOption[] = []): OrdenProduccion {
+  const operario = operarios.find(u => u.id === o.operarioId);
+  return {
+    id: o.id,
+    pedido: o.pedidoId ?? '',
+    operarioId: o.operarioId ?? '',
+    operarioNombre: operario?.nombre ?? (o.operario?.nombre ?? 'Sin asignar'),
+    referencia: o.referencia,
+    cantidad: o.cantidad,
+    fechaInicio: o.fechaInicio,
+    fechaEstimada: o.fechaEstimada,
+    avance: o.avance,
+    estado: (o.estado === 'Pendiente' ? 'Pendiente' : o.estado === 'En proceso' ? 'En proceso' : 'Terminado'),
+  };
+}
 
 export const AdminProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
-  const [items, setItems] = useState<OrdenProduccion[]>(mockOrdenesInicial);
+  const [items, setItems] = useState<OrdenProduccion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [operarios, setOperarios] = useState<UsuarioOption[]>([]);
+  const [loadingOperarios, setLoadingOperarios] = useState(true);
+
+  const fetchOrdenes = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await productionApi.list();
+      setItems(data.map(o => toOrden(o, operarios)));
+    } catch {
+      setError('No se pudieron cargar las órdenes de producción');
+    } finally {
+      setLoading(false);
+    }
+  }, [operarios]);
+
+  const fetchOperarios = useCallback(async () => {
+    setLoadingOperarios(true);
+    try {
+      const data = await authApi.listUsers();
+      const mapped: UsuarioOption[] = (data as { data: Array<{ id: string; nombre: string; role: string }> }).data
+        .filter(u => u.role === 'ASESOR' || u.role === 'ADMIN' || u.role === 'DOMICILIARIO')
+        .map(u => ({ id: u.id, nombre: u.nombre }));
+      setOperarios(mapped);
+    } catch {
+      toast.error('No se pudieron cargar los operarios');
+    } finally {
+      setLoadingOperarios(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchOperarios();
+  }, [fetchOperarios]);
+
+  useEffect(() => {
+    void fetchOrdenes();
+  }, [fetchOrdenes]);
 
   const filtered = useMemo(() => {
     return items.filter(o =>
@@ -44,15 +100,23 @@ export const AdminProduccion: React.FC = () => {
     setSelectedOrden(null);
   };
 
-  const handleSubmitOrden = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmitOrden = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedOrden) return;
     const fd = new FormData(e.currentTarget);
-    const operario = String(fd.get('operario') ?? '').trim();
+    const operarioId = String(fd.get('operarioId') ?? '').trim();
     const estado = (String(fd.get('estado') ?? '') || selectedOrden.estado) as OrdenProduccion['estado'];
-    setItems(prev => prev.map(it => it.id === selectedOrden.id ? { ...it, operario, estado } : it));
-    toast.success('Orden actualizada');
-    closeModals();
+    try {
+      const actualizado = await productionApi.update(selectedOrden.id, {
+        operarioId: operarioId || undefined,
+        estado,
+      });
+      setItems(prev => prev.map(it => it.id === selectedOrden.id ? toOrden(actualizado, operarios) : it));
+      toast.success('Orden actualizada');
+      closeModals();
+    } catch {
+      toast.error('No fue posible actualizar la orden');
+    }
   };
 
   const columns: DataTableColumn<OrdenProduccion>[] = [
@@ -67,7 +131,7 @@ export const AdminProduccion: React.FC = () => {
     title: item => `Detalle: ${item.id}`,
     render: (item) => (
       <div className={s.detailPanel}>
-        <div className={s.detailRow}><span>Operario:</span> {item.operario}</div>
+        <div className={s.detailRow}><span>Operario:</span> {item.operarioNombre}</div>
         <div className={s.detailRow}><span>Referencia:</span> {item.referencia}</div>
         <div className={s.detailRow}><span>Cantidad:</span> {item.cantidad}</div>
         <div className={s.detailRow}><span>Fecha inicio:</span> {item.fechaInicio || '-'}</div>
@@ -110,6 +174,7 @@ export const AdminProduccion: React.FC = () => {
           enableExport={false}
           enableRowSelection={false}
           enableSorting={true}
+          emptyMessage={loading ? 'Cargando órdenes...' : error ? error : 'No se encontraron órdenes'}
           toolbarLeft={null}
           maxVisibleColumns={5}
         />
@@ -126,11 +191,11 @@ export const AdminProduccion: React.FC = () => {
             <div className={s.formRow}>
               <div className={s.field}>
                 <label className={s.label}>Operario asignado</label>
-                <select className={s.select} name="operario" defaultValue={selectedOrden.operario}>
-                  <option>Juan Pérez</option>
-                  <option>María López</option>
-                  <option>Carlos Ruiz</option>
-                  <option>Ana Martínez</option>
+                <select className={s.select} name="operarioId" defaultValue={selectedOrden.operarioId} disabled={loadingOperarios}>
+                  <option value="">-- Seleccione un operario --</option>
+                  {operarios.map(op => (
+                    <option key={op.id} value={op.id}>{op.nombre}</option>
+                  ))}
                 </select>
               </div>
               <div className={s.field}>

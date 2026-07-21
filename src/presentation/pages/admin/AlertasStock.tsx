@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Search, Trash2, AlertTriangle, Package, Calendar, Bell, CheckCircle, BarChart3, FileText } from 'lucide-react';
 import s from './AlertasStock.module.css';
@@ -6,20 +6,37 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
 import { DataTableColumn, DataTableAction, DataTableDetailPanel } from '@/shared/ui/DataTable';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
+import { inventoryApi, type StockAlert } from '@/infrastructure/api/inventoryApi';
+import { alertsApi } from '@/infrastructure/api/alertsApi';
+import { ESTADOS_ALERTA_STOCK } from '@/shared/constants/options';
 
-const mockAlertas = [
-  { id: 'AL-001', insumo: 'Poliéster', codigo: 'INS-002', stockActual: 80, stockMinimo: 100, diferencia: -20, fechaAlerta: '2024-06-09', estado: 'Pendiente', categoria: 'Fibra', responsable: 'Juan Pérez', observaciones: 'Stock bajo. Solicitar reposición urgente.' },
-  { id: 'AL-002', insumo: 'Hilo polyester', codigo: 'INS-004', stockActual: 25, stockMinimo: 30, diferencia: -5, fechaAlerta: '2024-06-10', estado: 'Critico', categoria: 'Hilos', responsable: 'María López', observaciones: 'Stock crítico. Requiere atención inmediata.' },
-  { id: 'AL-003', insumo: 'Botones de náilon', codigo: 'INS-003', stockActual: 500, stockMinimo: 200, diferencia: 300, fechaAlerta: '2024-06-05', estado: 'Resuelta', categoria: 'Accesorios', responsable: 'Carlos Ruiz', observaciones: 'Alerta resuelta. Reposición completada.' },
-  { id: 'AL-004', insumo: 'Algodón Pima', codigo: 'INS-001', stockActual: 150, stockMinimo: 50, diferencia: 100, fechaAlerta: '2024-06-08', estado: 'Resuelta', categoria: 'Fibra', responsable: 'Ana Gómez', observaciones: 'Nivel de stock normalizado.' },
-];
-
-type AlertaStock = typeof mockAlertas[number];
+type AlertaStock = StockAlert;
 
 export const AdminAlertasStock: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [filtro, setFiltro] = useState<'Todos' | 'Pendiente' | 'Resuelta' | 'Critico'>('Todos');
-  const [alertas, setAlertas] = useState<AlertaStock[]>(mockAlertas);
+  const [filtro, setFiltro] = useState<'Todos' | (typeof ESTADOS_ALERTA_STOCK)[number]>('Todos');
+  const [alertas, setAlertas] = useState<AlertaStock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<AlertaStock | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await inventoryApi.listAlerts();
+        setAlertas(result.data);
+      } catch {
+        setError('No se pudieron cargar las alertas');
+        toast.error('No se pudieron cargar las alertas');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
 
   const filteredAlertas = alertas.filter(a =>
     (filtro === 'Todos' || a.estado === filtro) &&
@@ -56,11 +73,7 @@ export const AdminAlertasStock: React.FC = () => {
         {a.fechaAlerta}
       </div>
     )},
-    { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-      { value: 'Pendiente', label: 'Pendiente' },
-      { value: 'Resuelta', label: 'Resuelta' },
-      { value: 'Critico', label: 'Crítico' },
-    ], render: (a) => (
+    { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_ALERTA_STOCK.map(e => ({ value: e, label: e === 'Critico' ? 'Crítico' : e })), render: (a) => (
       <Badge variant={getEstadoBadge(a.estado)}>{a.estado}</Badge>
     )},
   ];
@@ -110,8 +123,16 @@ export const AdminAlertasStock: React.FC = () => {
   };
 
   const actions: DataTableAction<AlertaStock>[] = [
-    { label: 'Resolver', icon: <CheckCircle size={14} />, onClick: (a) => { setAlertas(prev => prev.filter(al => al.id !== a.id)); toast.success('Alerta resuelta'); }, disabled: (a) => a.estado === 'Resuelta' },
-    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (a) => { if (confirm('¿Eliminar alerta?')) { setAlertas(prev => prev.filter(al => al.id !== a.id)); toast.success('Alerta eliminada'); } } },
+    { label: 'Resolver', icon: <CheckCircle size={14} />, onClick: async (a) => {
+      try {
+        await alertsApi.markAsResolved(a.id);
+        setAlertas(prev => prev.map(al => al.id === a.id ? { ...al, estado: 'Resuelta' } : al));
+        toast.success('Alerta resuelta');
+      } catch {
+        toast.error('No se pudo resolver la alerta');
+      }
+    }, disabled: (a) => a.estado === 'Resuelta' },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (a) => setDeleteConfirm(a) },
   ];
 
   return (
@@ -141,7 +162,7 @@ export const AdminAlertasStock: React.FC = () => {
 
       <div className={s.filters}>
         <div className={s.filterGroup}>
-          {['Todos', 'Pendiente', 'Resuelta', 'Critico'].map(f => (
+          {['Todos', ...ESTADOS_ALERTA_STOCK].map(f => (
             <button
               key={f}
               className={`${s.filterBtn} ${filtro === f ? s.filterBtnActive : ''}`}
@@ -167,7 +188,7 @@ export const AdminAlertasStock: React.FC = () => {
         <DataTable<AlertaStock>
           data={filteredAlertas}
           pageSize={10}
-          emptyMessage="No se encontraron alertas"
+          emptyMessage={loading ? 'Cargando alertas...' : error ? error : 'No se encontraron alertas'}
           maxVisibleColumns={5}
           detailPanel={detailPanel}
           actions={actions}
@@ -179,6 +200,21 @@ export const AdminAlertasStock: React.FC = () => {
           toolbarLeft={null}
         />
       </div>
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => {
+          if (!deleteConfirm) return;
+          setAlertas(prev => prev.filter(al => al.id !== deleteConfirm.id));
+          toast.success('Alerta eliminada');
+          setDeleteConfirm(null);
+        }}
+        title="Eliminar alerta"
+        description={`¿Estás seguro de que deseas eliminar la alerta de "${deleteConfirm?.insumo}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };

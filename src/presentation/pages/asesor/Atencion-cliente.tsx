@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Send, Package, User, Paperclip, CheckCircle2, Clock, FileText, Download, UserCheck, Archive, CreditCard, MapPin, Phone } from 'lucide-react';
+import { Send, Package, User, Paperclip, CheckCircle2, Clock, FileText, UserCheck, Archive, CreditCard, MapPin, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import s from './Atencion-cliente.module.css';
 import { Button } from '@/shared/ui/Button';
@@ -8,6 +8,7 @@ import { DetailModal } from '@/shared/ui/DetailModal';
 import { useAppStore, useClientes, usePedidos } from '@/core/stores';
 import { Badge } from '@/shared/ui/Badge';
 import { Tooltip } from '@/shared/components/Tooltip';
+import { useAuthStore } from '@/core/stores/authStore';
 import type { Pedido } from '@/core/types';
 
 interface Mensaje {
@@ -17,21 +18,8 @@ interface Mensaje {
   hora: string;
 }
 
-const asesorActual = 'Camila Torres';
-
-const descargarArchivo = (nombre: string, contenido: string) => {
-  const blob = new Blob([contenido], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = nombre;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
-
 export const AtencionCliente: React.FC = () => {
+  const asesorActual = useAuthStore((st) => st.user?.name) || 'Sin asesor';
   const clientesStore = useClientes();
   const pedidosStore = usePedidos();
   const [isPedidoModalOpen, setIsPedidoModalOpen] = useState(false);
@@ -81,7 +69,7 @@ export const AtencionCliente: React.FC = () => {
     setNuevoMensaje('');
   };
 
-  const handleGenerarPedido = () => {
+  const handleGenerarPedido = async () => {
     if (!clienteActual) {
       toast.error('Selecciona un cliente antes de generar el pedido.');
       return;
@@ -91,26 +79,30 @@ export const AtencionCliente: React.FC = () => {
       return;
     }
 
-    const pedido = useAppStore.getState().createPedido({
-      cliente: clienteActual.nombre,
-      asesor: asesorActual,
-      fecha: new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }),
-      items: 1,
-      total: '$0',
-      estado: 'Nuevo',
-      prioridad: pedidoData.urgencia,
-      observaciones: pedidoData.detalle,
-      itemsList: [],
-    });
+    try {
+      const pedido = await useAppStore.getState().createPedido({
+        cliente: clienteActual.nombre,
+        asesor: asesorActual,
+        fecha: new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }),
+        items: 1,
+        total: '0',
+        estado: 'Nuevo',
+        prioridad: pedidoData.urgencia,
+        observaciones: pedidoData.detalle,
+        itemsList: [],
+      });
 
-    useAppStore.getState().addNotificacion({
-      tipo: 'success',
-      titulo: 'Pedido generado',
-      mensaje: `Pedido ${pedido.id} enviado a bodega para ${clienteActual.nombre}`,
-    });
-    toast.success(`Pedido ${pedido.id} enviado a bodega`);
-    setIsPedidoModalOpen(false);
-    setPedidoData({ detalle: '', urgencia: 'Estándar' });
+      useAppStore.getState().addNotificacion({
+        tipo: 'success',
+        titulo: 'Pedido generado',
+        mensaje: `Pedido ${pedido.id} enviado a bodega para ${clienteActual.nombre}`,
+      });
+      toast.success(`Pedido ${pedido.id} enviado a bodega`);
+      setIsPedidoModalOpen(false);
+      setPedidoData({ detalle: '', urgencia: 'Estándar' });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No fue posible generar el pedido.');
+    }
   };
 
   const handleAttach = () => fileInputRef.current?.click();
@@ -259,15 +251,9 @@ export const AtencionCliente: React.FC = () => {
               <FileText size={18} className={s.widgetIcon} />
             </div>
             <div className={s.resourceList}>
-              <div className={s.resourceItem} style={{ cursor: 'pointer' }} onClick={() => descargarArchivo('Catálogo Telas Verano 2026.pdf', 'Catálogo de Telas Verano 2026 - SurtiTelas\n\nContenido de muestra para demostración.')}>
+              <div className={s.resourceItem}>
                 <div className={s.resourceIcon}><FileText size={16} /></div>
-                <span className={s.resourceName}>Catálogo Telas Verano 2026.pdf</span>
-                <Download size={14} className={s.downloadIcon} />
-              </div>
-              <div className={s.resourceItem} style={{ cursor: 'pointer' }} onClick={() => descargarArchivo('Listado_Precios_Mayoristas.pdf', 'Listado de Precios Mayoristas - SurtiTelas\n\nContenido de muestra para demostración.')}>
-                <div className={s.resourceIcon}><FileText size={16} /></div>
-                <span className={s.resourceName}>Listado_Precios_Mayoristas.pdf</span>
-                <Download size={14} className={s.downloadIcon} />
+                <span className={s.resourceName}>Recursos disponibles desde el panel de administración</span>
               </div>
             </div>
           </div>

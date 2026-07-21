@@ -1,9 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Mail, Phone, MapPin, Clock, Send, MessageSquare, Plus, Archive, Paperclip, ChevronDown, AlertTriangle } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { toast } from 'sonner';
+import { Search, Mail, Phone, MapPin, Clock, Send, MessageSquare, Plus, Archive, Paperclip, ChevronDown, AlertTriangle, Loader2 } from 'lucide-react';
 import s from './ContactoEmpresa.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { contactApi, type ContactMessage } from '@/infrastructure/api/contactApi';
+import { companyApi } from '@/infrastructure/api/companyApi';
+import { TIPOS_CONTACTO, ESTADOS_CONTACTO } from '@/shared/constants/options';
 
 interface MensajeContacto {
   id: string;
@@ -12,42 +16,89 @@ interface MensajeContacto {
   email: string;
   telefono?: string;
   empresa?: string;
-  tipo: 'Consulta general' | 'Soporte técnico' | 'Cotización' | 'Reclamo' | 'Sugerencia';
+  tipo: (typeof TIPOS_CONTACTO)[number];
   fecha: string;
-  estado: 'Nuevo' | 'Leído' | 'Respondido' | 'Cerrado';
+  estado: (typeof ESTADOS_CONTACTO)[number];
   mensaje: string;
   prioridad: 'Alta' | 'Media' | 'Baja';
 }
 
-const mockMensajes: MensajeContacto[] = [
-  { id: 'MSG-001', asunto: 'Solicitud de cotización para 500 camisas', remitente: 'Tienda La Esquina', email: 'contacto@laesquina.com', telefono: '310 123 4567', empresa: 'Tienda La Esquina', tipo: 'Cotización', fecha: '2024-06-10 09:15', estado: 'Nuevo', prioridad: 'Alta', mensaje: 'Buenos días, necesito una cotización para 500 camisas manga larga en tela algodón, tallas M y L. Requiero entrega en 15 días.' },
-  { id: 'MSG-002', asunto: 'Problema con pedido ORD-2024-003', remitente: 'Distribuidora del Norte', email: 'pedidos@del norte.com', telefono: '311 234 5678', empresa: 'Distribuidora del Norte', tipo: 'Reclamo', fecha: '2024-06-10 08:30', estado: 'Leído', prioridad: 'Alta', mensaje: 'El pedido ORD-2024-003 llegó con 3 prendas defectuosas. Adjunto fotos. Solicito reposición urgente.' },
-  { id: 'MSG-003', asunto: 'Información sobre materiales disponibles', remitente: 'Confecciones del Sur', email: 'info@confecciones.com', tipo: 'Consulta general', fecha: '2024-06-09 14:20', estado: 'Respondido', prioridad: 'Media', mensaje: 'Quisiera saber qué tipos de telas tienen disponibles para confección de uniformes empresariales.' },
-  { id: 'MSG-004', asunto: 'Sugerencia para mejora de catálogo digital', remitente: 'Boutique Elegante', email: 'gerencia@boutique.com', telefono: '312 345 6789', empresa: 'Boutique Elegante', tipo: 'Sugerencia', fecha: '2024-06-09 11:00', estado: 'Nuevo', prioridad: 'Baja', mensaje: 'Sería útil agregar filtros por temporada en el catálogo digital. Actualmente es difícil encontrar prendas de invierno.' },
-  { id: 'MSG-005', asunto: 'Soporte para sistema de pedidos', remitente: 'Moda Express', email: 'sistemas@modaexpress.com', tipo: 'Soporte técnico', fecha: '2024-06-08 16:45', estado: 'Respondido', prioridad: 'Media', mensaje: 'El sistema de pedidos no me permite modificar cantidades después de crear la orden. Necesito ayuda para resolver esto.' },
-  { id: 'MSG-006', asunto: 'Interés en proveedor de insumos', remitente: 'Textiles del Valle', email: 'compras@textiles.com', telefono: '313 456 7890', empresa: 'Textiles del Valle', tipo: 'Consulta general', fecha: '2024-06-08 10:10', estado: 'Cerrado', prioridad: 'Baja', mensaje: 'Estamos interesados en conocer su lista de proveedores de insumos para evaluar posibles alianzas.' },
-  { id: 'MSG-007', asunto: 'URGENTE: Retraso en entrega', remitente: 'Ropa Deportiva Pro', email: 'logistica@deportivapro.com', telefono: '314 567 8901', empresa: 'Ropa Deportiva Pro', tipo: 'Reclamo', fecha: '2024-06-10 07:00', estado: 'Nuevo', prioridad: 'Alta', mensaje: 'La orden ORD-2024-007 tenía fecha de entrega para ayer y no ha llegado. Necesitamos confirmar status urgente.' },
-];
-
-const mockInfoEmpresa = {
-  nombre: 'SurtiTelas S.A.S',
-  nit: '900.987.654-3',
-  direccion: 'Calle 45 # 23-67, Bogotá, Colombia',
-  telefono: '+57 1 234 5678',
-  email: 'contacto@surtitelas.com',
-  sitioWeb: 'www.surtitelas.com',
-  horario: 'Lunes a Viernes: 8:00 AM - 6:00 PM | Sábados: 8:00 AM - 1:00 PM',
+const formatFecha = (value: string): string => {
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return value;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+
+const toMensajeContacto = (m: ContactMessage): MensajeContacto => ({
+  id: m.id,
+  asunto: m.asunto,
+  remitente: m.nombre,
+  email: m.email,
+  telefono: m.telefono,
+  empresa: m.nombre,
+  tipo: 'Consulta general',
+  fecha: formatFecha(m.createdAt),
+  estado: m.estado === 'Nuevo' ? 'Nuevo' : m.estado === 'Respondido' ? 'Respondido' : 'Cerrado',
+  mensaje: m.mensaje,
+  prioridad: m.prioridad === 'Alta' ? 'Alta' : m.prioridad === 'Media' ? 'Media' : 'Baja',
+});
+
+interface InfoEmpresa {
+  email: string;
+  telefono: string;
+  direccion: string;
+  horario: string;
+}
 
 export const AdminContactoEmpresa: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Nuevo' | 'Leído' | 'Respondido' | 'Cerrado'>('Todos');
+  const [filtroEstado, setFiltroEstado] = useState<'Todos' | (typeof ESTADOS_CONTACTO)[number]>('Todos');
   const [filtroTipo, _setFiltroTipo] = useState<string>('Todos');
   const [showNuevoMensaje, setShowNuevoMensaje] = useState(false);
   const [respuesta, setRespuesta] = useState('');
+  const [mensajes, setMensajes] = useState<MensajeContacto[]>([]);
+  const [infoEmpresa, setInfoEmpresa] = useState<InfoEmpresa | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await contactApi.list();
+        setMensajes(data.map(toMensajeContacto));
+      } catch {
+        setError('No se pudieron cargar los mensajes de contacto');
+        toast.error('No se pudieron cargar los mensajes de contacto');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  const loadCompanyInfo = async () => {
+    try {
+      const company = await companyApi.get();
+      setInfoEmpresa({
+        email: company.email ?? 'No disponible',
+        telefono: company.telefono ?? 'No disponible',
+        direccion: company.direccion ?? 'No disponible',
+        horario: company.ciudad ?? 'No disponible',
+      });
+    } catch {
+      setInfoEmpresa(null);
+    }
+  };
+
+  useEffect(() => {
+    void loadCompanyInfo();
+  }, []);
 
   const filteredMensajes = useMemo(() => {
-    return mockMensajes.filter(m =>
+    return mensajes.filter(m =>
       (filtroEstado === 'Todos' || m.estado === filtroEstado) &&
       (filtroTipo === 'Todos' || m.tipo === filtroTipo) &&
       (m.asunto.toLowerCase().includes(search.toLowerCase()) ||
@@ -55,7 +106,7 @@ export const AdminContactoEmpresa: React.FC = () => {
        m.empresa?.toLowerCase().includes(search.toLowerCase()) ||
        m.mensaje.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [search, filtroEstado, filtroTipo]);
+  }, [search, filtroEstado, filtroTipo, mensajes]);
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -87,10 +138,10 @@ export const AdminContactoEmpresa: React.FC = () => {
   };
 
   const stats = {
-    nuevos: mockMensajes.filter(m => m.estado === 'Nuevo').length,
-    urgentes: mockMensajes.filter(m => m.prioridad === 'Alta' && m.estado !== 'Cerrado').length,
-    respondidos: mockMensajes.filter(m => m.estado === 'Respondido').length,
-    cerrados: mockMensajes.filter(m => m.estado === 'Cerrado').length,
+    nuevos: mensajes.filter(m => m.estado === 'Nuevo').length,
+    urgentes: mensajes.filter(m => m.prioridad === 'Alta' && m.estado !== 'Cerrado').length,
+    respondidos: mensajes.filter(m => m.estado === 'Respondido').length,
+    cerrados: mensajes.filter(m => m.estado === 'Cerrado').length,
   };
 
   return (
@@ -126,11 +177,9 @@ export const AdminContactoEmpresa: React.FC = () => {
               <div className={s.selectWrapper}>
                 <select className={s.select}>
                   <option value="">Seleccione...</option>
-                  <option>Consulta general</option>
-                  <option>Soporte técnico</option>
-                  <option>Cotización</option>
-                  <option>Reclamo</option>
-                  <option>Sugerencia</option>
+                  {TIPOS_CONTACTO.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
                 </select>
                 <ChevronDown size={16} className={s.selectIcon} />
               </div>
@@ -158,28 +207,28 @@ export const AdminContactoEmpresa: React.FC = () => {
         <div className={s.infoCard}>
           <Mail size={18} className={s.infoIcon} />
           <div>
-            <div className={s.infoLabel}>{mockInfoEmpresa.email}</div>
+            <div className={s.infoLabel}>{infoEmpresa?.email ?? 'No disponible'}</div>
             <div className={s.infoValue}>Email</div>
           </div>
         </div>
         <div className={s.infoCard}>
           <Phone size={18} className={s.infoIcon} />
           <div>
-            <div className={s.infoLabel}>{mockInfoEmpresa.telefono}</div>
+            <div className={s.infoLabel}>{infoEmpresa?.telefono ?? 'No disponible'}</div>
             <div className={s.infoValue}>Teléfono</div>
           </div>
         </div>
         <div className={s.infoCard}>
           <MapPin size={18} className={s.infoIcon} />
           <div>
-            <div className={s.infoLabel}>{mockInfoEmpresa.direccion}</div>
+            <div className={s.infoLabel}>{infoEmpresa?.direccion ?? 'No disponible'}</div>
             <div className={s.infoValue}>Dirección</div>
           </div>
         </div>
         <div className={s.infoCard}>
           <Clock size={18} className={s.infoIcon} />
           <div>
-            <div className={s.infoLabel}>{mockInfoEmpresa.horario}</div>
+            <div className={s.infoLabel}>{infoEmpresa?.horario ?? 'No disponible'}</div>
             <div className={s.infoValue}>Horario</div>
           </div>
         </div>
@@ -218,7 +267,7 @@ export const AdminContactoEmpresa: React.FC = () => {
 
       <div className={s.filters}>
         <div className={s.filterGroup}>
-          {['Todos', 'Nuevo', 'Leído', 'Respondido', 'Cerrado'].map(estado => (
+          {['Todos', ...ESTADOS_CONTACTO].map(estado => (
             <button
               key={estado}
               className={`${s.filterBtn} ${filtroEstado === estado ? s.filterBtnActive : ''}`}
@@ -240,10 +289,20 @@ export const AdminContactoEmpresa: React.FC = () => {
         </div>
       </div>
 
+      {loading && (
+        <div className={s.loadingRow}>
+          <Loader2 size={18} className={s.spin} />
+          <span>Cargando mensajes de contacto...</span>
+        </div>
+      )}
+      {error && !loading && (
+        <div className={s.errorRow}>{error}</div>
+      )}
+
       <DataTable<MensajeContacto>
         data={filteredMensajes}
         pageSize={10}
-        emptyMessage="No se encontraron mensajes de contacto"
+        emptyMessage={loading ? 'Cargando mensajes de contacto...' : error ? error : 'No se encontraron mensajes de contacto'}
         maxVisibleColumns={5}
         detailPanel={{
           title: (m) => m.asunto,
@@ -279,13 +338,7 @@ export const AdminContactoEmpresa: React.FC = () => {
         ]}
         columns={[
           { key: 'id', header: 'ID', width: '80px', sortable: true, render: (m) => <span className={s.tdMono}>{m.id}</span> },
-          { key: 'tipo', header: 'Tipo', width: '120px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-            { value: 'Consulta general', label: 'Consulta general' },
-            { value: 'Soporte técnico', label: 'Soporte técnico' },
-            { value: 'Cotización', label: 'Cotización' },
-            { value: 'Reclamo', label: 'Reclamo' },
-            { value: 'Sugerencia', label: 'Sugerencia' },
-          ], render: (m) => (
+          { key: 'tipo', header: 'Tipo', width: '120px', sortable: true, filterable: true, filterType: 'select', filterOptions: TIPOS_CONTACTO.map(t => ({ value: t, label: t })), render: (m) => (
             <Badge variant={getTipoBadge(m.tipo)}>{m.tipo}</Badge>
           )},
           { key: 'asunto', header: 'Asunto', sortable: true, render: (m) => <span className={s.tdPrimary}>{m.asunto}</span> },
@@ -298,12 +351,7 @@ export const AdminContactoEmpresa: React.FC = () => {
           { key: 'prioridad', header: 'Prioridad', width: '100px', sortable: true, render: (m) => (
             <Badge variant={m.prioridad === 'Alta' ? 'danger' : m.prioridad === 'Media' ? 'warning' : 'success'}>{m.prioridad}</Badge>
           )},
-          { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-            { value: 'Nuevo', label: 'Nuevo' },
-            { value: 'Leído', label: 'Leído' },
-            { value: 'Respondido', label: 'Respondido' },
-            { value: 'Cerrado', label: 'Cerrado' },
-          ], render: (m) => (
+          { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_CONTACTO.map(e => ({ value: e, label: e })), render: (m) => (
             <Badge variant={getEstadoBadge(m.estado)}>{m.estado}</Badge>
           )},
         ]}

@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAuth as useAuthStore, TEST_ACCOUNTS } from '@/core/stores/authStore';
 import { useCart as useCartStore } from '@/core/stores/cartStore';
 import type { CartItem } from '@/core/stores/cartStore';
+import { useAppStore } from '@/core/stores';
+import { tokenStorage } from '@/infrastructure/api/tokenStorage';
 
 export { TEST_ACCOUNTS };
 export type { CartItem };
@@ -32,8 +34,28 @@ export const CartDrawerProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const AppProviders = ({ children }: { children: ReactNode }) => (
-  <CartDrawerProvider>
-    {children}
-  </CartDrawerProvider>
-);
+export const AppProviders = ({ children }: { children: ReactNode }) => {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const sessionChecked = useAuthStore((s) => s.sessionChecked);
+
+  // Revalida la sesión persistida contra el backend al arrancar (evita confiar
+  // en un estado autenticado obsoleto sin token válido).
+  useEffect(() => {
+    void useAuthStore.getState().checkSession();
+  }, []);
+
+  // Hidrata datos desde el backend solo después de validar la sesión.
+  useEffect(() => {
+    if (!sessionChecked || !isAuthenticated || !tokenStorage.getAccessToken()) return;
+    const store = useAppStore.getState();
+    void store.hydrateProductos();
+    void store.hydrateClientes();
+    void store.hydratePedidos();
+  }, [isAuthenticated, sessionChecked]);
+
+  return (
+    <CartDrawerProvider>
+      {children}
+    </CartDrawerProvider>
+  );
+};

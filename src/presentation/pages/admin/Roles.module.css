@@ -361,3 +361,37 @@
     grid-template-columns: 1fr;
   }
 }
+
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 16px;
+  color: var(--text-secondary, #6b7280);
+  text-align: center;
+}
+
+.errorBox {
+  color: #ef4444;
+}
+
+.spin {
+  animation: rolesSpin 1s linear infinite;
+}
+
+@keyframes rolesSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}
+
+.emptyRow {
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+  padding: 24px;
+}

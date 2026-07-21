@@ -17,6 +17,7 @@
   background: var(--modal-overlay);
   backdrop-filter: blur(12px);
   animation: modalOverlayFade 0.22s var(--ease-out);
+  cursor: default;
 }
 
 .overlay--form {

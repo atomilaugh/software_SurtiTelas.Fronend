@@ -16,6 +16,7 @@ import { useProductos, useAppStore } from '@/core/stores';
 import { useAuth } from '@/core/stores/authStore';
 import { productService } from '@/services/productService';
 import type { Producto, PublicationStatus } from '@/core/types';
+import { MARCA_DEFECTO, ETIQUETAS_PRODUCTO } from '@/shared/constants/options';
 
 const publishStatus = (p: Producto): PublicationStatus => {
   if (!p.publicado) return p.estado === 'Inactivo' ? 'Oculto' : 'Borrador';
@@ -48,7 +49,7 @@ export const AdminCatalogo: React.FC = () => {
   const [descripcionCorta, setDescripcionCorta] = useState('');
   const [categoria, setCategoria] = useState('');
   const [subcategoria, setSubcategoria] = useState('');
-  const [marca, setMarca] = useState('SurtiTelas');
+  const [marca, setMarca] = useState('');
   const [precio, setPrecio] = useState('');
   const [precioAnterior, setPrecioAnterior] = useState('');
   const [descuento, setDescuento] = useState('');
@@ -78,7 +79,7 @@ export const AdminCatalogo: React.FC = () => {
     setDescripcionCorta('');
     setCategoria('');
     setSubcategoria('');
-    setMarca('SurtiTelas');
+    setMarca('');
     setPrecio('');
     setPrecioAnterior('');
     setDescuento('');
@@ -104,9 +105,9 @@ export const AdminCatalogo: React.FC = () => {
     setNombre(product.nombre);
     setDescripcion(product.descripcion || '');
     setDescripcionCorta(product.descripcionCorta || product.descripcion || '');
-    setCategoria(product.categoria || 'General');
+    setCategoria(product.categoria || '');
     setSubcategoria(product.subcategoria || '');
-    setMarca(product.marca || 'SurtiTelas');
+    setMarca(product.marca || '');
     setPrecio(String(product.precio));
     setPrecioAnterior(product.precioAnterior ? String(product.precioAnterior) : '');
     setDescuento(product.descuento ? String(product.descuento) : '');
@@ -136,6 +137,8 @@ export const AdminCatalogo: React.FC = () => {
     }
     if (imagenes.length > 4) { setFormError('El producto permite un máximo de 4 imágenes.'); return false; }
     if (cantidadStock !== '' && Number(cantidadStock) < 0) { setFormError('La cantidad en stock no puede ser negativa'); return false; }
+    if (!colores || colores.length === 0) { setFormError('Debes añadir al menos 1 color.'); return false; }
+    if (!tallas || tallas.length === 0) { setFormError('Debes añadir al menos 1 talla.'); return false; }
     return true;
   };
 
@@ -172,16 +175,15 @@ export const AdminCatalogo: React.FC = () => {
       };
 
       if (editingRef) {
-        useAppStore.getState().updateProducto(editingRef, baseData);
-        const refreshed = useAppStore.getState().productos.find(p => p.ref === editingRef);
-        toast.success(refreshed ? `${refreshed.nombre} actualizado correctamente` : 'Producto actualizado');
+        const refreshed = await useAppStore.getState().updateProducto(editingRef, baseData);
+        toast.success(`${refreshed.nombre} actualizado correctamente`);
       } else {
         const nuevoCodigo = `PROD-${String(useAppStore.getState().productos.length + 1).padStart(3, '0')}`;
-        useAppStore.getState().createProducto({
+        const creado = await useAppStore.getState().createProducto({
           ...baseData,
           codigo: nuevoCodigo,
         });
-        toast.success('Producto creado correctamente');
+        toast.success(`${creado.nombre} creado correctamente`);
       }
 
       resetForm();
@@ -324,23 +326,23 @@ export const AdminCatalogo: React.FC = () => {
   const actions: DataTableAction<Producto>[] = [
     {
       label: 'Ver más',
-      icon: <Eye size={14} />,
+      icon: <Eye size={14} aria-hidden="true" focusable="false" />,
       onClick: (item: Producto) => handleOpenDetail(item),
     },
     {
       label: 'Vista previa',
-      icon: <Eye size={14} />,
+      icon: <Eye size={14} aria-hidden="true" focusable="false" />,
       onClick: (item: Producto) => handleOpenPreview(item),
     },
     {
       label: 'Editar',
-      icon: <Edit size={14} />,
+      icon: <Edit size={14} aria-hidden="true" focusable="false" />,
       onClick: (item: Producto) => openEdit(item),
     },
     ...(canPublish ? [
       {
         label: 'Publicar',
-        icon: <Eye size={14} />,
+        icon: <Eye size={14} aria-hidden="true" focusable="false" />,
         onClick: (item: Producto) => handlePublish(item),
         disabled: (item: Producto) => (item.publicado === true) || (publishingRef.current[item.ref] === true),
       },
@@ -348,14 +350,14 @@ export const AdminCatalogo: React.FC = () => {
     ...(canUnpublish ? [
       {
         label: 'Ocultar',
-        icon: <EyeOff size={14} />,
+        icon: <EyeOff size={14} aria-hidden="true" focusable="false" />,
         onClick: (item: Producto) => handleUnpublish(item),
         disabled: (item: Producto) => item.publicado !== true,
       },
     ] : []),
     {
       label: 'Eliminar',
-      icon: <Trash2 size={14} />,
+      icon: <Trash2 size={14} aria-hidden="true" focusable="false" />,
       danger: true,
       onClick: (item: Producto) => setDeleteConfirm(item),
     },
@@ -523,17 +525,16 @@ export const AdminCatalogo: React.FC = () => {
           <div className={s.formGroup}>
             <label>Etiquetas</label>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {[
-                { key: 'destacado', label: 'Destacado', state: destacado, set: setDestacado },
-                { key: 'oferta', label: 'Oferta', state: oferta, set: setOferta },
-                { key: 'nuevo', label: 'Nuevo', state: nuevo, set: setNuevo },
-                { key: 'masVendido', label: 'Más vendido', state: masVendido, set: setMasVendido },
-              ].map(({ key, label, state, set }) => (
+              {ETIQUETAS_PRODUCTO.map(({ key, label }) => {
+                const state = key === 'destacado' ? destacado : key === 'oferta' ? oferta : key === 'nuevo' ? nuevo : masVendido;
+                const set = key === 'destacado' ? setDestacado : key === 'oferta' ? setOferta : key === 'nuevo' ? setNuevo : setMasVendido;
+                return (
                 <label key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--color-text-secondary)', padding: '6px 12px', background: state ? 'rgba(244,162,97,0.15)' : 'rgba(255,255,255,0.04)', borderRadius: '8px', border: `1px solid ${state ? 'rgba(244,162,97,0.3)' : 'rgba(255,255,255,0.1)'}` }}>
                   <input type="checkbox" checked={state} onChange={e => set(e.target.checked)} />
                   {label}
                 </label>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -549,9 +550,9 @@ export const AdminCatalogo: React.FC = () => {
       <ConfirmationModal
         open={!!deleteConfirm}
         onClose={() => setDeleteConfirm(null)}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (deleteConfirm) {
-            deleteProducto(deleteConfirm.ref);
+            await deleteProducto(deleteConfirm.ref);
             toast.success(`"${deleteConfirm.nombre}" eliminado del catálogo`);
           }
           setDeleteConfirm(null);

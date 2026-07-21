@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ChevronDown, MessageCircle, Archive, Package, CreditCard, User } from 'lucide-react';
 import s from './MisPedidos.module.css';
 import { Badge } from '@/shared/ui/Badge';
-import { usePedidos } from '@/core/stores';
+import { ordersApi } from '@/infrastructure/api/ordersApi';
 import { DetailModal } from '@/shared/ui/DetailModal';
 import { Modal } from '@/shared/ui/Modal';
 import { Button } from '@/shared/ui/Button';
@@ -21,7 +21,9 @@ const statusVariant = (estado: Pedido['estado']) => {
 
 export const MisPedidos: React.FC = () => {
   const navigate = useNavigate();
-  const { pedidos, updatePedido } = usePedidos();
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState('todos');
   const [expandedPedido, setExpandedPedido] = useState<string | null>(null);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
@@ -29,21 +31,37 @@ export const MisPedidos: React.FC = () => {
   const [mensajeAsesor, setMensajeAsesor] = useState('');
   const [cancelPedido, setCancelPedido] = useState<Pedido | null>(null);
 
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await ordersApi.me();
+        setPedidos(result.pedidos);
+      } catch {
+        setError('No se pudieron cargar tus pedidos');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
   const filteredPedidos = useMemo(() => {
-    return pedidos.filter(p =>
+    return pedidos.filter((p) =>
       activeFilter === 'todos' || p.estado.toLowerCase().replace(' ', '') === activeFilter
     );
   }, [pedidos, activeFilter]);
 
   const filtrosEstado = [
     { label: 'Todos', key: 'todos', count: pedidos.length },
-    { label: 'Nuevo', key: 'nuevo', count: pedidos.filter(p => p.estado === 'Nuevo').length },
-    { label: 'En producción', key: 'produccion', count: pedidos.filter(p => p.estado === 'En producción').length },
-    { label: 'Listo', key: 'listo', count: pedidos.filter(p => p.estado === 'Listo').length },
-    { label: 'Despachado', key: 'despachado', count: pedidos.filter(p => p.estado === 'Despachado').length },
-    { label: 'En camino', key: 'camino', count: pedidos.filter(p => p.estado === 'En camino').length },
-    { label: 'Entregado', key: 'entregado', count: pedidos.filter(p => p.estado === 'Entregado').length },
-    { label: 'Cancelado', key: 'cancelado', count: pedidos.filter(p => p.estado === 'Cancelado').length },
+    { label: 'Nuevo', key: 'nuevo', count: pedidos.filter((p) => p.estado === 'Nuevo').length },
+    { label: 'En producción', key: 'produccion', count: pedidos.filter((p) => p.estado === 'En producción').length },
+    { label: 'Listo', key: 'listo', count: pedidos.filter((p) => p.estado === 'Listo').length },
+    { label: 'Despachado', key: 'despachado', count: pedidos.filter((p) => p.estado === 'Despachado').length },
+    { label: 'En camino', key: 'camino', count: pedidos.filter((p) => p.estado === 'En camino').length },
+    { label: 'Entregado', key: 'entregado', count: pedidos.filter((p) => p.estado === 'Entregado').length },
+    { label: 'Cancelado', key: 'cancelado', count: pedidos.filter((p) => p.estado === 'Cancelado').length },
   ];
 
   const contactarAsesor = () => {
@@ -59,12 +77,36 @@ export const MisPedidos: React.FC = () => {
     setChatPedido(null);
   };
 
-  const cancelarPedido = () => {
+  const cancelarPedido = async () => {
     if (!cancelPedido) return;
-    updatePedido(cancelPedido.id, { estado: 'Cancelado', observaciones: cancelPedido.observaciones || 'Cancelado por solicitud del cliente' });
-    toast.success(`Pedido ${cancelPedido.id} cancelado`);
-    setCancelPedido(null);
+    try {
+      await ordersApi.updateStatus(cancelPedido.id, 'Cancelado');
+      setPedidos((prev) => prev.map((p) => (p.id === cancelPedido.id ? { ...p, estado: 'Cancelado' } : p)));
+      toast.success(`Pedido ${cancelPedido.id} cancelado`);
+    } catch {
+      toast.error('No se pudo cancelar el pedido');
+    } finally {
+      setCancelPedido(null);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className={s.pedidosLayout}>
+        <h1 className={s.pageTitle}>Mis Pedidos</h1>
+        <p className={s.pageSubtitle}>Cargando...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={s.pedidosLayout}>
+        <h1 className={s.pageTitle}>Mis Pedidos</h1>
+        <p className={s.pageSubtitle}>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className={s.pedidosLayout}>
@@ -72,7 +114,7 @@ export const MisPedidos: React.FC = () => {
       <p className={s.pageSubtitle}>Historial y seguimiento de tus compras</p>
 
       <div className={s.estadoTabs}>
-        {filtrosEstado.map(filtro => (
+        {filtrosEstado.map((filtro) => (
           <button
             key={filtro.key}
             className={`${s.estadoTab} ${activeFilter === filtro.key ? s.estadoTabActive : ''}`}
@@ -266,7 +308,7 @@ export const MisPedidos: React.FC = () => {
       <Modal open={Boolean(chatPedido)} onClose={() => setChatPedido(null)} title={`Consultar pedido ${chatPedido?.id}`} size="sm">
         <div className="grid gap-4">
           <p className="text-sm text-[var(--color-text-secondary)]">Escribe la consulta y copia el mensaje para enviarlo por tu canal de WhatsApp.</p>
-          <textarea className="min-h-28 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" placeholder="Ej: ¿Cuándo sale despachado mi pedido?" value={mensajeAsesor} onChange={e => setMensajeAsesor(e.target.value)} />
+          <textarea className="min-h-28 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--border-focus)]" placeholder="Ej: ¿Cuándo sale despachado mi pedido?" value={mensajeAsesor} onChange={(e) => setMensajeAsesor(e.target.value)} />
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setChatPedido(null)}>Cancelar</Button>
             <Button onClick={contactarAsesor}><MessageCircle size={14} /> Copiar mensaje</Button>

@@ -156,7 +156,7 @@ export const DropdownMenu = ({ trigger, items, header, align = 'right', classNam
       try {
         const val = value ?? (typeof window !== 'undefined' ? window.localStorage.getItem('dashboard-theme') : null) ?? 'light';
         if (menuRef.current) menuRef.current.setAttribute('data-theme', val);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
     };

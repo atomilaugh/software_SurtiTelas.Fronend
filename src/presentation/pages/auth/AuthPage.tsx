@@ -3,17 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Eye, EyeOff, Phone, Building2, Check } from 'lucide-react';
 import { useAuth, TEST_ACCOUNTS } from '@/app/providers/AppProviders';
 import { toast } from 'sonner';
+import { appContent } from '@/shared/config/appContent';
 import './AuthPage.css';
 
 type Tab = 'login' | 'register';
 type RoleId = 'admin' | 'asesor' | 'domiciliario' | 'cliente';
 
-const ROLES: { id: RoleId; icon: React.ReactNode; label: string; desc: string; iconClass: string }[] = [
-  { id: 'admin', icon: '⚙️', label: 'Administrador', desc: 'Acceso completo al sistema', iconClass: 'roleIcon--admin' },
-  { id: 'asesor', icon: '💼', label: 'Asesor', desc: 'Gestión de clientes y ventas', iconClass: 'roleIcon--asesor' },
-  { id: 'domiciliario', icon: '🚚', label: 'Domiciliario', desc: 'Gestión de entregas y rutas', iconClass: 'roleIcon--delivery' },
-  { id: 'cliente', icon: '🛍️', label: 'Cliente', desc: 'Catálogo y seguimiento de pedidos', iconClass: 'roleIcon--cliente' },
-];
+const ROLES: { id: RoleId; icon: React.ReactNode; label: string; desc: string; iconClass: string }[] = appContent.auth.roles as { id: RoleId; icon: React.ReactNode; label: string; desc: string; iconClass: string }[];
 
 function passwordStrength(pwd: string): null | 'weak' | 'fair' | 'strong' {
   if (!pwd) return null;
@@ -136,43 +132,11 @@ const AuthPage: React.FC = () => {
         </div>
 
         <div className="leftContent">
-          <p className="leftTagline">Plataforma de gestión</p>
+          <p className="leftTagline">{appContent.brand.tagline}</p>
           <h1 className="leftHeading">
-            Controla tu negocio<br />con <em>precisión</em><br />y elegancia
+            {appContent.auth.heading}
           </h1>
-          <p className="leftDesc">
-            Gestiona ventas, producción e inventario desde un solo lugar.
-            Diseñado para empresas de confección que quieren crecer sin perder el control.
-          </p>
-          <div className="metricsRow">
-            <div className="metric">
-              <div className="metricValue">1.2<span>+</span></div>
-              <div className="metricLabel">Clientes activos</div>
-            </div>
-            <div className="metricDivider" />
-            <div className="metric">
-              <div className="metricValue">98<span>%</span></div>
-              <div className="metricLabel">Satisfacción</div>
-            </div>
-            <div className="metricDivider" />
-            <div className="metric">
-              <div className="metricValue">$48<span>M</span></div>
-              <div className="metricLabel">Ventas gestionadas</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="testimonial">
-          <p className="testimonialQuote">
-            Desde que implementamos Surtitelas, redujimos errores de inventario un 80% y duplicamos la velocidad de despacho.
-          </p>
-          <div className="testimonialAuthor">
-            <div className="testimonialAvatar">MR</div>
-            <div>
-              <div className="testimonialName">María Rodríguez</div>
-              <div className="testimonialRole">Gerente — Confecciones Andina</div>
-            </div>
-          </div>
+          <p className="leftDesc">{appContent.auth.description}</p>
         </div>
       </aside>
 

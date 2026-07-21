@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Factory, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import s from './AsignacionProduccion.module.css';
@@ -6,6 +6,9 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
 import { Modal } from '@/shared/ui/Modal';
+import { productionApi } from '@/infrastructure/api/productionApi';
+import { workshopsApi } from '@/infrastructure/api/workshopsApi';
+import { ESTADOS_PRODUCCION } from '@/shared/constants/options';
 
 interface OrdenProduccion {
   id: string;
@@ -27,29 +30,56 @@ interface Taller {
   especialidad: string;
 }
 
-const ordenesIniciales: OrdenProduccion[] = [
-  { id: 'OP-001', numeroOrden: 'ORD-2024-001', prenda: 'Camisa manga larga', referencia: 'REF-1001', cantidad: 200, fechaPrometida: '2024-06-15', estado: 'Pendiente', prioridad: 'Alta', cliente: 'Cliente A' },
-  { id: 'OP-002', numeroOrden: 'ORD-2024-002', prenda: 'Pantalón jean', referencia: 'REF-1002', cantidad: 150, fechaPrometida: '2024-06-18', estado: 'Pendiente', prioridad: 'Media', cliente: 'Cliente B' },
-  { id: 'OP-003', numeroOrden: 'ORD-2024-003', prenda: 'Blusa estampada', referencia: 'REF-1003', cantidad: 300, fechaPrometida: '2024-06-14', estado: 'Asignada', tallerAsignado: 'Taller Textil El Progreso', prioridad: 'Alta', cliente: 'Cliente C' },
-  { id: 'OP-004', numeroOrden: 'ORD-2024-004', prenda: 'Vestido casual', referencia: 'REF-1004', cantidad: 100, fechaPrometida: '2024-06-20', estado: 'En produccion', tallerAsignado: 'Confección Martínez', prioridad: 'Media', cliente: 'Cliente D' },
-  { id: 'OP-005', numeroOrden: 'ORD-2024-005', prenda: 'Short deportivo', referencia: 'REF-1005', cantidad: 250, fechaPrometida: '2024-06-12', estado: 'Pendiente', prioridad: 'Alta', cliente: 'Cliente E' },
-  { id: 'OP-006', numeroOrden: 'ORD-2024-006', prenda: 'Camiseta básica', referencia: 'REF-1006', cantidad: 500, fechaPrometida: '2024-06-22', estado: 'Completada', tallerAsignado: 'Taller San José', prioridad: 'Baja', cliente: 'Cliente F' },
-];
-
-const mockTalleres: Taller[] = [
-  { id: 'T-001', nombre: 'Taller Textil El Progreso', capacidadDisponible: 25, especialidad: 'Camisas y blusas' },
-  { id: 'T-002', nombre: 'Confección Martínez', capacidadDisponible: 40, especialidad: 'Pantalones y vestidos' },
-  { id: 'T-003', nombre: 'Taller San José', capacidadDisponible: 10, especialidad: 'Prendas deportivas' },
-  { id: 'T-004', nombre: 'Artesanías del Valle', capacidadDisponible: 60, especialidad: 'Prendas artesanales' },
-];
-
 export const AdminAsignacionProduccion: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState<'Todos' | 'Pendiente' | 'Asignada' | 'En produccion' | 'Completada'>('Todos');
-  const [ordenes, setOrdenes] = useState<OrdenProduccion[]>(ordenesIniciales);
+  const [filtroEstado, setFiltroEstado] = useState<'Todos' | (typeof ESTADOS_PRODUCCION)[number]>('Todos');
+  const [ordenes, setOrdenes] = useState<OrdenProduccion[]>([]);
+  const [talleres, setTalleres] = useState<Taller[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
   const [tallerSeleccionado, setTallerSeleccionado] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const [orders, workshops] = await Promise.all([
+          productionApi.list(),
+          workshopsApi.list(),
+        ]);
+        const mappedOrders: OrdenProduccion[] = orders.map((o) => ({
+          id: o.id,
+          numeroOrden: o.pedidoNumero || o.referencia,
+          prenda: o.pedidoItemNombre || o.referencia,
+          referencia: o.referencia,
+          cantidad: o.cantidad,
+          fechaPrometida: o.fechaEstimada,
+          estado: o.estado === 'En proceso' ? 'En produccion' : o.estado === 'Terminado' ? 'Completada' : o.estado === 'Pendiente' ? 'Pendiente' : 'Asignada',
+          tallerAsignado: o.taller?.nombre,
+          prioridad: (o.pedidoPrioridad === 'ALTA' ? 'Alta' : o.pedidoPrioridad === 'MEDIA' ? 'Media' : o.pedidoPrioridad === 'BAJA' ? 'Baja' : 'Media') as OrdenProduccion['prioridad'],
+          cliente: o.pedidoCliente ?? '',
+        }));
+        const mappedWorkshops: Taller[] = workshops.map((w) => ({
+          id: w.id,
+          nombre: w.nombre,
+          capacidadDisponible: w.capacidad || 0,
+          especialidad: w.ciudad || 'General',
+        }));
+        setOrdenes(mappedOrders);
+        setTalleres(mappedWorkshops);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error cargando datos');
+        toast.error('Error cargando datos de producción');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const filteredOrdenes = useMemo(() => {
     return ordenes.filter(o =>
@@ -67,16 +97,30 @@ export const AdminAsignacionProduccion: React.FC = () => {
     setModalOpen(true);
   };
 
-  const handleAsignarTaller = () => {
+  const handleAsignarTaller = async () => {
     if (!selectedOrden || !tallerSeleccionado) return;
-    setOrdenes(prev => prev.map(o => o.id === selectedOrden.id
-      ? { ...o, estado: 'Asignada', tallerAsignado: tallerSeleccionado }
-      : o
-    ));
-    toast.success(`Orden ${selectedOrden.numeroOrden} asignada a ${tallerSeleccionado}`);
-    setModalOpen(false);
-    setSelectedOrden(null);
-    setTallerSeleccionado('');
+    try {
+      setSaving(true);
+      const taller = talleres.find(t => t.nombre === tallerSeleccionado);
+      if (!taller) return;
+      const updated = await productionApi.assignToWorkshop(selectedOrden.id, taller.id);
+      setOrdenes(prev => prev.map(o => o.id === selectedOrden.id
+        ? {
+            ...o,
+            estado: 'Asignada',
+            tallerAsignado: updated.taller?.nombre || tallerSeleccionado,
+          }
+        : o
+      ));
+      toast.success(`Orden ${selectedOrden.numeroOrden} asignada a ${tallerSeleccionado}`);
+      setModalOpen(false);
+      setSelectedOrden(null);
+      setTallerSeleccionado('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error asignando taller');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getEstadoBadge = (estado: string) => {
@@ -95,6 +139,14 @@ export const AdminAsignacionProduccion: React.FC = () => {
     enProduccion: ordenes.filter(o => o.estado === 'En produccion').length,
     completadas: ordenes.filter(o => o.estado === 'Completada').length,
   };
+
+  if (loading) {
+    return <div className={s.header}><p>Cargando órdenes de producción...</p></div>;
+  }
+
+  if (error) {
+    return <div className={s.header}><p className="text-red-500">{error}</p></div>;
+  }
 
   return (
     <div>
@@ -137,7 +189,7 @@ export const AdminAsignacionProduccion: React.FC = () => {
 
       <div className={s.filters}>
         <div className={s.filterGroup}>
-          {['Todos', 'Pendiente', 'Asignada', 'En produccion', 'Completada'].map(estado => (
+          {['Todos', ...ESTADOS_PRODUCCION].map(estado => (
             <button
               key={estado}
               className={`${s.filterBtn} ${filtroEstado === estado ? s.filterBtnActive : ''}`}
@@ -162,7 +214,7 @@ export const AdminAsignacionProduccion: React.FC = () => {
       <DataTable<OrdenProduccion>
         data={filteredOrdenes}
         pageSize={10}
-        emptyMessage="No se encontraron órdenes de producción"
+        emptyMessage="Sin resultados"
         enableSorting
         enableColumnFilters
         enableRowSelection
@@ -187,7 +239,7 @@ export const AdminAsignacionProduccion: React.FC = () => {
           { key: 'clienteTaller', header: 'Cliente / Taller', width: '240px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar cliente...', render: (o) => (
             <div className="flex flex-col gap-0.5">
               <span className="text-[var(--color-text-primary)]">{o.cliente}</span>
-              <span className="text-xs text-[var(--color-text-secondary)]">{o.tallerAsignado || 'Sin asignar'}</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">{o.tallerAsignado || '—'}</span>
             </div>
           )},
           { key: 'entrega', header: 'Entrega', width: '160px', sortable: true, render: (o) => (
@@ -196,12 +248,7 @@ export const AdminAsignacionProduccion: React.FC = () => {
               <span className="text-xs text-[var(--color-text-secondary)]">Prioridad {o.prioridad}</span>
             </div>
           )},
-          { key: 'estado', header: 'Estado', width: '120px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-            { value: 'Pendiente', label: 'Pendiente' },
-            { value: 'Asignada', label: 'Asignada' },
-            { value: 'En produccion', label: 'En producción' },
-            { value: 'Completada', label: 'Completada' },
-          ], render: (o) => <Badge variant={getEstadoBadge(o.estado)}>{o.estado}</Badge> },
+          { key: 'estado', header: 'Estado', width: '120px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_PRODUCCION.map(e => ({ value: e, label: e === 'En produccion' ? 'En producción' : e })), render: (o) => <Badge variant={getEstadoBadge(o.estado)}>{o.estado}</Badge> },
         ]}
         detailPanel={{
           title: (o) => `${o.estado === 'Pendiente' ? 'Asignar Taller' : 'Cambiar Taller Asignado'} - ${o.numeroOrden}`,
@@ -219,13 +266,13 @@ export const AdminAsignacionProduccion: React.FC = () => {
                 <div className={s.selectWrapper}>
                   <select className={s.select} value={tallerSeleccionado} onChange={e => setTallerSeleccionado(e.target.value)}>
                     <option value="">-- Seleccione un taller --</option>
-                    {mockTalleres.map(t => (<option key={t.id} value={t.nombre}>{t.nombre} (Disponible: {t.capacidadDisponible})</option>))}
+                    {talleres.map(t => (<option key={t.id} value={t.nombre}>{t.nombre} (Disponible: {t.capacidadDisponible})</option>))}
                   </select>
                 </div>
               </div>
               <div className={s.formActions}>
                 <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleAsignarTaller} disabled={!tallerSeleccionado}>Asignar taller</Button>
+                <Button onClick={handleAsignarTaller} disabled={!tallerSeleccionado || saving}>{saving ? 'Guardando...' : 'Asignar taller'}</Button>
               </div>
             </div>
           ),
@@ -252,13 +299,13 @@ export const AdminAsignacionProduccion: React.FC = () => {
               <div className={s.selectWrapper}>
                 <select className={s.select} value={tallerSeleccionado} onChange={e => setTallerSeleccionado(e.target.value)}>
                   <option value="">-- Seleccione un taller --</option>
-                  {mockTalleres.map(t => (<option key={t.id} value={t.nombre}>{t.nombre} (Disponible: {t.capacidadDisponible})</option>))}
+                  {talleres.map(t => (<option key={t.id} value={t.nombre}>{t.nombre} (Disponible: {t.capacidadDisponible})</option>))}
                 </select>
               </div>
             </div>
             <div className={s.formActions}>
               <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
-              <Button onClick={handleAsignarTaller} disabled={!tallerSeleccionado}>Asignar taller</Button>
+              <Button onClick={handleAsignarTaller} disabled={!tallerSeleccionado || saving}>{saving ? 'Guardando...' : 'Asignar taller'}</Button>
             </div>
           </div>
         )}
@@ -266,4 +313,3 @@ export const AdminAsignacionProduccion: React.FC = () => {
     </div>
   );
 };
-

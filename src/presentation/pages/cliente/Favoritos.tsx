@@ -1,48 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Heart, ShoppingBag, X, AlertTriangle, PackageSearch } from 'lucide-react';
+import { Heart, ShoppingBag, X, AlertTriangle, PackageSearch, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
 import { useCart } from '@/core/stores/cartStore';
-import { useProductos } from '@/core/stores';
 import type { Producto } from '@/core/types';
+import { favoritesApi } from '@/infrastructure/api/favoritesApi';
 import s from './Favoritos.module.css';
 
-const FAVORITES_STORAGE_KEY = 'surtitelas.favorites';
-
-interface FavoriteSnapshot {
-  id: string;
-  ref: string;
-  nombre: string;
-  precio: number;
-  imagenPrincipal?: string;
-  imagenes: string[];
-  categoria?: string;
-  stock: Producto['stock'];
-  cantidadStock: number;
-}
-
-const readFavorites = (): string[] => {
-  try {
-    const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw) as string[];
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string' && id.trim() !== '') : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeFavorites = (favoriteIds: string[]) => {
-  window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
-};
-
-const getProductImage = (product: FavoriteSnapshot) => product.imagenPrincipal || product.imagenes[0] || '';
+const _FAVORITES_STORAGE_KEY = 'surtitelas.favorites';
 
 const formatCurrency = (value: number) => `$${value.toLocaleString('es-CO')}`;
 
-const toFavoriteSnapshot = (product: Producto): FavoriteSnapshot => ({
+const toFavoriteSnapshot = (product: Producto) => ({
   id: product.id || product.ref,
   ref: product.ref,
   nombre: product.nombre,
@@ -55,44 +25,42 @@ const toFavoriteSnapshot = (product: Producto): FavoriteSnapshot => ({
 });
 
 export const Favoritos: React.FC = () => {
-  const { productos } = useProductos();
   const { addToCart } = useCart();
-  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
-  const [productToRemove, setProductToRemove] = useState<FavoriteSnapshot | null>(null);
+  const [favorites, setFavorites] = useState<Producto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [productToRemove, setProductToRemove] = useState<ReturnType<typeof toFavoriteSnapshot> | null>(null);
 
   useEffect(() => {
-    setFavoriteIds(readFavorites());
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await favoritesApi.list();
+        setFavorites(data);
+      } catch {
+        setError('No se pudieron cargar tus favoritos. Intenta nuevamente.');
+        toast.error('Error al cargar favoritos');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
   }, []);
 
-  const favoriteProducts = useMemo(() => {
-    const productsById = productos
-      .map(toFavoriteSnapshot)
-      .reduce<Record<string, FavoriteSnapshot>>((acc, product) => {
-        acc[product.id] = product;
-        return acc;
-      }, {});
-
-    const idsFromStorage = new Set(favoriteIds);
-
-    return Array.from(idsFromStorage)
-      .map(id => productsById[id])
-      .filter((product): product is FavoriteSnapshot => Boolean(product));
-  }, [favoriteIds, productos]);
+  const favoriteProducts = useMemo(() => favorites.map(toFavoriteSnapshot), [favorites]);
 
   const removeFavorite = () => {
     if (!productToRemove) return;
 
-    setFavoriteIds(current => {
-      const next = current.filter(id => id !== productToRemove.id);
-      writeFavorites(next);
-      return next;
-    });
+    favoritesApi.toggle(productToRemove.id);
+    setFavorites(current => current.filter(p => p.id !== productToRemove.id));
 
     toast.success(`${productToRemove.nombre} eliminado de favoritos`);
     setProductToRemove(null);
   };
 
-  const handleAddToCart = (product: FavoriteSnapshot) => {
+  const handleAddToCart = (product: ReturnType<typeof toFavoriteSnapshot>) => {
     if (product.stock === 'Agotado' || product.cantidadStock <= 0) {
       toast.error('Este producto no tiene stock disponible');
       return;
@@ -102,7 +70,7 @@ export const Favoritos: React.FC = () => {
       cartId: product.id,
       nombre: product.nombre,
       precio: product.precio,
-      imagen: getProductImage(product),
+      imagen: product.imagenPrincipal || product.imagenes[0] || '',
       categoria: product.categoria || 'Catálogo',
       talla: 'Única',
       color: 'Único',
@@ -112,6 +80,29 @@ export const Favoritos: React.FC = () => {
 
     toast.success(`${product.nombre} agregado al carrito`);
   };
+
+  if (loading) {
+    return (
+      <div className={s.favoritesPage}>
+        <div className={s.loadingState}>
+          <Loader2 size={28} className={s.loadingSpinner} />
+          <span>Cargando tus favoritos...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={s.favoritesPage}>
+        <div className={s.errorState}>
+          <AlertCircle size={28} />
+          <span>{error}</span>
+          <Button variant="secondary" onClick={() => window.location.reload()}>Reintentar</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={s.favoritesPage}>
@@ -146,8 +137,8 @@ export const Favoritos: React.FC = () => {
               </div>
 
               <div className={s.productImageWrapper}>
-                {getProductImage(product) ? (
-                  <img src={getProductImage(product)} alt={product.nombre} loading="lazy" />
+                {product.imagenPrincipal || product.imagenes[0] ? (
+                  <img src={product.imagenPrincipal || product.imagenes[0]} alt={product.nombre} loading="lazy" />
                 ) : (
                   <div className={s.placeholderImage}><PackageSearch size={28} /></div>
                 )}

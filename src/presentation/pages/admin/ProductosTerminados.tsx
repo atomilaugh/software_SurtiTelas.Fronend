@@ -1,12 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, ToggleLeft, Barcode, Package, CreditCard, Calendar, User, Save } from 'lucide-react';
+import { Plus, Edit, Trash2, ToggleLeft, Barcode, Package, CreditCard, Calendar, User, Save, Loader2, AlertCircle } from 'lucide-react';
 import s from './ProductosTerminados.module.css';
 import f from '@/styles/Form.module.css';
 import { Button } from '@/shared/ui/Button';
 import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '@/shared/ui/DataTable';
+import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Modal } from '@/shared/ui/Modal';
+import { productsApi } from '@/infrastructure/api/productsApi';
+import { CATEGORIAS_PRODUCTO, TALLAS_PRODUCTO } from '@/shared/constants/options';
 
 interface Producto {
   id: string;
@@ -21,28 +24,43 @@ interface Producto {
   estado: 'Activo' | 'Inactivo';
 }
 
-const productosIniciales: Producto[] = [
-  { id: 'PT-001', codigo: 'PROD-001', nombre: 'Camisa Polo M', categoria: 'Camisas', talla: 'M', color: 'Azul', stock: 50, precio: 45000, fechaCreacion: '2024-01-15', estado: 'Activo' },
-  { id: 'PT-002', codigo: 'PROD-002', nombre: 'Pantaloneta', categoria: 'Pantalones', talla: 'Única', color: 'Negro', stock: 30, precio: 38000, fechaCreacion: '2024-02-20', estado: 'Activo' },
-  { id: 'PT-003', codigo: 'PROD-003', nombre: 'Chaqueta Denim', categoria: 'Chaquetas', talla: 'L', color: 'Azul', stock: 15, precio: 120000, fechaCreacion: '2024-03-10', estado: 'Activo' },
-  { id: 'PT-004', codigo: 'PROD-004', nombre: 'Blusa Casual', categoria: 'Blusas', talla: 'S', color: 'Blanco', stock: 0, precio: 35000, fechaCreacion: '2024-01-25', estado: 'Inactivo' },
-  { id: 'PT-005', codigo: 'PROD-005', nombre: 'Vestido Largo', categoria: 'Vestidos', talla: 'M', color: 'Rojo', stock: 25, precio: 85000, fechaCreacion: '2024-04-12', estado: 'Activo' },
-];
-
-const categorias = ['Camisas', 'Pantalones', 'Chaquetas', 'Blusas', 'Vestidos', 'Básicos', 'Deportivo'];
-const tallas = ['XS', 'S', 'M', 'L', 'XL', 'Única'];
+const categorias: string[] = [...CATEGORIAS_PRODUCTO];
+const tallas: string[] = [...TALLAS_PRODUCTO];
 
 export const AdminProductosTerminados: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [productos, setProductos] = useState<Producto[]>(productosIniciales);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Producto | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await productsApi.list();
+        if (!active) return;
+        setProductos(data);
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los productos terminados');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
 
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
-  const [categoria, setCategoria] = useState(categorias[0]);
-  const [talla, setTalla] = useState(tallas[0]);
+  const [categoria, setCategoria] = useState('');
+  const [talla, setTalla] = useState('');
   const [color, setColor] = useState('');
   const [stock, setStock] = useState('');
   const [precio, setPrecio] = useState('');
@@ -60,8 +78,8 @@ export const AdminProductosTerminados: React.FC = () => {
   const resetForm = () => {
     setCodigo('');
     setNombre('');
-    setCategoria(categorias[0]);
-    setTalla(tallas[0]);
+    setCategoria('');
+    setTalla('');
     setColor('');
     setStock('');
     setPrecio('');
@@ -112,7 +130,7 @@ export const AdminProductosTerminados: React.FC = () => {
         nombre: nombre.trim(),
         categoria,
         talla,
-        color: color.trim() || 'Sin especificar',
+        color: color.trim() || '',
         stock: Number(stock) || 0,
         precio: Number(precio),
         estado,
@@ -125,7 +143,7 @@ export const AdminProductosTerminados: React.FC = () => {
         nombre: nombre.trim(),
         categoria,
         talla,
-        color: color.trim() || 'Sin especificar',
+        color: color.trim() || '',
         stock: Number(stock) || 0,
         precio: Number(precio),
         fechaCreacion: hoy,
@@ -190,7 +208,7 @@ export const AdminProductosTerminados: React.FC = () => {
       setProductos(prev => prev.map(p => p.id === item.id ? { ...p, estado: p.estado === 'Activo' ? 'Inactivo' : 'Activo' } : p));
       toast.info(`Producto "${item.nombre}" ${item.estado === 'Activo' ? 'desactivado' : 'activado'}`);
     } },
-    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => { if (confirm('¿Eliminar producto terminado?')) { setProductos(prev => prev.filter(p => p.id !== item.id)); toast.success('Producto terminado eliminado'); } } },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => setDeleteConfirm(item) },
   ];
 
   return (
@@ -217,6 +235,19 @@ export const AdminProductosTerminados: React.FC = () => {
       </div>
 
       <div className={s.tableWrapper}>
+        {loading && (
+          <div className={s.stateBox}>
+            <Loader2 size={28} className={s.spin} />
+            <p>Cargando productos terminados...</p>
+          </div>
+        )}
+        {error && (
+          <div className={s.errorBox}>
+            <AlertCircle size={28} />
+            <p>{error}</p>
+          </div>
+        )}
+        {!loading && !error && (
         <DataTable
           data={filteredProductos}
           columns={columns}
@@ -228,7 +259,9 @@ export const AdminProductosTerminados: React.FC = () => {
           enableSorting={true}
           toolbarLeft={null}
           maxVisibleColumns={5}
+          emptyMessage="Sin resultados"
         />
+        )}
       </div>
 
       <Modal
@@ -303,6 +336,21 @@ export const AdminProductosTerminados: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => {
+          if (!deleteConfirm) return;
+          setProductos(prev => prev.filter(p => p.id !== deleteConfirm.id));
+          toast.success('Producto terminado eliminado');
+          setDeleteConfirm(null);
+        }}
+        title="Eliminar producto terminado"
+        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };

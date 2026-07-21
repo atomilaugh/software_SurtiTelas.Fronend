@@ -1,11 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, AlertTriangle, Clock, FileText, CreditCard, Download, DollarSign, ChevronDown, X } from 'lucide-react';
+import { Plus, CheckCircle, AlertTriangle, Clock, FileText, CreditCard, Download, DollarSign, ChevronDown, X, Loader2, AlertCircle } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Pagos.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { paymentsApi, type Payment } from '@/infrastructure/api/paymentsApi';
 
 interface Factura {
   id: string;
@@ -35,26 +36,52 @@ interface Abono {
   recibidoPor: string;
 }
 
-const mockFacturas: Factura[] = [
-  { id: 'FAC-001', numeroFactura: 'F001-2024', cliente: 'Tienda La Esquina', total: 5355000, abonado: 5355000, saldo: 0, cuotasTotales: 1, cuotasPagadas: 1, fechaProximaCuota: '-', estado: 'Pagado', metodoPago: 'Transferencia', fechaCreacion: '2024-06-01', vendedor: 'Juan Pérez' },
-  { id: 'FAC-002', numeroFactura: 'F002-2024', cliente: 'Distribuidora del Norte', total: 7378000, abonado: 2000000, saldo: 5378000, cuotasTotales: 3, cuotasPagadas: 1, fechaProximaCuota: '2024-07-05', estado: 'Parcial', metodoPago: 'Credito', fechaCreacion: '2024-06-05', vendedor: 'María Gómez' },
-  { id: 'FAC-003', numeroFactura: 'F003-2024', cliente: 'Almacén Central', total: 2142000, abonado: 0, saldo: 2142000, cuotasTotales: 2, cuotasPagadas: 0, fechaProximaCuota: '2024-06-20', estado: 'Vencido', metodoPago: 'Transferencia', fechaCreacion: '2024-05-20', vendedor: 'Carlos Ruiz' },
-  { id: 'FAC-004', numeroFactura: 'F004-2024', cliente: 'Moda Express', total: 10591000, abonado: 1000000, saldo: 9591000, cuotasTotales: 4, cuotasPagadas: 1, fechaProximaCuota: '2024-07-10', estado: 'Parcial', metodoPago: 'Credito', fechaCreacion: '2024-06-08', vendedor: 'Ana López' },
-  { id: 'FAC-005', numeroFactura: 'F005-2024', cliente: 'Boutique Elegante', total: 3808000, abonado: 3808000, saldo: 0, cuotasTotales: 1, cuotasPagadas: 1, fechaProximaCuota: '-', estado: 'Pagado', metodoPago: 'Tarjeta', fechaCreacion: '2024-06-10', vendedor: 'Juan Pérez' },
-  { id: 'FAC-006', numeroFactura: 'F006-2024', cliente: 'Ropa Deportiva Pro', total: 6545000, abonado: 3000000, saldo: 3545000, cuotasTotales: 3, cuotasPagadas: 1, fechaProximaCuota: '2024-06-15', estado: 'Parcial', metodoPago: 'Transferencia', fechaCreacion: '2024-05-28', vendedor: 'María Gómez' },
-  { id: 'FAC-007', numeroFactura: 'F007-2024', cliente: 'Tienda El Barrio', total: 2890000, abonado: 0, saldo: 2890000, cuotasTotales: 2, cuotasPagadas: 0, fechaProximaCuota: '2024-06-18', estado: 'En Mora', metodoPago: 'Credito', fechaCreacion: '2024-05-15', vendedor: 'Carlos Ruiz' },
-  { id: 'FAC-008', numeroFactura: 'F008-2024', cliente: 'Distribuciones Andina', total: 8920000, abonado: 4000000, saldo: 4920000, cuotasTotales: 4, cuotasPagadas: 2, fechaProximaCuota: '2024-07-20', estado: 'Parcial', metodoPago: 'Credito', fechaCreacion: '2024-06-02', vendedor: 'Ana López' },
-  { id: 'FAC-009', numeroFactura: 'F009-2024', cliente: 'Modas Chic', total: 1560000, abonado: 1560000, saldo: 0, cuotasTotales: 1, cuotasPagadas: 1, fechaProximaCuota: '-', estado: 'Pagado', metodoPago: 'Efectivo', fechaCreacion: '2024-06-09', vendedor: 'Juan Pérez' },
-  { id: 'FAC-010', numeroFactura: 'F010-2024', cliente: 'Ropa Juvenil S.A.', total: 4120000, abonado: 0, saldo: 4120000, cuotasTotales: 2, cuotasPagadas: 0, fechaProximaCuota: '2024-06-25', estado: 'Pendiente', metodoPago: 'Transferencia', fechaCreacion: '2024-06-11', vendedor: 'María Gómez' },
-];
+const facturasFromPayments = (payments: Payment[]): Factura[] =>
+  payments.map((p) => {
+    const aprobado = p.status === 'Aprobado';
+    const rechazado = p.status === 'Rechazado';
+    const reembolsado = p.status === 'Reembolsado';
+    const total = aprobado || rechazado || reembolsado ? p.amount : p.amount;
+    const abonado = aprobado || reembolsado ? p.amount : 0;
+    const saldo = total - abonado;
+    const estado: Factura['estado'] = rechazado
+      ? 'Vencido'
+      : reembolsado
+        ? 'Pagado'
+        : aprobado
+          ? 'Pagado'
+          : 'Pendiente';
+    return {
+      id: p.id,
+      numeroFactura: p.orderId,
+      cliente: p.customerId,
+      total,
+      abonado,
+      saldo,
+      cuotasTotales: 1,
+      cuotasPagadas: aprobado || reembolsado ? 1 : 0,
+      fechaProximaCuota: p.paidAt ?? '-',
+      estado,
+      metodoPago: p.method === 'Tarjeta' ? 'Tarjeta' : p.method === 'Efectivo' ? 'Efectivo' : 'Transferencia',
+      fechaCreacion: p.createdAt.split('T')[0],
+      vendedor: p.asesorId ?? 'Sin asesor',
+    };
+  });
 
-const mockAbonos: Abono[] = [
-  { id: 'AB-001', facturaId: 'FAC-002', numeroFactura: 'F002-2024', cliente: 'Distribuidora del Norte', valor: 2000000, fecha: '2024-06-05', metodoPago: 'Transferencia', concepto: 'Abono inicial', recibidoPor: 'María Gómez' },
-  { id: 'AB-002', facturaId: 'FAC-004', numeroFactura: 'F004-2024', cliente: 'Moda Express', valor: 1000000, fecha: '2024-06-08', metodoPago: 'Tarjeta', concepto: 'Primera cuota', recibidoPor: 'Ana López' },
-  { id: 'AB-003', facturaId: 'FAC-006', numeroFactura: 'F006-2024', cliente: 'Ropa Deportiva Pro', valor: 3000000, fecha: '2024-05-28', metodoPago: 'Transferencia', concepto: 'Parcial', recibidoPor: 'María Gómez' },
-  { id: 'AB-004', facturaId: 'FAC-008', numeroFactura: 'F008-2024', cliente: 'Distribuciones Andina', valor: 4000000, fecha: '2024-06-02', metodoPago: 'Credito', concepto: 'Abono 50%', recibidoPor: 'Ana López' },
-  { id: 'AB-005', facturaId: 'FAC-008', numeroFactura: 'F008-2024', cliente: 'Distribuciones Andina', valor: 2000000, fecha: '2024-06-10', metodoPago: 'Transferencia', concepto: 'Segunda cuota', recibidoPor: 'María Gómez' },
-];
+const abonosFromPayments = (payments: Payment[]): Abono[] =>
+  payments
+    .filter((p) => p.status === 'Aprobado')
+    .map((p) => ({
+      id: p.id,
+      facturaId: p.orderId,
+      numeroFactura: p.orderId,
+      cliente: p.customerId,
+      valor: p.amount,
+      fecha: (p.paidAt ?? p.createdAt).split('T')[0],
+      metodoPago: p.method === 'Tarjeta' ? 'Tarjeta' : p.method === 'Efectivo' ? 'Efectivo' : 'Transferencia',
+      concepto: p.reference ?? p.notes ?? 'Pago de factura',
+      recibidoPor: p.asesorId ?? 'Sistema',
+    }));
 
 export const AdminPagos: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -65,18 +92,42 @@ export const AdminPagos: React.FC = () => {
   const [selectedFactura, setSelectedFactura] = useState<Factura | null>(null);
   const [nuevoAbono, setNuevoAbono] = useState({ valor: '', metodo: 'Transferencia', concepto: '', fecha: '' });
   const [showFilters, setShowFilters] = useState(false);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadPayments = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await paymentsApi.list();
+      setPayments(data);
+    } catch {
+      setError('No se pudieron cargar los pagos. Intenta nuevamente.');
+      toast.error('Error al cargar los pagos');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPayments();
+  }, [loadPayments]);
+
+  const facturas = useMemo(() => facturasFromPayments(payments), [payments]);
+  const abonos = useMemo(() => abonosFromPayments(payments), [payments]);
 
   const filteredFacturas = useMemo(() => {
-    return mockFacturas.filter(f =>
+    return facturas.filter(f =>
       (filtroEstado === 'Todos' || f.estado === filtroEstado) &&
       (filtroMetodo === 'Todos' || f.metodoPago === filtroMetodo) &&
       (f.numeroFactura.toLowerCase().includes(search.toLowerCase()) ||
        f.cliente.toLowerCase().includes(search.toLowerCase()) ||
        f.vendedor.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [search, filtroEstado, filtroMetodo]);
+  }, [search, filtroEstado, filtroMetodo, facturas]);
 
-  const metodosUnicos = Array.from(new Set(mockFacturas.map(f => f.metodoPago)));
+  const metodosUnicos = Array.from(new Set(facturas.map(f => f.metodoPago)));
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -104,11 +155,11 @@ export const AdminPagos: React.FC = () => {
   };
 
   const stats = {
-    totalFacturado: mockFacturas.reduce((sum, f) => sum + f.total, 0),
-    totalAbonado: mockFacturas.reduce((sum, f) => sum + f.abonado, 0),
-    totalSaldo: mockFacturas.reduce((sum, f) => sum + f.saldo, 0),
-    vencidas: mockFacturas.filter(f => f.estado === 'Vencido' || f.estado === 'En Mora').length,
-    porVencer: mockFacturas.filter(f => f.estado === 'Parcial' || f.estado === 'Pendiente').length,
+    totalFacturado: facturas.reduce((sum, f) => sum + f.total, 0),
+    totalAbonado: facturas.reduce((sum, f) => sum + f.abonado, 0),
+    totalSaldo: facturas.reduce((sum, f) => sum + f.saldo, 0),
+    vencidas: facturas.filter(f => f.estado === 'Vencido' || f.estado === 'En Mora').length,
+    porVencer: facturas.filter(f => f.estado === 'Parcial' || f.estado === 'Pendiente').length,
   };
 
   const _handleVerDetalle = (factura: Factura) => {
@@ -134,10 +185,33 @@ export const AdminPagos: React.FC = () => {
     setNuevoAbono({ valor: '', metodo: 'Transferencia', concepto: '', fecha: '' });
   };
 
-  const abonosDeFactura = (facturaId: string) => mockAbonos.filter(a => a.facturaId === facturaId);
+  const abonosDeFactura = (facturaId: string) => abonos.filter(a => a.facturaId === facturaId);
 
   return (
     <div>
+      {loading && (
+        <div className={s.header}>
+          <div>
+            <h1 className={s.pageTitle}>Pagos, abonos y financiación</h1>
+            <p className={s.pageSubtitle}>Registro y gestión de pagos parciales y planes de financiación</p>
+          </div>
+          <div className={s.headerActions}>
+            <Loader2 size={20} className={s.loadingSpinner} />
+            <span className={s.loadingText}>Cargando pagos…</span>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className={s.errorBanner}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+          <Button variant="secondary" onClick={() => void loadPayments()}>Reintentar</Button>
+        </div>
+      )}
+
+      {!loading && !error && (
+      <>
       <div className={s.header}>
         <div>
           <h1 className={s.pageTitle}>Pagos, abonos y financiación</h1>
@@ -307,7 +381,7 @@ export const AdminPagos: React.FC = () => {
       />
 
       {modalDetalleOpen && selectedFactura && (
-        <div className={s.modalOverlay} onClick={() => setModalDetalleOpen(false)}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <div className={s.modalHeaderInfo}>
@@ -382,7 +456,7 @@ export const AdminPagos: React.FC = () => {
       )}
 
       {modalAbonoOpen && selectedFactura && (
-        <div className={s.modalOverlay} onClick={() => setModalAbonoOpen(false)}>
+        <div className={s.modalOverlay}>
           <div className={s.modal} onClick={e => e.stopPropagation()}>
             <div className={s.modalHeader}>
               <h2 className={s.modalTitle}>Registrar abono - {selectedFactura.numeroFactura}</h2>
@@ -458,6 +532,9 @@ export const AdminPagos: React.FC = () => {
           </div>
         </div>
       )}
+      </>
+      )}
+
     </div>
   );
 };
