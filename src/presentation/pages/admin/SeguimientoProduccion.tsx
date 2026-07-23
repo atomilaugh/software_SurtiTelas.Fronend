@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Clock, Factory, TrendingUp } from 'lucide-react';
+import { Search, Clock, Factory, TrendingUp, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import s from './SeguimientoProduccion.module.css';
 import { Badge } from '@/shared/ui/Badge';
@@ -60,6 +60,13 @@ export const AdminSeguimientoProduccion: React.FC = () => {
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
   const [nuevoAvance, setNuevoAvance] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editReferencia, setEditReferencia] = useState('');
+  const [editCantidad, setEditCantidad] = useState('');
+  const [editFecha, setEditFecha] = useState('');
+  const [editNotas, setEditNotas] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -76,7 +83,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
           cantidadProducida: Math.round((o.avance / 100) * o.cantidad),
           fechaInicio: o.fechaInicio,
           fechaPrometida: o.fechaEstimada,
-          estado: o.estado === 'En proceso' ? 'En produccion' : o.estado === 'Terminado' ? 'Completada' : o.estado === 'Pendiente' ? 'Pendiente' : 'Asignada',
+          estado: o.estado === 'En produccion' ? 'En produccion' : o.estado === 'Completada' ? 'Completada' : o.estado === 'Pendiente' ? 'Pendiente' : 'Asignada',
           tallerAsignado: o.taller?.nombre,
           prioridad: (o.pedidoPrioridad === 'ALTA' ? 'Alta' : o.pedidoPrioridad === 'MEDIA' ? 'Media' : o.pedidoPrioridad === 'BAJA' ? 'Baja' : 'Media') as OrdenProduccion['prioridad'],
           cliente: o.pedidoCliente ?? '',
@@ -111,6 +118,70 @@ export const AdminSeguimientoProduccion: React.FC = () => {
     setModalOpen(true);
   };
 
+  const handleCambiarEstado = async (orden: OrdenProduccion, nuevoEstado: OrdenProduccion['estado']) => {
+    try {
+      await productionApi.update(orden.id, { estado: nuevoEstado });
+      setOrdenes(prev => prev.map(o => o.id === orden.id ? { ...o, estado: nuevoEstado } : o));
+      toast.success(`Estado actualizado a ${nuevoEstado}`);
+    } catch {
+      toast.error('No se pudo actualizar el estado');
+    }
+  };
+
+  const openEditModal = (orden: OrdenProduccion) => {
+    setEditingId(orden.id);
+    setEditReferencia(orden.referencia);
+    setEditCantidad(String(orden.cantidad));
+    setEditFecha(orden.fechaPrometida);
+    setEditNotas(orden.observaciones);
+    setEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      const updated = await productionApi.update(editingId, {
+        referencia: editReferencia,
+        cantidad: Number(editCantidad),
+        fechaEstimada: editFecha,
+        notasTecnicas: editNotas || undefined,
+      });
+      setOrdenes(prev => prev.map(o => o.id === editingId ? {
+        ...o,
+        referencia: updated.referencia,
+        cantidad: updated.cantidad,
+        fechaPrometida: updated.fechaEstimada,
+        observaciones: updated.notasTecnicas || '',
+        cantidadProducida: Math.round((updated.avance / 100) * updated.cantidad),
+        avance: updated.avance,
+      } : o));
+      toast.success('Orden actualizada');
+      setEditModalOpen(false);
+      setEditingId(null);
+    } catch {
+      toast.error('No se pudo actualizar la orden');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      setSaving(true);
+      await productionApi.remove(deleteId);
+      setOrdenes(prev => prev.filter(o => o.id !== deleteId));
+      toast.success('Orden eliminada');
+      setDeleteId(null);
+    } catch {
+      toast.error('No se pudo eliminar la orden');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleActualizarAvance = async () => {
     if (!selectedOrden || !nuevoAvance) return;
     try {
@@ -118,9 +189,9 @@ export const AdminSeguimientoProduccion: React.FC = () => {
       const producidas = Number(nuevoAvance);
       const avance = Math.round((producidas / selectedOrden.cantidad) * 100);
       if (avance >= 100) {
-        await productionApi.update(selectedOrden.id, { estado: 'Terminado' });
+        await productionApi.update(selectedOrden.id, { estado: 'Completada' });
       } else {
-        await productionApi.update(selectedOrden.id, { avance, estado: 'En proceso' });
+        await productionApi.update(selectedOrden.id, { avance, estado: 'En produccion' });
       }
       setOrdenes(prev => prev.map(o => {
         if (o.id !== selectedOrden.id) return o;
@@ -141,7 +212,7 @@ export const AdminSeguimientoProduccion: React.FC = () => {
 
   const handleCompletarOrden = async (orden: OrdenProduccion) => {
     try {
-      await productionApi.update(orden.id, { estado: 'Terminado' });
+      await productionApi.update(orden.id, { estado: 'Completada' });
       setOrdenes(prev => prev.map(o => o.id === orden.id
         ? { ...o, cantidadProducida: o.cantidad, avance: 100, estado: 'Completada' as const }
         : o
@@ -257,6 +328,8 @@ export const AdminSeguimientoProduccion: React.FC = () => {
         actions={(o) => [
           ...(o.estado === 'En produccion' ? [{ label: 'Actualizar avance', icon: <Clock size={14} />, onClick: () => abrirModal(o) }] : []),
           ...(o.estado === 'Asignada' ? [{ label: 'Iniciar producción', icon: <Factory size={14} />, onClick: () => abrirModal(o) }] : []),
+          { label: 'Editar', icon: <Edit size={14} />, onClick: () => openEditModal(o) },
+          { label: 'Eliminar', icon: <Trash2 size={14} />, onClick: () => setDeleteId(o.id) },
         ]}
         columns={[
           { key: 'orden', header: 'Orden', width: '180px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar orden...', render: (o) => (
@@ -301,7 +374,13 @@ export const AdminSeguimientoProduccion: React.FC = () => {
               <div className={s.infoRow}><span className={s.infoLabel}>Referencia:</span><span className={s.infoValue}>{o.referencia}</span></div>
               <div className={s.infoRow}><span className={s.infoLabel}>Cliente:</span><span className={s.infoValue}>{o.cliente}</span></div>
               <div className={s.infoRow}><span className={s.infoLabel}>Taller:</span><span className={s.infoValue}>{o.tallerAsignado || '—'}</span></div>
-              <div className={s.infoRow}><span className={s.infoLabel}>Estado:</span><Badge variant={_getEstadoBadge(o.estado)}>{o.estado}</Badge></div>
+              <div className={s.infoRow}><span className={s.infoLabel}>Estado:</span>
+                <div className={s.selectWrapper}>
+                  <select className={s.select} value={o.estado} onChange={e => handleCambiarEstado(o, e.target.value as OrdenProduccion['estado'])}>
+                    {ESTADOS_PRODUCCION.map(e => (<option key={e} value={e}>{e}</option>))}
+                  </select>
+                </div>
+              </div>
               <div className={s.infoRow}><span className={s.infoLabel}>Fecha inicio:</span><span className={s.infoValue}>{o.fechaInicio}</span></div>
               <div className={s.infoRow}><span className={s.infoLabel}>Fecha límite:</span><span className={`${s.infoValue} ${_getDiasRestantes(o.fechaPrometida) < 0 && (o.estado !== 'Completada' && o.estado !== 'Pendiente') ? s.infoValueWarning : ''}`}>{o.fechaPrometida}{_getDiasRestantes(o.fechaPrometida) < 0 && (o.estado !== 'Completada' && o.estado !== 'Pendiente') && <span className={s.retrasoBadge}> Retrasado +{Math.abs(_getDiasRestantes(o.fechaPrometida))} días</span>}</span></div>
               <div className={s.infoRow}><span className={s.infoLabel}>Observaciones:</span><span className={s.infoValue}>{o.observaciones || '—'}</span></div>
@@ -361,6 +440,88 @@ export const AdminSeguimientoProduccion: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={editModalOpen}
+        onClose={() => { setEditModalOpen(false); setEditingId(null); }}
+        title="Editar orden de producción"
+        description="Modifica los datos de la orden."
+        size="lg"
+        variant="form"
+      >
+        <form id="editOrdenForm" className={s.form} onSubmit={handleEditSubmit}>
+          <div className={s.formRow}>
+            <div className={s.field}>
+              <label className={s.label}>Referencia</label>
+              <input
+                type="text"
+                className={s.input}
+                value={editReferencia}
+                onChange={e => setEditReferencia(e.target.value)}
+                required
+              />
+            </div>
+            <div className={s.field}>
+              <label className={s.label}>Cantidad</label>
+              <input
+                type="number"
+                className={s.input}
+                value={editCantidad}
+                onChange={e => setEditCantidad(e.target.value)}
+                required
+                min="1"
+              />
+            </div>
+          </div>
+          <div className={s.formRow}>
+            <div className={s.field}>
+              <label className={s.label}>Fecha límite</label>
+              <input
+                type="date"
+                className={s.input}
+                value={editFecha}
+                onChange={e => setEditFecha(e.target.value)}
+                required
+              />
+            </div>
+            <div className={s.field}>
+              <label className={s.label}>Observaciones</label>
+              <input
+                type="text"
+                className={s.input}
+                value={editNotas}
+                onChange={e => setEditNotas(e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+          </div>
+          <div className={s.formActions}>
+            <Button variant="secondary" type="button" onClick={() => { setEditModalOpen(false); setEditingId(null); }} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Eliminar orden"
+        description="Esta acción no se puede deshacer."
+        size="sm"
+      >
+        <div className={s.formActions}>
+          <Button variant="secondary" onClick={() => setDeleteId(null)} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleDelete} disabled={saving}>
+            {saving ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </div>
       </Modal>
     </div>
   );

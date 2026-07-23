@@ -96,13 +96,13 @@ function toProductBody(p: Partial<Producto>): Record<string, unknown> {
 
 export interface ProductsListResult {
   data: Producto[];
-  meta: PaginatedResponse<ProductDTO>['meta'];
+  meta: PaginatedResponse<ProductDTO>['data']['meta'];
 }
 
 export const catalogApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<ProductsListResult> {
-    const response = await api.get<PaginatedResponse<ProductDTO>>('/catalog/products', { query, auth: false });
-    const data = (response?.data ?? []).map(toProducto);
+    const response = await api.get<{ items: ProductDTO[]; meta: PaginatedResponse<ProductDTO>['data']['meta'] }>('/catalog/products', { query, auth: false });
+    const data = (response?.items ?? []).map(toProducto);
     const meta = response?.meta ?? { totalRecords: 0, page: 1, limit: 12, totalPages: 1 };
     return { data, meta };
   },

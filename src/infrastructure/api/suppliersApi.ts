@@ -52,13 +52,13 @@ function toSupplierBody(p: Partial<Proveedor>): Record<string, unknown> {
 
 export interface SuppliersListResult {
   data: Proveedor[];
-  meta: PaginatedResponse<SupplierDTO>['meta'];
+  meta: PaginatedResponse<SupplierDTO>['data']['meta'];
 }
 
 export const suppliersApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<SuppliersListResult> {
-    const response = await api.get<PaginatedResponse<SupplierDTO>>('/stock/suppliers', { query });
-    const data = (response?.data ?? []).map(toProveedor);
+    const response = await api.get<{ items: SupplierDTO[]; meta: PaginatedResponse<SupplierDTO>['data']['meta'] }>('/stock/suppliers', { query });
+    const data = (response?.items ?? []).map(toProveedor);
     const meta = response?.meta ?? { totalRecords: 0, page: 1, limit: 10, totalPages: 1 };
     return { data, meta };
   },

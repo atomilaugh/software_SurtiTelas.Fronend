@@ -40,8 +40,7 @@ export const AdminAlertasStock: React.FC = () => {
 
   const filteredAlertas = alertas.filter(a =>
     (filtro === 'Todos' || a.estado === filtro) &&
-    (a.insumo.toLowerCase().includes(search.toLowerCase()) ||
-     a.codigo.toLowerCase().includes(search.toLowerCase()))
+    ((a.nombre ?? '').toLowerCase().includes(search.toLowerCase()))
   );
 
   const getEstadoBadge = (estado: string) => {
@@ -54,10 +53,10 @@ export const AdminAlertasStock: React.FC = () => {
 
   const columns: DataTableColumn<AlertaStock>[] = [
     { key: 'id', header: 'ID', width: '80px', sortable: true, render: (a) => <span className={s.tdMono}>{a.id}</span> },
-    { key: 'insumo', header: 'Insumo', sortable: true, render: (a) => (
+    { key: 'nombre', header: 'Insumo', sortable: true, render: (a) => (
       <div className={s.insumoCell}>
         <Package size={14} />
-        <span className={s.tdPrimary}>{a.insumo}</span>
+        <span className={s.tdPrimary}>{a.nombre}</span>
       </div>
     )},
     { key: 'stockActual', header: 'Stock Actual', width: '110px', sortable: true, align: 'center', render: (a) => (
@@ -66,12 +65,6 @@ export const AdminAlertasStock: React.FC = () => {
     { key: 'stockMinimo', header: 'Stock Mínimo', width: '110px', sortable: true, align: 'center', render: (a) => a.stockMinimo },
     { key: 'diferencia', header: 'Diferencia', width: '90px', sortable: true, align: 'center', render: (a) => (
       <span className={a.diferencia < 0 ? s.diferenciaNegativa : s.diferenciaPositiva}>{a.diferencia}</span>
-    )},
-    { key: 'fechaAlerta', header: 'Fecha', width: '110px', sortable: true, render: (a) => (
-      <div className={s.fechaCell}>
-        <Calendar size={14} />
-        {a.fechaAlerta}
-      </div>
     )},
     { key: 'estado', header: 'Estado', width: '110px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_ALERTA_STOCK.map(e => ({ value: e, label: e === 'Critico' ? 'Crítico' : e })), render: (a) => (
       <Badge variant={getEstadoBadge(a.estado)}>{a.estado}</Badge>
@@ -85,8 +78,8 @@ export const AdminAlertasStock: React.FC = () => {
       icon: <Bell size={18} />,
       title: 'Alerta de stock',
       code: item.id,
-      subtitle: `${item.insumo} · ${item.codigo}`,
-      meta: `${item.fechaAlerta} · ${item.responsable}`,
+      subtitle: `${item.nombre} · ${item.categoria}`,
+      meta: item.unidadMedida,
       status: <Badge variant={getEstadoBadge(item.estado)} dot>{item.estado}</Badge>,
     }),
     kpis: (item) => [
@@ -94,27 +87,19 @@ export const AdminAlertasStock: React.FC = () => {
       { label: 'Stock mínimo', value: item.stockMinimo, icon: <AlertTriangle size={16} />, tone: 'default' },
       { label: 'Diferencia', value: item.diferencia, helper: item.diferencia < 0 ? 'Requiere reposición' : 'Cobertura suficiente', icon: <BarChart3 size={16} />, tone: item.diferencia < 0 ? 'danger' : 'success' },
     ],
-    observations: (item) => ({ title: 'Observaciones', icon: <FileText size={16} />, tone: item.estado === 'Resuelta' ? 'success' : item.estado === 'Critico' ? 'danger' : 'warning', children: item.observaciones }),
     render: (item) => (
       <div className={s.detailPanel}>
         <div className={s.detailSection}>
           <h4 className={s.detailSectionTitle}>Información del insumo</h4>
           <div className={s.detailGrid}>
-            <div className={s.detailItem}><span className={s.detailLabel}>Código</span><span>{item.codigo}</span></div>
+            <div className={s.detailItem}><span className={s.detailLabel}>Nombre</span><span>{item.nombre}</span></div>
             <div className={s.detailItem}><span className={s.detailLabel}>Categoría</span><span>{item.categoria}</span></div>
+            <div className={s.detailItem}><span className={s.detailLabel}>Unidad</span><span>{item.unidadMedida}</span></div>
             <div className={s.detailItem}><span className={s.detailLabel}>Stock actual</span><span>{item.stockActual}</span></div>
             <div className={s.detailItem}><span className={s.detailLabel}>Stock mínimo</span><span>{item.stockMinimo}</span></div>
             <div className={s.detailItem}><span className={s.detailLabel}>Diferencia</span><span className={item.diferencia < 0 ? s.diferenciaNegativa : s.diferenciaPositiva}>{item.diferencia}</span></div>
-            <div className={s.detailItem}><span className={s.detailLabel}>Fecha alerta</span><span>{item.fechaAlerta}</span></div>
-            {item.responsable && <div className={s.detailItem}><span className={s.detailLabel}>Responsable</span><span>{item.responsable}</span></div>}
           </div>
         </div>
-        {item.observaciones && (
-          <div className={s.detailSection}>
-            <h4 className={s.detailSectionTitle}>Observaciones</h4>
-            <div className={s.detailItemFull}><span>{item.observaciones}</span></div>
-          </div>
-        )}
         <div className={s.modalActions}>
           <Button variant="secondary">Cerrar</Button>
         </div>
@@ -211,7 +196,7 @@ export const AdminAlertasStock: React.FC = () => {
           setDeleteConfirm(null);
         }}
         title="Eliminar alerta"
-        description={`¿Estás seguro de que deseas eliminar la alerta de "${deleteConfirm?.insumo}"? Esta acción no se puede deshacer.`}
+        description={`¿Estás seguro de que deseas eliminar la alerta de "${deleteConfirm?.nombre ?? deleteConfirm?.id}"? Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar"
         variant="danger"
       />

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Edit, Shield, Loader2, AlertCircle, EyeOff } from 'lucide-react';
+import { Edit, Shield, Loader2, AlertCircle, EyeOff, Trash2 } from 'lucide-react';
 import s from './Roles.module.css';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Badge } from '@/shared/ui/Badge';
@@ -11,6 +11,10 @@ import { useDelegatedTooltips } from '@/shared/components/Tooltip';
 import { cn } from '@/shared/utils';
 import { rolesApi, type Rol } from '@/infrastructure/api/rolesApi';
 import { PERMISOS_SISTEMA } from '@/shared/constants/options';
+
+const PROTECTED_ROLES = new Set(['ADMIN', 'ASESOR']);
+
+const isProtectedRole = (rol: Rol) => PROTECTED_ROLES.has((rol.nombre ?? '').toUpperCase());
 
 const mapBackendRole = (rol: Rol): Rol => ({
   ...rol,
@@ -153,6 +157,25 @@ export const AdminRoles: React.FC = () => {
       onClick: (item: Rol) => {
         setSelectedRol(item);
         setModalOpen(true);
+      },
+    },
+    {
+      label: (item: Rol) => (isProtectedRole(item) ? 'Protegido' : 'Desactivar'),
+      icon: <Trash2 size={14} aria-hidden="true" focusable="false" />,
+      disabled: (item: Rol) => isProtectedRole(item),
+      onClick: async (item: Rol) => {
+        if (isProtectedRole(item)) {
+          toast.error('Rol protegido, no se puede eliminar');
+          return;
+        }
+        const nuevoEstado = item.estado === 'Activo' ? 'Inactivo' : 'Activo';
+        try {
+          await rolesApi.updateStatus(item.id, nuevoEstado);
+          setItems(prev => prev.map(it => it.id === item.id ? { ...it, estado: nuevoEstado } : it));
+          toast.success(`Rol ${nuevoEstado.toLowerCase()} correctamente`);
+        } catch {
+          toast.error('No se pudo actualizar el estado del rol');
+        }
       },
     },
     {

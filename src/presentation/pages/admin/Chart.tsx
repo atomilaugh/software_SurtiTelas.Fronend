@@ -26,6 +26,20 @@ const COLORS = [
   '#94a3b8',
 ];
 
+const TOOLTIP_CONTENT_STYLE = {
+  background: 'var(--color-bg-elevated)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-md)',
+  padding: '10px 14px',
+  color: 'var(--color-text-primary)',
+  fontSize: '0.82rem',
+  lineHeight: 1.4,
+};
+
+const TOOLTIP_ITEM_STYLE = {
+  color: 'var(--color-text-secondary)',
+};
+
 /* ========================================= */
 
 interface ChartWrapperProps {
@@ -79,13 +93,25 @@ export function BarChart({
         <ReBarChart data={data}>
           <CartesianGrid
             strokeDasharray="3 3"
+            stroke="var(--color-border-subtle)"
           />
 
-          <XAxis dataKey="label" />
+          <XAxis
+            dataKey="label"
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 11 }}
+          />
 
-          <YAxis />
+          <YAxis
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 11 }}
+          />
 
-          <Tooltip />
+          <Tooltip
+            cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            itemStyle={TOOLTIP_ITEM_STYLE}
+          />
 
           <Bar
             dataKey="value"
@@ -124,13 +150,24 @@ export function LineChart({
         <ReLineChart data={data}>
           <CartesianGrid
             strokeDasharray="3 3"
+            stroke="var(--color-border-subtle)"
           />
 
-          <XAxis dataKey="label" />
+          <XAxis
+            dataKey="label"
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 11 }}
+          />
 
-          <YAxis />
+          <YAxis
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 11 }}
+          />
 
-          <Tooltip />
+          <Tooltip
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            itemStyle={TOOLTIP_ITEM_STYLE}
+          />
 
           <Line
             type="monotone"
@@ -191,7 +228,10 @@ export function PieChart({
             ))}
           </Pie>
 
-          <Tooltip />
+          <Tooltip
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            itemStyle={TOOLTIP_ITEM_STYLE}
+          />
         </RePieChart>
       </ResponsiveContainer>
     </ChartWrapper>

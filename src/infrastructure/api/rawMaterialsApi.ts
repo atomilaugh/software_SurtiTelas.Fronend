@@ -51,8 +51,8 @@ function toRawMaterialBody(m: Partial<RawMaterial>): Record<string, unknown> {
 
 export const rawMaterialsApi = {
   async list(): Promise<RawMaterial[]> {
-    const response = await api.get<{ data: RawMaterialDTO[]; meta: Record<string, unknown> }>('/stock/raw-materials');
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: RawMaterialDTO[]; meta: Record<string, unknown> }>('/stock/raw-materials');
+    const data = response?.items ?? [];
     return data.map(toRawMaterial);
   },
 

@@ -9,6 +9,9 @@ import {
   Crown,
   Palette,
   Settings2,
+  Users,
+  Cpu,
+  PenTool,
   Headphones,
   Sparkles,
   ArrowRight,
@@ -75,11 +78,17 @@ const featuresData: FeatureItem[] = appContent.publicPages.about.features.map((f
   description: feature.description,
 }));
 
+const teamIcons: Record<string, React.ReactNode> = {
+  'Equipo de producto': <Users size={22} />,
+  'Equipo creativo': <PenTool size={22} />,
+  'Equipo técnico': <Cpu size={22} />,
+};
+
 const teamData: TeamMember[] = appContent.publicPages.about.team.map((member) => ({
   name: member.name,
   role: member.role,
   description: member.description,
-  icon: <Crown size={22} />,
+  icon: teamIcons[member.name] ?? <Crown size={22} />,
 }));
 
 /* =========================================================

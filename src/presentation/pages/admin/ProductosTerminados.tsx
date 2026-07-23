@@ -5,10 +5,9 @@ import s from './ProductosTerminados.module.css';
 import f from '@/styles/Form.module.css';
 import { Button } from '@/shared/ui/Button';
 import { DataTable, DataTableColumn, DataTableAction, DataTableDetailPanel } from '@/shared/ui/DataTable';
-import { ConfirmationModal } from '@/shared/ui/ConfirmationModal';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import { Modal } from '@/shared/ui/Modal';
-import { productsApi } from '@/infrastructure/api/productsApi';
+import { productsApi, type ProductTerminado } from '@/infrastructure/api/productsApi';
 import { CATEGORIAS_PRODUCTO, TALLAS_PRODUCTO } from '@/shared/constants/options';
 
 interface Producto {
@@ -35,7 +34,6 @@ export const AdminProductosTerminados: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<Producto | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -112,20 +110,15 @@ export const AdminProductosTerminados: React.FC = () => {
     setEditingId(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     if (!nombre.trim()) { setFormError('El nombre del producto es obligatorio'); return; }
     if (!codigo.trim()) { setFormError('El código del producto es obligatorio'); return; }
     if (!precio || Number(precio) <= 0) { setFormError('El precio debe ser mayor a 0'); return; }
-    if (!editingId && productos.some(p => p.codigo.toLowerCase() === codigo.trim().toLowerCase())) {
-      setFormError('Ya existe un producto con ese código'); return;
-    }
     setSaving(true);
-    const hoy = new Date().toISOString().slice(0, 10);
-    if (editingId) {
-      setProductos(prev => prev.map(p => p.id === editingId ? {
-        ...p,
+    try {
+      const data: Partial<ProductTerminado> = {
         codigo: codigo.trim(),
         nombre: nombre.trim(),
         categoria,
@@ -133,26 +126,28 @@ export const AdminProductosTerminados: React.FC = () => {
         color: color.trim() || '',
         stock: Number(stock) || 0,
         precio: Number(precio),
-        estado,
-      } : p));
-      toast.success(`Producto "${nombre.trim()}" actualizado correctamente`);
-    } else {
-      const nuevo: Producto = {
-        id: `PT-${String(productos.length + 1).padStart(3, '0')}`,
-        codigo: codigo.trim(),
-        nombre: nombre.trim(),
-        categoria,
-        talla,
-        color: color.trim() || '',
-        stock: Number(stock) || 0,
-        precio: Number(precio),
-        fechaCreacion: hoy,
         estado,
       };
-      setProductos(prev => [nuevo, ...prev]);
-      toast.success(`Producto "${nuevo.nombre}" creado correctamente`);
+      if (editingId) {
+        await productsApi.update(editingId, data);
+        setProductos(prev => prev.map(p => p.id === editingId ? { ...p, ...data } : p));
+        toast.success(`Producto "${nombre.trim()}" actualizado correctamente`);
+      } else {
+        if (productos.some(p => p.codigo.toLowerCase() === codigo.trim().toLowerCase())) {
+          setFormError('Ya existe un producto con ese código');
+          setSaving(false);
+          return;
+        }
+        const creado = await productsApi.create(data);
+        setProductos(prev => [creado, ...prev]);
+        toast.success(`Producto "${creado.nombre}" creado correctamente`);
+      }
+      closeModal();
+    } catch {
+      toast.error('No se pudo guardar el producto');
+    } finally {
+      setSaving(false);
     }
-    closeModal();
   };
 
   const columns: DataTableColumn<Producto>[] = [
@@ -204,11 +199,17 @@ export const AdminProductosTerminados: React.FC = () => {
 
   const actions: DataTableAction<Producto>[] = [
     { label: 'Editar', icon: <Edit size={14} />, onClick: (item) => openModal(item) },
-    { label: 'Desactivar', icon: <ToggleLeft size={14} />, onClick: (item) => {
-      setProductos(prev => prev.map(p => p.id === item.id ? { ...p, estado: p.estado === 'Activo' ? 'Inactivo' : 'Activo' } : p));
-      toast.info(`Producto "${item.nombre}" ${item.estado === 'Activo' ? 'desactivado' : 'activado'}`);
+    { label: 'Desactivar', icon: <ToggleLeft size={14} />, onClick: async (item) => {
+      const nuevoEstado = item.estado === 'Activo' ? 'Inactivo' : 'Activo';
+      await productsApi.update(item.id, { estado: nuevoEstado });
+      setProductos(prev => prev.map(p => p.id === item.id ? { ...p, estado: nuevoEstado } : p));
+      toast.info(`Producto "${item.nombre}" ${nuevoEstado === 'Inactivo' ? 'desactivado' : 'activado'}`);
     } },
-    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: (item) => setDeleteConfirm(item) },
+    { label: 'Eliminar', icon: <Trash2 size={14} />, danger: true, onClick: async (item) => {
+      await productsApi.remove(item.id);
+      setProductos(prev => prev.filter(p => p.id !== item.id));
+      toast.success(`Producto "${item.nombre}" eliminado`);
+    } },
   ];
 
   return (
@@ -336,21 +337,6 @@ export const AdminProductosTerminados: React.FC = () => {
           </div>
         </form>
       </Modal>
-
-      <ConfirmationModal
-        open={!!deleteConfirm}
-        onClose={() => setDeleteConfirm(null)}
-        onConfirm={() => {
-          if (!deleteConfirm) return;
-          setProductos(prev => prev.filter(p => p.id !== deleteConfirm.id));
-          toast.success('Producto terminado eliminado');
-          setDeleteConfirm(null);
-        }}
-        title="Eliminar producto terminado"
-        description={`¿Estás seguro de que deseas eliminar "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
-        variant="danger"
-      />
     </div>
   );
 };

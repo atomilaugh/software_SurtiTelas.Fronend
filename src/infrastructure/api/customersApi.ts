@@ -64,8 +64,8 @@ export interface CustomersListResult {
 
 export const customersApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<CustomersListResult> {
-    const response = await api.get<PaginatedResponse<CustomerDTO>>('/customers', { query });
-    const data = (response?.data ?? []).map(toCliente);
+    const response = await api.get<{ items: CustomerDTO[]; meta: PaginatedResponse<CustomerDTO>['data']['meta'] }>('/customers', { query });
+    const data = (response?.items ?? []).map(toCliente);
     const meta = response?.meta ?? { totalRecords: 0, page: 1, limit: 10, totalPages: 1 };
     return { data, meta };
   },
@@ -81,5 +81,9 @@ export const customersApi = {
       toCustomerBody(changes),
     );
     return toCliente(dto);
+  },
+
+  async remove(id: string): Promise<void> {
+    await api.delete(`/customers/${encodeURIComponent(id)}`);
   },
 };

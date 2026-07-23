@@ -49,8 +49,8 @@ export function toPayment(dto: PaymentDTO): Payment {
 
 export const paymentsApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<Payment[]> {
-    const response = await api.get<{ data: PaymentDTO[]; meta: Record<string, unknown> }>('/payments', { query });
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: PaymentDTO[]; meta: Record<string, unknown> }>('/payments', { query });
+    const data = response?.items ?? [];
     return data.map(toPayment);
   },
 
@@ -82,5 +82,19 @@ export const paymentsApi = {
       status: status === 'Pendiente' ? 'PENDING' : status === 'Aprobado' ? 'APPROVED' : status === 'Rechazado' ? 'REJECTED' : 'REFUNDED',
     });
     return toPayment(dto);
+  },
+
+  async update(id: string, changes: Partial<Payment>): Promise<Payment> {
+    const body: Record<string, unknown> = {};
+    if (changes.amount !== undefined) body.amount = changes.amount;
+    if (changes.method !== undefined) body.method = changes.method === 'Efectivo' ? 'CASH' : changes.method === 'Transferencia' ? 'TRANSFER' : changes.method === 'Tarjeta' ? 'CARD' : 'OTHER';
+    if (changes.reference !== undefined) body.reference = changes.reference;
+    if (changes.notes !== undefined) body.notes = changes.notes;
+    const dto = await api.patch<PaymentDTO>(`/payments/${encodeURIComponent(id)}`, body);
+    return toPayment(dto);
+  },
+
+  async remove(id: string): Promise<void> {
+    await api.delete(`/payments/${encodeURIComponent(id)}`);
   },
 };

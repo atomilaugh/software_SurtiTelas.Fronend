@@ -30,14 +30,14 @@ const formatFecha = (value: string): string => {
 
 const toAcceso = (log: AccessLog): Acceso => ({
   id: log.id,
-  usuario: log.usuario ?? '—',
+  usuario: typeof log.usuario === 'object' && log.usuario !== null ? log.usuario.nombre : (log.usuario ?? '—'),
   rol: log.dispositivo ?? '—',
   modulo: log.modulo ?? '—',
   permiso: `${log.accion}${log.ip ? ` · ${log.ip}` : ''}`,
   fechaAsignacion: formatFecha(log.createdAt),
   expira: null,
   estado: log.estado === 'Exitoso' ? 'Activo' : 'Expirado',
-});
+} as Acceso);
 
 export const AdminGestionAcceso: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -106,16 +106,17 @@ export const AdminGestionAcceso: React.FC = () => {
         toast.success('Acceso actualizado');
       } else {
         const nuevo = await accessApi.create({ usuario, rol, modulo, accion: permiso, expira });
-        setItems(prev => [{
+        const nuevoAcceso: Acceso = {
           id: nuevo.id,
-          usuario: nuevo.usuario ?? usuario,
+          usuario: typeof nuevo.usuario === 'object' && nuevo.usuario !== null ? nuevo.usuario.nombre : (nuevo.usuario ?? usuario),
           rol,
           modulo: nuevo.modulo ?? modulo,
           permiso: `${nuevo.accion}${nuevo.ip ? ` · ${nuevo.ip}` : ''}`,
           fechaAsignacion: formatFecha(nuevo.createdAt),
           expira: expira,
           estado: nuevo.estado === 'Exitoso' ? 'Activo' : 'Expirado',
-        }, ...prev]);
+        };
+        setItems(prev => [nuevoAcceso, ...prev]);
         toast.success('Acceso creado');
       }
     } catch (err) {

@@ -169,7 +169,7 @@ export const PerfilCliente: React.FC = () => {
       }
       const updated = await authApi.updateProfile(payload);
       if (user) {
-        useAuthStore.setState({ user: { ...user, nombre: updated.nombre, email: updated.email } });
+        useAuthStore.setState({ user: { ...user, name: updated.nombre, email: updated.email } });
       }
       toast.success('Cambios guardados correctamente');
       setPassword('');

@@ -12,25 +12,29 @@ const ForgotPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) {
       setError('El email es obligatorio');
       return;
     }
-    
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError('Email inválido');
       return;
     }
-    
+
     setLoading(true);
     setError('');
-    
+    setDevResetUrl(null);
+
     try {
-      await authApi.forgotPassword({ email });
+      const result = await authApi.forgotPassword({ email });
+      const resetUrl = (result as any).resetUrl || null;
+      setDevResetUrl(resetUrl);
       setSuccess(true);
       toast.success('Correo de recuperación enviado');
     } catch {
@@ -139,6 +143,16 @@ const ForgotPasswordPage: React.FC = () => {
                 <p style={{ fontSize: '0.875rem', color: '#555555', lineHeight: 1.6 }}>
                   Revisa tu bandeja de entrada y sigue las instrucciones para restablecer tu contraseña.
                 </p>
+                {devResetUrl && (
+                  <div style={{ marginTop: 16, padding: 12, background: '#f1f5f9', borderRadius: 8, textAlign: 'left' }}>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 8 }}>
+                      Estás en modo desarrollo. Usá este enlace para restablecer tu contraseña:
+                    </p>
+                    <a href={devResetUrl} style={{ fontSize: '0.875rem', color: '#2563eb', wordBreak: 'break-all' }}>
+                      {devResetUrl}
+                    </a>
+                  </div>
+                )}
               </div>
 
               <button className="submitBtn" onClick={() => navigate('/login')}>

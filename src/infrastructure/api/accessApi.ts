@@ -6,7 +6,12 @@ export type AccessEstado = 'Exitoso' | 'Fallido';
 export interface AccessLogDTO {
   id: string;
   usuarioId?: string;
-  usuario?: string;
+  usuario?: {
+    id: string;
+    nombre: string;
+    email: string;
+    role: string;
+  } | null;
   accion: AccessAccion;
   ip?: string;
   modulo?: string;
@@ -18,7 +23,12 @@ export interface AccessLogDTO {
 export interface AccessLog {
   id: string;
   usuarioId?: string;
-  usuario?: string;
+  usuario?: {
+    id: string;
+    nombre: string;
+    email: string;
+    role: string;
+  } | null;
   accion: AccessAccion;
   ip?: string;
   modulo?: string;
@@ -43,8 +53,8 @@ export function toAccessLog(dto: AccessLogDTO): AccessLog {
 
 export const accessApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<AccessLog[]> {
-    const response = await api.get<{ data: AccessLogDTO[]; meta: Record<string, unknown> }>('/access-logs', { query });
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: AccessLogDTO[]; meta: Record<string, unknown> }>('/access-logs', { query });
+    const data = response?.items ?? [];
     return data.map(toAccessLog);
   },
 

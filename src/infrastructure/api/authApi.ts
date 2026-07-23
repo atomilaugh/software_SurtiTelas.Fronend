@@ -80,6 +80,7 @@ export interface ForgotPasswordRequest {
 
 export interface ForgotPasswordResponse {
   message: string;
+  resetUrl?: string;
 }
 
 export interface ResetPasswordRequest {
@@ -89,7 +90,7 @@ export interface ResetPasswordRequest {
 
 export interface UsersListResult {
   data: BackendAuthUser[];
-  meta: PaginatedResponse<BackendAuthUser>['meta'];
+  meta: PaginatedResponse<BackendAuthUser>['data']['meta'];
 }
 
 export const authApi = {
@@ -105,7 +106,10 @@ export const authApi = {
     api.patch<UpdateProfileResponse>('/auth/me', data),
 
   listUsers: (query?: Record<string, string | number | boolean | undefined | null>): Promise<UsersListResult> =>
-    api.get<PaginatedResponse<BackendAuthUser>>('/auth/users', { query }),
+    api.get<{ items: BackendAuthUser[]; meta: PaginatedResponse<BackendAuthUser>['data']['meta'] }>('/auth/users', { query }).then((response) => ({
+      data: response.items,
+      meta: response.meta,
+    })),
 
   createUser: (data: CreateUserRequest) =>
     api.post<CreateUserResponse>('/auth/register', data),

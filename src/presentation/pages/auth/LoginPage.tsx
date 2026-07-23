@@ -1,7 +1,7 @@
 ﻿import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Eye, EyeOff, ArrowLeft } from 'lucide-react';
-import { useAuth, TEST_ACCOUNTS } from '@/app/providers/AppProviders';
+import { useAuth } from '@/app/providers/AppProviders';
 import { toast } from 'sonner';
 import partnerLogo from '@/assets/images/logos/partner-logo-2-Photoroom.png';
 import { authApi } from '@/infrastructure/api/authApi';
@@ -206,23 +206,6 @@ const LoginPage: React.FC = () => {
           <div className="formFooter">
             ¿No tienes cuenta?{' '}
             <button className="switchLink" onClick={() => navigate('/registro')}>Regístrate gratis</button>
-          </div>
-
-          {/* Test accounts */}
-          <div className="auth-test-accounts">
-            <p className="testAccountsLabel">Credenciales de prueba:</p>
-            <div className="testAccountsGrid">
-              {TEST_ACCOUNTS.map(account => (
-                <button
-                  key={account.email}
-                  type="button"
-                  className="testAccountBtn"
-                  onClick={() => { setEmail(account.email); setPassword(account.password); }}
-                >
-                  {account.label}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </main>

@@ -84,13 +84,9 @@ export interface CreateReturnInput {
 
 export const returnsApi = {
   async list(): Promise<Return[]> {
-    try {
-      const response = await api.get<{ data: ReturnDTO[]; meta: Record<string, unknown> }>('/returns');
-      const data = response?.data ?? [];
-      return data.map(toReturn);
-    } catch {
-      return [];
-    }
+    const response = await api.get<{ items: ReturnDTO[]; meta: Record<string, unknown> }>('/returns');
+    const data = response?.items ?? [];
+    return data.map(toReturn);
   },
 
   async getById(id: string): Promise<Return | null> {

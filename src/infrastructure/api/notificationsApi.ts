@@ -35,8 +35,8 @@ export function toNotification(dto: NotificationDTO): Notification {
 
 export const notificationsApi = {
   async list(): Promise<Notification[]> {
-    const response = await api.get<{ data: NotificationDTO[]; meta: Record<string, unknown> }>('/notifications');
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: NotificationDTO[]; meta: Record<string, unknown> }>('/notifications');
+    const data = response?.items ?? [];
     return data.map(toNotification);
   },
 

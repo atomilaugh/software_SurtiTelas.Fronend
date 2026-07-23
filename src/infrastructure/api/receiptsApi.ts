@@ -37,8 +37,14 @@ export function toReceipt(dto: ReceiptDTO): Receipt {
 
 export const receiptsApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<Receipt[]> {
-    const response = await api.get<{ data: ReceiptDTO[]; meta: Record<string, unknown> }>('/receipts', { query });
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: ReceiptDTO[]; meta: Record<string, unknown> }>('/receipts', { query });
+    const data = response?.items ?? [];
+    return data.map(toReceipt);
+  },
+
+  async listMine(): Promise<Receipt[]> {
+    const response = await api.get<{ items: ReceiptDTO[]; meta: Record<string, unknown> }>('/receipts/me');
+    const data = response?.items ?? [];
     return data.map(toReceipt);
   },
 
@@ -61,5 +67,19 @@ export const receiptsApi = {
     };
     const dto = await api.post<ReceiptDTO>('/receipts', body);
     return toReceipt(dto);
+  },
+
+  async update(id: string, changes: Partial<Receipt>): Promise<Receipt> {
+    const dto = await api.patch<ReceiptDTO>(`/receipts/${encodeURIComponent(id)}`, changes);
+    return toReceipt(dto);
+  },
+
+  async updateStatus(id: string, estado: string): Promise<Receipt> {
+    const dto = await api.patch<ReceiptDTO>(`/receipts/${encodeURIComponent(id)}/status`, { estado });
+    return toReceipt(dto);
+  },
+
+  async remove(id: string): Promise<void> {
+    await api.delete(`/receipts/${encodeURIComponent(id)}`);
   },
 };

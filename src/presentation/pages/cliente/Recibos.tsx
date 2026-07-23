@@ -76,7 +76,7 @@ export const Recibos: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await receiptsApi.list();
+        const data = await receiptsApi.listMine();
         setRecibos(data.map(toRecibo));
       } catch {
         setError('No se pudieron cargar tus recibos. Intenta nuevamente.');

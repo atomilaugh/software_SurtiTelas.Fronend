@@ -47,19 +47,25 @@ export interface CreateUserInput {
   telefono?: string;
 }
 
+export interface UpdateUserInput {
+  nombre?: string;
+  telefono?: string;
+}
+
 export const usersApi = {
-  async list(): Promise<Usuario[]> {
-    try {
-      const response = await api.get<{ data: (BackendAuthUser & { estado?: string; createdAt?: string })[]; meta: Record<string, unknown> }>('/auth/users');
-      const data = response?.data ?? [];
-      return data.map(toUser);
-    } catch {
-      return [];
-    }
+  async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<Usuario[]> {
+    const response = await api.get<{ items: (BackendAuthUser & { estado?: string; createdAt?: string; pedidosRealizados?: number })[]; meta: Record<string, unknown> }>('/auth/users', { query });
+    const data = response?.items ?? [];
+    return data.map(toUser);
   },
 
   async create(input: CreateUserInput): Promise<Usuario> {
     const dto = await api.post<BackendAuthUser & { estado?: string; createdAt?: string }>('/auth/users', input);
+    return toUser(dto);
+  },
+
+  async update(id: string, changes: UpdateUserInput): Promise<Usuario> {
+    const dto = await api.patch<BackendAuthUser & { estado?: string; createdAt?: string }>(`/auth/users/${encodeURIComponent(id)}`, changes);
     return toUser(dto);
   },
 

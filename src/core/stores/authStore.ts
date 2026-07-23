@@ -4,7 +4,7 @@ import { authApi, type BackendRole } from '@/infrastructure/api/authApi';
 import { ApiError, setUnauthorizedHandler } from '@/infrastructure/api/httpClient';
 import { tokenStorage } from '@/infrastructure/api/tokenStorage';
 
-export type UserRole = 'admin' | 'asesor' | 'domiciliario' | 'cliente';
+export type UserRole = 'admin' | 'almacen' | 'asesor' | 'domiciliario' | 'cliente' | 'produccion' | 'reportes';
 
 export interface User {
   uid: string;
@@ -46,9 +46,12 @@ const AUTH_STORAGE_KEY = 'surtitelas.auth';
 
 const ROLE_MAP: Record<BackendRole, UserRole> = {
   ADMIN: 'admin',
+  ALMACEN: 'almacen',
   ASESOR: 'asesor',
   DOMICILIARIO: 'domiciliario',
   CLIENTE: 'cliente',
+  PRODUCCION: 'produccion',
+  REPORTES: 'reportes',
 };
 
 const mapRole = (role: BackendRole): UserRole => ROLE_MAP[role] ?? 'cliente';

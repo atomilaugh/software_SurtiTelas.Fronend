@@ -20,7 +20,7 @@ interface TopHeaderProps {
   user: {
     name: string;
     email: string;
-    role: 'admin' | 'asesor' | 'domiciliario' | 'cliente';
+    role: 'admin' | 'almacen' | 'asesor' | 'domiciliario' | 'cliente' | 'produccion' | 'reportes';
     initial: string;
   };
   notificationCount: number;

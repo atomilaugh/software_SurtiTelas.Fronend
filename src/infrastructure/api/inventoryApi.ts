@@ -43,62 +43,58 @@ export function toInventoryMovement(dto: InventoryMovementDTO): InventoryMovemen
 
 export interface StockAlertDTO {
   id: string;
-  insumo: string;
-  codigo: string;
+  nombre?: string;
+  categoria?: string;
+  unidadMedida?: string;
   stockActual: number;
   stockMinimo: number;
-  diferencia: number;
-  fechaAlerta: string;
-  estado: 'Pendiente' | 'Resuelta' | 'Critico';
-  categoria: string;
-  responsable: string;
-  observaciones: string;
+  precioUnitario?: number;
 }
 
 export interface StockAlert {
   id: string;
-  insumo: string;
-  codigo: string;
+  nombre: string;
+  categoria: string;
+  unidadMedida: string;
   stockActual: number;
   stockMinimo: number;
+  precioUnitario: number;
   diferencia: number;
-  fechaAlerta: string;
   estado: 'Pendiente' | 'Resuelta' | 'Critico';
-  categoria: string;
-  responsable: string;
-  observaciones: string;
+  responsable?: string;
+  observaciones?: string;
 }
 
 export function toStockAlert(dto: StockAlertDTO): StockAlert {
+  const diferencia = dto.stockActual - dto.stockMinimo;
+  const estado: StockAlert['estado'] = diferencia < 0 ? 'Critico' : 'Pendiente';
   return {
     id: dto.id,
-    insumo: dto.insumo,
-    codigo: dto.codigo,
+    nombre: dto.nombre ?? 'Sin nombre',
+    categoria: dto.categoria ?? 'General',
+    unidadMedida: dto.unidadMedida ?? 'Unid',
     stockActual: dto.stockActual,
     stockMinimo: dto.stockMinimo,
-    diferencia: dto.diferencia,
-    fechaAlerta: dto.fechaAlerta,
-    estado: dto.estado,
-    categoria: dto.categoria,
-    responsable: dto.responsable,
-    observaciones: dto.observaciones,
+    precioUnitario: dto.precioUnitario ?? 0,
+    diferencia,
+    estado,
   };
 }
 
 export interface MovementsListResult {
   data: InventoryMovement[];
-  meta: PaginatedResponse<InventoryMovementDTO>['meta'];
+  meta: PaginatedResponse<InventoryMovementDTO>['data']['meta'];
 }
 
 export interface StockAlertsListResult {
   data: StockAlert[];
-  meta: PaginatedResponse<StockAlertDTO>['meta'];
+  meta: PaginatedResponse<StockAlertDTO>['data']['meta'];
 }
 
 export const inventoryApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<MovementsListResult> {
-    const response = await api.get<PaginatedResponse<InventoryMovementDTO>>('/stock/movements', { query });
-    const data = (response?.data ?? []).map(toInventoryMovement);
+    const response = await api.get<{ items: InventoryMovementDTO[]; meta: PaginatedResponse<InventoryMovementDTO>['data']['meta'] }>('/stock/movements', { query });
+    const data = (response?.items ?? []).map(toInventoryMovement);
     const meta = response?.meta ?? { totalRecords: 0, page: 1, limit: 10, totalPages: 1 };
     return { data, meta };
   },
@@ -117,8 +113,8 @@ export const inventoryApi = {
   },
 
   async listAlerts(query?: Record<string, string | number | boolean | undefined | null>): Promise<StockAlertsListResult> {
-    const response = await api.get<PaginatedResponse<StockAlertDTO>>('/stock/alerts', { query });
-    const data = (response?.data ?? []).map(toStockAlert);
+    const response = await api.get<{ items: StockAlertDTO[]; meta: PaginatedResponse<StockAlertDTO>['data']['meta'] }>('/stock/alerts', { query });
+    const data = (response?.items ?? []).map(toStockAlert);
     const meta = response?.meta ?? { totalRecords: 0, page: 1, limit: 10, totalPages: 1 };
     return { data, meta };
   },

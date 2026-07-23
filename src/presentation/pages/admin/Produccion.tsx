@@ -18,7 +18,7 @@ interface OrdenProduccion {
   fechaInicio: string;
   fechaEstimada: string;
   avance: number;
-  estado: 'Pendiente' | 'En proceso' | 'Terminado';
+  estado: 'Pendiente' | 'Asignada' | 'En produccion' | 'Completada';
 }
 
 interface UsuarioOption {
@@ -38,7 +38,7 @@ function toOrden(o: ProductionOrder, operarios: UsuarioOption[] = []): OrdenProd
     fechaInicio: o.fechaInicio,
     fechaEstimada: o.fechaEstimada,
     avance: o.avance,
-    estado: (o.estado === 'Pendiente' ? 'Pendiente' : o.estado === 'En proceso' ? 'En proceso' : 'Terminado'),
+    estado: o.estado,
   };
 }
 
@@ -202,8 +202,9 @@ export const AdminProduccion: React.FC = () => {
                 <label className={s.label}>Estado</label>
                 <select className={s.select} name="estado" defaultValue={selectedOrden.estado}>
                   <option>Pendiente</option>
-                  <option>En proceso</option>
-                  <option>Terminado</option>
+                  <option>Asignada</option>
+                  <option>En produccion</option>
+                  <option>Completada</option>
                 </select>
               </div>
             </div>

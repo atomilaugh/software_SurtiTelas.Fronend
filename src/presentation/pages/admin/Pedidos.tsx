@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { Plus, Save, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Pedidos.module.css';
@@ -8,12 +8,12 @@ import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { Modal } from '../../../shared/ui/Modal';
+import { ConfirmationModal } from '../../../shared/ui/ConfirmationModal';
 import { ordersApi } from '@/infrastructure/api/ordersApi';
-import { customersApi } from '@/infrastructure/api/customersApi';
 import { authApi, type BackendAuthUser } from '@/infrastructure/api/authApi';
 import { useAuthStore } from '@/core/stores/authStore';
 import { ESTADOS_PEDIDO, ORDER_STATUS_COLORS } from '@/shared/constants/options';
-import type { Pedido, PedidoItem, Cliente } from '@/core/types';
+import type { Pedido, PedidoItem } from '@/core/types';
 import { useServerPagination } from '@/hooks/useServerPagination';
 
 type PedidoFormItem = {
@@ -31,7 +31,7 @@ const formatoCOP = (valor: number) =>
 export const AdminPedidos: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const [pageData, setPageData] = useState<Pedido[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clientes, setClientes] = useState<BackendAuthUser[]>([]);
   const [asesores, setAsesores] = useState<BackendAuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,8 +39,9 @@ export const AdminPedidos: React.FC = () => {
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
-  const [clienteNombre, setClienteNombre] = useState('');
+  const [clienteId, setClienteId] = useState('');
   const [asesorId, setAsesorId] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [estado, setEstado] = useState<Pedido['estado']>('Nuevo');
@@ -49,6 +50,9 @@ export const AdminPedidos: React.FC = () => {
     { id: 'I1', nombre: '', precio: 0, cantidad: 1 },
   ]);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<Pedido | null>(null);
+  const [statusConfirm, setStatusConfirm] = useState<{ id: string; estado: Pedido['estado'] } | null>(null);
 
   const pagination = useServerPagination(10);
 
@@ -60,18 +64,24 @@ export const AdminPedidos: React.FC = () => {
         limit: pagination.limit,
       };
       if (search.trim()) ordersQuery.search = search.trim();
-      const [ordersResult, clientsResult, _profile, usersResult] = await Promise.all([
+
+      const [ordersResult, clientesResult, _profile, asesoresResult] = await Promise.all([
         ordersApi.list(ordersQuery),
-        customersApi.list(),
+        authApi.listUsers({ limit: 100, role: 'CLIENTE' }),
         authApi.me(),
-        authApi.listUsers(),
+        authApi.listUsers({ limit: 100, role: 'ASESOR' }),
       ]);
-      setPageData(ordersResult.pedidos);
+
+      const clientesIds = new Set((clientesResult.data ?? []).map(c => c.id));
+      setClientes(clientesResult.data ?? []);
+      setAsesores(asesoresResult.data ?? []);
+
+      const pedidos = (ordersResult.pedidos ?? []).filter(p => p.clienteId && clientesIds.has(p.clienteId));
+      setPageData(pedidos);
       pagination.setTotalRecords(ordersResult.meta.totalRecords);
-      setClientes(clientsResult.data);
-      setAsesores(usersResult.data.filter((u) => u.role === 'ASESOR'));
-      if (!asesorId && usersResult.data.some((u) => u.role === 'ASESOR')) {
-        const adminAsesor = usersResult.data.find((u) => u.role === 'ASESOR');
+
+      if (!asesorId && asesoresResult.data?.length) {
+        const adminAsesor = asesoresResult.data.find((u) => u.role === 'ASESOR');
         setAsesorId(adminAsesor?.id ?? '');
       }
     } catch {
@@ -93,7 +103,7 @@ export const AdminPedidos: React.FC = () => {
   const totalItems = items.reduce((sum, it) => sum + it.cantidad, 0);
 
   const resetForm = () => {
-    setClienteNombre('');
+    setClienteId('');
     setAsesorId('');
     setFecha(new Date().toISOString().slice(0, 10));
     setEstado('Nuevo');
@@ -110,7 +120,7 @@ export const AdminPedidos: React.FC = () => {
 
   const openEdit = (p: Pedido) => {
     setSelectedPedido(p);
-    setClienteNombre(p.cliente);
+    setClienteId(p.clienteId ?? '');
     setFecha(p.fecha);
     setEstado(p.estado);
     setObservaciones(p.observaciones || '');
@@ -147,15 +157,8 @@ export const AdminPedidos: React.FC = () => {
     e.preventDefault();
     setFormError(null);
 
-    const clienteFinal = clienteNombre.trim();
-    if (!clienteFinal) {
-      setFormError('El cliente es obligatorio');
-      return;
-    }
-
-    const clienteDto = clientes.find((c) => c.nombre.toLowerCase() === clienteFinal.toLowerCase());
-    if (!clienteDto) {
-      setFormError('Selecciona un cliente válido');
+    if (!clienteId) {
+      setFormError('Selecciona un cliente');
       return;
     }
 
@@ -175,15 +178,21 @@ export const AdminPedidos: React.FC = () => {
       }));
 
       if (selectedPedido) {
-        const actualizado = await ordersApi.updateStatus(selectedPedido.id, estado);
+        const actualizado = await ordersApi.updateOrderFull(selectedPedido.id, {
+          clienteId,
+          asesorId: asesorId || undefined,
+          prioridad: undefined,
+          observaciones: observaciones || undefined,
+          itemsList,
+        });
         setPageData((prev) =>
           prev.map((p) => (p.id === selectedPedido.id ? actualizado : p))
         );
         toast.success(`Pedido ${selectedPedido.id} actualizado`);
       } else {
         const resultado = await ordersApi.create({
-          clienteId: clienteDto.id,
-          asesorId: asesorId || user?.uid,
+          clienteId,
+          asesorId: asesorId || undefined,
           itemsList,
           prioridad: undefined,
           observaciones: observaciones || undefined,
@@ -200,6 +209,32 @@ export const AdminPedidos: React.FC = () => {
     }
   };
 
+  const handleChangeStatus = async () => {
+    if (!statusConfirm) return;
+    try {
+      await ordersApi.updateStatus(statusConfirm.id, statusConfirm.estado);
+      await hydrate();
+      toast.success(`Pedido ${statusConfirm.id} actualizado a ${statusConfirm.estado}`);
+      setStatusConfirm(null);
+    } catch {
+      toast.error('No se pudo actualizar el estado');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await ordersApi.delete(deleteConfirm.id);
+      await hydrate();
+      toast.success(`Pedido ${deleteConfirm.id} eliminado`);
+      setDeleteConfirm(null);
+    } catch {
+      toast.error('No se pudo eliminar el pedido');
+    }
+  };
+
+  const detailPedido = detailId ? pageData.find(p => p.id === detailId) : null;
+
   return (
     <div>
       <div className={s.header}>
@@ -207,10 +242,10 @@ export const AdminPedidos: React.FC = () => {
           <h1 className={s.pageTitle}>Pedidos</h1>
           <p className={s.pageSubtitle}>Gestión de pedidos del sistema</p>
         </div>
-        <Button onClick={openNew}>
-          <Plus size={16} />
-          Nuevo Pedido
-        </Button>
+        <div className={s.headerActions}>
+          <Button leftIcon={<Plus size={16} />} onClick={openNew}>Nuevo Pedido</Button>
+          <Button variant="secondary" onClick={hydrate}>Actualizar</Button>
+        </div>
       </div>
 
       <div className={s.toolbar}>
@@ -224,56 +259,68 @@ export const AdminPedidos: React.FC = () => {
         />
       </div>
 
-      <DataTable<Pedido>
-        data={pageData}
-        pageSize={pagination.limit}
-        emptyMessage={loading ? 'Cargando pedidos...' : 'Sin resultados'}
-        enableSorting
-        enableColumnFilters
-        enableRowSelection
-        enableExport
-        exportFileName="pedidos"
-        maxVisibleColumns={5}
-        serverMode
-        currentPage={pagination.page}
-        totalPages={pagination.totalPages}
-        totalItems={pagination.totalRecords}
-        onPageChange={handlePageChange}
-        columns={[
-          { key: 'id', header: 'ID Pedido', width: '130px', sortable: true, filterable: true, render: (p) => <span className={s.tdMono}>{p.numero ?? p.id}</span> },
-          { key: 'cliente', header: 'Cliente', sortable: true, filterable: true, render: (p) => <span className={s.tdPrimary}>{p.cliente}</span> },
-          { key: 'asesor', header: 'Asesor', render: (p) => p.asesor },
-          { key: 'fecha', header: 'Fecha', width: '110px', render: (p) => p.fecha },
-          { key: 'total', header: 'Total', width: '120px', render: (p) => p.total },
-          { key: 'estado', header: 'Estado', width: '130px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_PEDIDO.map(es => ({ value: es, label: es })), render: (p) => (
-            <Badge variant={orderStatuses[p.estado]}>{p.estado}</Badge>
-          )},
-        ]}
-        actions={(p) => [
-          { label: 'Editar', onClick: () => openEdit(p) },
-        ]}
-        detailPanel={{
-          title: (p) => `Pedido ${p.numero ?? p.id}`,
-          render: (p, onClose) => (
-            <div className={s.detailModalContent}>
-              <div className={s.detailSection}>
-                <h4 className={s.detailSectionTitle}>Detalles del pedido</h4>
-                <div className={s.detailGrid}>
-                  <div className={s.detailItem}><span className={s.detailLabel}>ID</span><span>{p.numero ?? p.id}</span></div>
-                  <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{p.cliente}</span></div>
-                  <div className={s.detailItem}><span className={s.detailLabel}>Asesor</span><span>{p.asesor}</span></div>
-                  <div className={s.detailItem}><span className={s.detailLabel}>Items</span><span>{p.items}</span></div>
-                  <div className={s.detailItem}><span className={s.detailLabel}>Total</span><span>{p.total}</span></div>
-                  <div className={s.detailItem}><span className={s.detailLabel}>Estado</span><span><Badge variant={orderStatuses[p.estado]}>{p.estado}</Badge></span></div>
+      <div className={s.tableWrapper}>
+        {loading && (
+          <div className={s.loadingRow}>
+            <span>Cargando pedidos...</span>
+          </div>
+        )}
+        {!loading && (
+          <DataTable<Pedido>
+            data={pageData}
+            pageSize={pagination.limit}
+            emptyMessage="Sin resultados"
+            enableSorting
+            enableColumnFilters
+            enableRowSelection
+            enableExport
+            exportFileName="pedidos"
+            maxVisibleColumns={5}
+            serverMode
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalRecords}
+            onPageChange={handlePageChange}
+            columns={[
+              { key: 'id', header: 'ID Pedido', width: '130px', sortable: true, filterable: true, render: (p) => <span className={s.tdMono}>{p.numero ?? p.id}</span> },
+              { key: 'cliente', header: 'Cliente', sortable: true, filterable: true, render: (p) => <span className={s.tdPrimary}>{p.cliente}</span> },
+              { key: 'asesor', header: 'Asesor', render: (p) => p.asesor },
+              { key: 'fecha', header: 'Fecha', width: '110px', render: (p) => p.fecha },
+              { key: 'total', header: 'Total', width: '120px', render: (p) => p.total },
+              { key: 'estado', header: 'Estado', width: '130px', sortable: true, filterable: true, filterType: 'select', filterOptions: ESTADOS_PEDIDO.map(es => ({ value: es, label: es })), render: (p) => (
+                <Badge variant={orderStatuses[p.estado]}>{p.estado}</Badge>
+              )},
+            ]}
+            actions={(p) => [
+              { label: 'Ver detalle', icon: <Eye size={14} />, onClick: () => setDetailId(p.id) },
+              { label: 'Editar', icon: <Save size={14} />, onClick: () => openEdit(p) },
+              { label: 'Cambiar estado', onClick: () => setStatusConfirm({ id: p.id, estado: p.estado }) },
+              { label: 'Eliminar', icon: <Trash2 size={14} />, onClick: () => setDeleteConfirm(p), danger: true },
+            ]}
+            detailPanel={{
+              title: (p) => `Pedido ${p.numero ?? p.id}`,
+              render: (p, onClose) => (
+                <div className={s.detailModalContent}>
+                  <div className={s.detailSection}>
+                    <h4 className={s.detailSectionTitle}>Detalles del pedido</h4>
+                    <div className={s.detailGrid}>
+                      <div className={s.detailItem}><span className={s.detailLabel}>ID</span><span>{p.numero ?? p.id}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{p.cliente}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Asesor</span><span>{p.asesor}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Items</span><span>{p.items}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Total</span><span>{p.total}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Estado</span><span><Badge variant={orderStatuses[p.estado]}>{p.estado}</Badge></span></div>
+                    </div>
+                  </div>
+                  <div className={s.modalActions}>
+                    <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+                  </div>
                 </div>
-              </div>
-              <div className={s.modalActions}>
-                <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-              </div>
-            </div>
-          ),
-        }}
-      />
+              ),
+            }}
+          />
+        )}
+      </div>
 
       <Modal
         open={editModalOpen}
@@ -289,10 +336,10 @@ export const AdminPedidos: React.FC = () => {
           <div className={f.formRow}>
             <div className={f.field}>
               <label className={f.label}>Cliente *</label>
-              <select className={f.select} value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)}>
+              <select className={f.select} value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
                 <option value="">Selecciona un cliente</option>
                 {clientes.map((c) => (
-                  <option key={c.id} value={c.nombre}>
+                  <option key={c.id} value={c.id}>
                     {c.nombre}
                   </option>
                 ))}
@@ -416,6 +463,73 @@ export const AdminPedidos: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDelete}
+        title="Eliminar pedido"
+        description={`¿Estás seguro de que deseas eliminar el pedido "${deleteConfirm?.id}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
+
+      <Modal open={!!statusConfirm} onClose={() => setStatusConfirm(null)} title="Cambiar estado del pedido" description="Selecciona el nuevo estado para el pedido." size="md" variant="form">
+        <div className={f.form}>
+          <div className={f.field}>
+            <label className={f.label}>Estado</label>
+            <select className={f.select} value={statusConfirm?.estado ?? ''} onChange={(e) => setStatusConfirm((prev) => prev ? { ...prev, estado: e.target.value as Pedido['estado'] } : null)}>
+              {ESTADOS_PEDIDO.map((es) => (
+                <option key={es} value={es}>{es}</option>
+              ))}
+            </select>
+          </div>
+          <div className={f.formActions}>
+            <Button variant="secondary" onClick={() => setStatusConfirm(null)} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleChangeStatus} disabled={saving}>{saving ? 'Guardando...' : 'Guardar cambios'}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!detailId} onClose={() => setDetailId(null)} title={`Pedido ${detailPedido?.numero ?? detailPedido?.id}`} description="Detalle del pedido" size="md">
+        {detailPedido && (
+          <div className={s.detailModalContent}>
+            <div className={s.detailSection}>
+              <h4 className={s.detailSectionTitle}>Detalles del pedido</h4>
+              <div className={s.detailGrid}>
+                <div className={s.detailItem}><span className={s.detailLabel}>ID</span><span>{detailPedido.numero ?? detailPedido.id}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{detailPedido.cliente}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Asesor</span><span>{detailPedido.asesor}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Items</span><span>{detailPedido.items}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Total</span><span>{detailPedido.total}</span></div>
+                <div className={s.detailItem}><span className={s.detailLabel}>Estado</span><span><Badge variant={orderStatuses[detailPedido.estado]}>{detailPedido.estado}</Badge></span></div>
+              </div>
+            </div>
+            {detailPedido.observaciones && (
+              <div className={s.detailSection}>
+                <h4 className={s.detailSectionTitle}>Observaciones</h4>
+                <p>{detailPedido.observaciones}</p>
+              </div>
+            )}
+            {detailPedido.itemsList && detailPedido.itemsList.length > 0 && (
+              <div className={s.detailSection}>
+                <h4 className={s.detailSectionTitle}>Items</h4>
+                <div className={s.detailGrid}>
+                  {detailPedido.itemsList.map((it, idx) => (
+                    <div className={s.detailItem} key={idx}>
+                      <span className={s.detailLabel}>Item {idx + 1}</span>
+                      <span>{it.nombre} | Cant: {it.cantidad} | Precio: {formatoCOP(it.precio)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className={s.modalActions}>
+              <Button variant="secondary" onClick={() => setDetailId(null)}>Cerrar</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

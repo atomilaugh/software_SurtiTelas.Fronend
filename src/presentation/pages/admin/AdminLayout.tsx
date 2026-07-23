@@ -9,6 +9,8 @@ import { TopHeader } from '@/presentation/components/TopHeader';
 import { cn } from '@/shared/utils';
 import logoImg from '@/assets/images/logos/partner-logo-2-Photoroom.png';
 import { useAuthStore } from '@/core/stores/authStore';
+import { useAppStore } from '@/core/stores';
+import { tokenStorage } from '@/infrastructure/api/tokenStorage';
 import { notificationsApi } from '@/infrastructure/api/notificationsApi';
 import { reportsApi } from '@/infrastructure/api/reportsApi';
 import { adminContent } from '@/shared/config/adminContent';
@@ -119,6 +121,23 @@ export const AdminLayout: React.FC = () => {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const hydrate = async () => {
+      const token = tokenStorage.getAccessToken();
+      if (!token) return;
+      try {
+        await useAppStore.getState().hydrateAll();
+      } finally {
+        if (active) {
+          // noop: hydrated or failed silently
+        }
+      }
+    };
+    void hydrate();
+    return () => { active = false; };
+  }, []);
+
   const handleLogout = async () => {
     // Clean theme state scoped to dashboards so public pages remain unaffected
     try {
@@ -177,7 +196,7 @@ export const AdminLayout: React.FC = () => {
   const userDisplay = {
     name: authUser?.name ?? authUser?.email ?? '',
     email: authUser?.email ?? '',
-    role: authUser?.role ?? ('admin' as const),
+    role: authUser?.role ?? 'admin',
     initial: (authUser?.name ?? authUser?.email ?? '?').charAt(0).toUpperCase(),
   };
   const roleLabel = userDisplay.role === 'admin' ? adminContent.layout.userRoleLabels.admin : adminContent.layout.userRoleLabels.default;

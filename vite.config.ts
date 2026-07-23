@@ -35,7 +35,7 @@ export default defineConfig({
     },
   server: {
     port: 5173,
-    host: '127.0.0.1', // Servidor local Vite explícito
+    host: 'localhost', // Sirve en http://localhost:5173 para evitar problemas de CORS con backend
     open: true, // Abre el navegador automáticamente
     strictPort: true, // Fijo en 5173: evita saltos a 5174/5179 que rompen CORS
     hmr: {

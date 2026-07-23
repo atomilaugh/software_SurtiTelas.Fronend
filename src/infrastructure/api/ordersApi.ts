@@ -15,6 +15,8 @@ export interface OrderDTO {
   prioridad?: Pedido['prioridad'];
   observaciones?: string;
   itemsList?: PedidoItem[];
+  clienteId: string;
+  asesorId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,7 +48,7 @@ function formatDate(iso: string): string {
 export interface OrdersListResult {
   pedidos: Pedido[];
   idByNumero: Record<string, string>;
-  meta: PaginatedResponse<OrderDTO>['meta'];
+  meta: PaginatedResponse<OrderDTO>['data']['meta'];
 }
 
 export function toPedido(dto: OrderDTO): Pedido {
@@ -62,13 +64,15 @@ export function toPedido(dto: OrderDTO): Pedido {
     prioridad: dto.prioridad,
     observaciones: dto.observaciones,
     itemsList: dto.itemsList ?? [],
+    clienteId: dto.clienteId,
+    asesorId: dto.asesorId,
   };
 }
 
 export const ordersApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<OrdersListResult> {
-    const response = await api.get<PaginatedResponse<OrderDTO>>('/orders', { query });
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: OrderDTO[]; meta: PaginatedResponse<OrderDTO>['data']['meta'] }>('/orders', { query });
+    const data = response?.items ?? [];
     const idByNumero: Record<string, string> = {};
     const pedidos = data.map((dto) => {
       idByNumero[dto.numero] = dto.id;
@@ -88,8 +92,8 @@ export const ordersApi = {
   },
 
   async me(query?: Record<string, string | number | boolean | undefined | null>): Promise<OrdersListResult> {
-    const response = await api.get<PaginatedResponse<OrderDTO>>('/orders/me', { query });
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: OrderDTO[]; meta: PaginatedResponse<OrderDTO>['data']['meta'] }>('/orders/me', { query });
+    const data = response?.items ?? [];
     const idByNumero: Record<string, string> = {};
     const pedidos = data.map((dto) => {
       idByNumero[dto.numero] = dto.id;

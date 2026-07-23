@@ -278,7 +278,7 @@ const RegisterPage: React.FC = () => {
 
             <button type="submit" className={`submitBtn ${loading ? 'submitBtn--loading' : ''}`} disabled={loading}>
               <span className="btnInner">{loading && <span className="spinner" />}
-                {loading ? 'Creando cuenta...' : 'Crear cuenta gratis'}
+                {loading ? 'Creando cuenta...' : 'Crear cuenta '}
               </span>
             </button>
           </form>

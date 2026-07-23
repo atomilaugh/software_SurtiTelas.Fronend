@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Eye, EyeOff, Phone, Building2, Check } from 'lucide-react';
-import { useAuth, TEST_ACCOUNTS } from '@/app/providers/AppProviders';
+import { useAuth } from '@/app/providers/AppProviders';
 import { toast } from 'sonner';
 import { appContent } from '@/shared/config/appContent';
 import './AuthPage.css';
@@ -233,27 +233,9 @@ const AuthPage: React.FC = () => {
                 </button>
               </div>
 
-<div className="formFooter">
+              <div className="formFooter">
                 ¿No tienes cuenta?{' '}
                 <button className="switchLink" onClick={() => switchTab('register')}>Regístrate gratis</button>
-              </div>
-              <div className="auth-test-accounts">
-                <p className="testAccountsLabel">Credenciales de prueba:</p>
-                <div className="testAccountsGrid">
-                  {TEST_ACCOUNTS.map(account => (
-                    <button
-                      key={account.email}
-                      type="button"
-                      className="testAccountBtn"
-                      onClick={() => {
-                        setLoginEmail(account.email);
-                        setLoginPassword(account.password);
-                      }}
-                    >
-                      {account.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           )}

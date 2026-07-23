@@ -1,14 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Download, FileText, Printer, Clock, CheckCircle, AlertTriangle, Plus, Edit, Send, DollarSign, ChevronDown, Calendar, Save, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { FileText, Printer, Clock, CheckCircle, AlertTriangle, Plus, Edit, Send, DollarSign, ChevronDown, Calendar, Save, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { SearchInput } from '@/shared/ui/SearchInput';
 import s from './Recibos.module.css';
 import f from '@/styles/Form.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
-import { DataTable } from '@/shared/ui/DataTable';
-import { Modal } from '@/shared/ui/Modal';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { Modal } from '../../../shared/ui/Modal';
+import { ConfirmationModal } from '../../../shared/ui/ConfirmationModal';
 import { receiptsApi, type Receipt } from '@/infrastructure/api/receiptsApi';
+import { authApi, type BackendAuthUser } from '@/infrastructure/api/authApi';
+import type { PedidoItem } from '@/core/types';
 
 interface Recibo {
   id: string;
@@ -41,13 +44,16 @@ interface ItemForm {
   precioUnitario: string;
 }
 
-function toRecibo(dto: Receipt): Recibo {
+function toRecibo(dto: Receipt, clientesMap: Map<string, BackendAuthUser>): Recibo {
   const total = Number(dto.total) || 0;
+  const clienteUsuario = clientesMap.get(dto.customerId);
+  const clienteNombre = clienteUsuario?.nombre ?? 'Cliente';
+  const clienteEmail = clienteUsuario?.email ?? dto.customerId;
   return {
     id: dto.id,
     numeroRecibo: dto.numero,
-    cliente: 'Cliente',
-    nitCliente: dto.customerId,
+    cliente: clienteNombre,
+    nitCliente: clienteEmail,
     fechaEmision: (dto.createdAt ?? new Date().toISOString()).slice(0, 10),
     fechaVencimiento: (dto.createdAt ?? new Date().toISOString()).slice(0, 10),
     subtotal: total,
@@ -55,9 +61,7 @@ function toRecibo(dto: Receipt): Recibo {
     total,
     estado: 'Borrador',
     vendedor: 'Sin asignar',
-    items: dto.pagos && dto.pagos.length > 0
-      ? dto.pagos.map((p, i) => ({ id: p.id ?? `I${i + 1}`, descripcion: p.method, cantidad: 1, precioUnitario: Number(p.amount) || 0, total: Number(p.amount) || 0 }))
-      : [{ id: 'I1', descripcion: 'Recibo', cantidad: 1, precioUnitario: total, total }],
+    items: [{ id: 'I1', descripcion: 'Recibo', cantidad: 1, precioUnitario: total, total }],
   };
 }
 
@@ -74,26 +78,6 @@ export const AdminRecibos: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await receiptsApi.list();
-        if (!active) return;
-        setRecibos(data.map(toRecibo));
-      } catch (err) {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : 'No se pudieron cargar los recibos');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    load();
-    return () => { active = false; };
-  }, []);
-
   const [cliente, setCliente] = useState('');
   const [nitCliente, setNitCliente] = useState('');
   const [vendedor, setVendedor] = useState('');
@@ -104,16 +88,41 @@ export const AdminRecibos: React.FC = () => {
     { id: 'I1', descripcion: '', cantidad: '', precioUnitario: '' },
   ]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingNumero, setEditingNumero] = useState<string>('');
+  const [deleteConfirm, setDeleteConfirm] = useState<Recibo | null>(null);
+  const [statusConfirm, setStatusConfirm] = useState<{ id: string; estado: Recibo['estado'] } | null>(null);
 
   const hoy = new Date().toISOString().slice(0, 10);
+
+  const loadRecibos = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const clientesResult = await authApi.listUsers({ limit: 100, role: 'CLIENTE' });
+      const clientesMap = new Map((clientesResult.data ?? []).map(c => [c.id, c]));
+      const data = await receiptsApi.list();
+      const recibosFiltrados = data.filter(r => clientesMap.has(r.customerId));
+      setRecibos(recibosFiltrados.map(r => toRecibo(r, clientesMap)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar los recibos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    loadRecibos();
+    return () => { active = false; };
+  }, []);
 
   const filteredRecibos = useMemo(() => {
     return recibos.filter(r =>
       (filtroEstado === 'Todos' || r.estado === filtroEstado) &&
       (r.numeroRecibo.toLowerCase().includes(search.toLowerCase()) ||
-       r.cliente.toLowerCase().includes(search.toLowerCase()) ||
-       r.nitCliente.toLowerCase().includes(search.toLowerCase()) ||
-       r.vendedor.toLowerCase().includes(search.toLowerCase()))
+        r.cliente.toLowerCase().includes(search.toLowerCase()) ||
+        r.nitCliente.toLowerCase().includes(search.toLowerCase()) ||
+        r.vendedor.toLowerCase().includes(search.toLowerCase()))
     );
   }, [recibos, search, filtroEstado]);
 
@@ -142,9 +151,11 @@ export const AdminRecibos: React.FC = () => {
       setMetodoPago(recibo.metodoPago || '');
       setItems(recibo.items.map(it => ({ id: it.id, descripcion: it.descripcion, cantidad: String(it.cantidad), precioUnitario: String(it.precioUnitario) })));
       setEditingId(recibo.id);
+      setEditingNumero(recibo.numeroRecibo);
     } else {
       resetForm();
       setEditingId(null);
+      setEditingNumero('');
     }
     setModalOpen(true);
   };
@@ -168,7 +179,7 @@ export const AdminRecibos: React.FC = () => {
     setItems(prev => prev.length > 1 ? prev.filter(it => it.id !== id) : prev);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     if (!cliente.trim()) { setFormError('El cliente es obligatorio'); return; }
@@ -187,40 +198,81 @@ export const AdminRecibos: React.FC = () => {
         total: cantidad * precioUnitario,
       };
     });
-    if (editingId) {
-      setRecibos(prev => prev.map(r => r.id === editingId ? {
-        ...r,
-        cliente: cliente.trim(),
-        nitCliente: nitCliente.trim(),
-        vendedor: vendedor.trim() || 'Sin asignar',
-        fechaEmision,
-        fechaVencimiento: fechaVencimiento || fechaEmision,
-        items: itemsRecibo,
-        metodoPago: metodoPago || undefined,
-      } : r));
-      toast.success('Recibo actualizado correctamente');
-    } else {
-      const secuencia = String(recibos.length + 1).padStart(3, '0');
-      const nuevo: Recibo = {
-        id: `REC-${secuencia}`,
-        numeroRecibo: `R${secuencia}-${new Date().getFullYear()}`,
-        cliente: cliente.trim(),
-        nitCliente: nitCliente.trim(),
-        fechaEmision,
-        fechaVencimiento: fechaVencimiento || fechaEmision,
-        subtotal,
-        iva,
-        total,
-        estado: 'Borrador',
-        metodoPago: metodoPago || undefined,
-        vendedor: vendedor.trim() || 'Sin asignar',
-        items: itemsRecibo,
-      };
-      setRecibos(prev => [nuevo, ...prev]);
-      toast.success(`Recibo ${nuevo.numeroRecibo} creado`);
+    try {
+      if (editingId) {
+        await receiptsApi.update(editingId, {
+          customerId: nitCliente.trim(),
+          concepto: itemsRecibo.map(it => it.descripcion).join(', '),
+          total,
+        });
+        setRecibos(prev => prev.map(r => r.id === editingId ? {
+          ...r,
+          cliente: cliente.trim(),
+          nitCliente: nitCliente.trim(),
+          vendedor: vendedor.trim() || 'Sin asignar',
+          fechaEmision,
+          fechaVencimiento: fechaVencimiento || fechaEmision,
+          items: itemsRecibo,
+          metodoPago: metodoPago || undefined,
+        } : r));
+        toast.success('Recibo actualizado correctamente');
+      } else {
+        const secuencia = String(recibos.length + 1).padStart(3, '0');
+        const nuevo: Recibo = {
+          id: `REC-${secuencia}`,
+          numeroRecibo: `R${secuencia}-${new Date().getFullYear()}`,
+          cliente: cliente.trim(),
+          nitCliente: nitCliente.trim(),
+          fechaEmision,
+          fechaVencimiento: fechaVencimiento || fechaEmision,
+          subtotal,
+          iva,
+          total,
+          estado: 'Borrador',
+          metodoPago: metodoPago || undefined,
+          vendedor: vendedor.trim() || 'Sin asignar',
+          items: itemsRecibo,
+        };
+        setRecibos(prev => [nuevo, ...prev]);
+        toast.success(`Recibo ${nuevo.numeroRecibo} creado`);
+      }
+      closeModal();
+    } catch {
+      toast.error('No se pudo guardar el recibo');
+    } finally {
+      setSaving(false);
     }
-    closeModal();
   };
+
+  const handleChangeStatus = async () => {
+    if (!statusConfirm) return;
+    try {
+      await receiptsApi.updateStatus(statusConfirm.id, statusConfirm.estado);
+      await loadRecibos();
+      toast.success(`Recibo ${statusConfirm.id} actualizado a ${statusConfirm.estado}`);
+      setStatusConfirm(null);
+    } catch {
+      toast.error('No se pudo actualizar el estado');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await receiptsApi.remove(deleteConfirm.id);
+      await loadRecibos();
+      toast.success(`Recibo ${deleteConfirm.numeroRecibo} eliminado`);
+      setDeleteConfirm(null);
+    } catch {
+      toast.error('No se pudo eliminar el recibo');
+    }
+  };
+
+  const detailRecibo = useMemo(() => {
+    const id = statusConfirm?.id || deleteConfirm?.id;
+    if (!id) return null;
+    return recibos.find(r => r.id === id) ?? null;
+  }, [recibos, statusConfirm, deleteConfirm]);
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -253,9 +305,6 @@ export const AdminRecibos: React.FC = () => {
           <p className={s.pageSubtitle}>Gestión de recibos</p>
         </div>
         <div className={s.headerActions}>
-          <Button variant="secondary" leftIcon={<Download size={16} />} onClick={() => toast.success('Exportando recibos...')}>
-            Exportar
-          </Button>
           <Button leftIcon={<Plus size={16} />} onClick={() => openModal()}>
             Nuevo Recibo
           </Button>
@@ -322,19 +371,6 @@ export const AdminRecibos: React.FC = () => {
               </button>
             ))}
           </div>
-          <div className={s.viewToggle}>
-            <button className={`${s.viewBtn} ${s.viewBtnActive}`} title="Vista tabla">
-              <FileText size={16} />
-            </button>
-            <button className={s.viewBtn} title="Vista tarjetas">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, width: 16, height: 16 }}>
-                <div style={{ width: 6, height: 6, background: 'currentColor', borderRadius: 1 }} />
-                <div style={{ width: 6, height: 6, background: 'currentColor', borderRadius: 1 }} />
-                <div style={{ width: 6, height: 6, background: 'currentColor', borderRadius: 1 }} />
-                <div style={{ width: 6, height: 6, background: 'currentColor', borderRadius: 1 }} />
-              </div>
-            </button>
-          </div>
         </div>
       )}
 
@@ -352,86 +388,86 @@ export const AdminRecibos: React.FC = () => {
           </div>
         )}
         {!loading && !error && (
-        <DataTable<Recibo>
-          data={filteredRecibos}
-          pageSize={10}
-          emptyMessage="No se encontraron recibos"
-          enableSorting
-          enableColumnFilters
-          enableRowSelection
-          enableExport
-          exportFileName="recibos"
-          maxVisibleColumns={5}
-          modalSize="xl"
-          columns={[
-            { key: 'numeroRecibo', header: 'N° Recibo', width: '130px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar recibo...', render: (r) => <span className={s.tdPrimary}>{r.numeroRecibo}</span> },
-            { key: 'cliente', header: 'Cliente', sortable: true, filterable: true, render: (r) => r.cliente },
-            { key: 'nitCliente', header: 'NIT', width: '120px', render: (r) => <span className={s.tdMono}>{r.nitCliente}</span> },
-            { key: 'fechaEmision', header: 'Fecha', width: '110px', render: (r) => (
-              <div className={s.fechaCell}><Calendar size={14} />{r.fechaEmision}</div>
-            )},
-            { key: 'total', header: 'Total', width: '120px', render: (r) => <span className={`${s.tdRight} ${s.tdTotal}`}>{formatCurrency(r.total)}</span> },
-            { key: 'estado', header: 'Estado', width: '160px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
-              { value: 'Borrador', label: 'Borrador' },
-              { value: 'Enviado', label: 'Enviado' },
-              { value: 'Pagado', label: 'Pagado' },
-              { value: 'Vencido', label: 'Vencido' },
-              { value: 'Cancelado', label: 'Cancelado' },
-            ], render: (r) => (
-              <Badge variant={getEstadoBadge(r.estado)}>{r.estado}</Badge>
-            )},
-          ]}
-          actions={(r) => [
-            ...(r.estado === 'Borrador' || r.estado === 'Enviado' ? [{ label: 'Editar', icon: <Edit size={14} />, onClick: () => openModal(r) }] : []),
-            ...(r.estado === 'Borrador' ? [{ label: 'Enviar', icon: <Send size={14} />, onClick: () => { setRecibos(prev => prev.map(rc => rc.id === r.id ? { ...rc, estado: 'Enviado' } : rc)); toast.success(`Recibo ${r.numeroRecibo} enviado`); } }] : []),
-            ...(r.estado === 'Enviado' ? [{ label: 'Marcar pagado', icon: <CheckCircle size={14} />, onClick: () => { setRecibos(prev => prev.map(rc => rc.id === r.id ? { ...rc, estado: 'Pagado' } : rc)); toast.success(`Recibo ${r.numeroRecibo} marcado como pagado`); } }] : []),
-          ]}
-          detailPanel={{
-            title: (r) => `Recibo ${r.numeroRecibo}`,
-            render: (r, onClose) => (
-              <div className={s.detailModalContent}>
-                <div className={s.detailSection}>
-                  <h4 className={s.detailSectionTitle}>Información de recibo</h4>
-                  <div className={s.detailGrid}>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{r.cliente}</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>NIT</span><span>{r.nitCliente}</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Vendedor</span><span>{r.vendedor}</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Emisión</span><span>{r.fechaEmision}</span></div>
-                    <div className={s.detailItem}><span className={s.detailLabel}>Vencimiento</span><span>{r.fechaVencimiento}</span></div>
-                    {r.metodoPago && <div className={s.detailItem}><span className={s.detailLabel}>Método</span><span>{r.metodoPago}</span></div>}
+          <DataTable<Recibo>
+            data={filteredRecibos}
+            pageSize={10}
+            emptyMessage="No se encontraron recibos"
+            enableSorting
+            enableColumnFilters
+            enableRowSelection
+            enableExport
+            exportFileName="recibos"
+            maxVisibleColumns={5}
+            columns={[
+              { key: 'numeroRecibo', header: 'N° Recibo', width: '130px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar recibo...', render: (r) => <span className={s.tdPrimary}>{r.numeroRecibo}</span> },
+              { key: 'cliente', header: 'Cliente', sortable: true, filterable: true, render: (r) => r.cliente },
+              { key: 'nitCliente', header: 'NIT', width: '120px', render: (r) => <span className={s.tdMono}>{r.nitCliente}</span> },
+              { key: 'fechaEmision', header: 'Fecha', width: '110px', render: (r) => (
+                <div className={s.fechaCell}><Calendar size={14} />{r.fechaEmision}</div>
+              )},
+              { key: 'total', header: 'Total', width: '120px', render: (r) => <span className={`${s.tdRight} ${s.tdTotal}`}>{formatCurrency(r.total)}</span> },
+              { key: 'estado', header: 'Estado', width: '160px', sortable: true, filterable: true, filterType: 'select', filterOptions: [
+                { value: 'Borrador', label: 'Borrador' },
+                { value: 'Enviado', label: 'Enviado' },
+                { value: 'Pagado', label: 'Pagado' },
+                { value: 'Vencido', label: 'Vencido' },
+                { value: 'Cancelado', label: 'Cancelado' },
+              ], render: (r) => (
+                <Badge variant={getEstadoBadge(r.estado)}>{r.estado}</Badge>
+              )},
+            ]}
+            actions={(r) => [
+              ...(r.estado === 'Borrador' || r.estado === 'Enviado' ? [{ label: 'Editar', icon: <Edit size={14} />, onClick: () => openModal(r) }] : []),
+              ...(r.estado === 'Borrador' ? [{ label: 'Enviar', icon: <Send size={14} />, onClick: async () => { await receiptsApi.updateStatus(r.id, 'Enviado'); await loadRecibos(); toast.success(`Recibo ${r.numeroRecibo} enviado`); } }] : []),
+              ...(r.estado === 'Enviado' ? [{ label: 'Marcar pagado', icon: <CheckCircle size={14} />, onClick: async () => { await receiptsApi.updateStatus(r.id, 'Pagado'); await loadRecibos(); toast.success(`Recibo ${r.numeroRecibo} marcado como pagado`); } }] : []),
+              { label: 'Eliminar', icon: <Trash2 size={14} />, onClick: () => setDeleteConfirm(r), danger: true },
+            ]}
+            detailPanel={{
+              title: (r) => `Recibo ${r.numeroRecibo}`,
+              render: (r, onClose) => (
+                <div className={s.detailModalContent}>
+                  <div className={s.detailSection}>
+                    <h4 className={s.detailSectionTitle}>Información de recibo</h4>
+                    <div className={s.detailGrid}>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Cliente</span><span>{r.cliente}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>NIT</span><span>{r.nitCliente}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Vendedor</span><span>{r.vendedor}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Emisión</span><span>{r.fechaEmision}</span></div>
+                      <div className={s.detailItem}><span className={s.detailLabel}>Vencimiento</span><span>{r.fechaVencimiento}</span></div>
+                      {r.metodoPago && <div className={s.detailItem}><span className={s.detailLabel}>Método</span><span>{r.metodoPago}</span></div>}
+                    </div>
+                  </div>
+                  <div className={s.detailSection}>
+                    <h4 className={s.detailSectionTitle}>Detalle de artículos</h4>
+                    <table className={s.detailItemsTable}>
+                      <thead><tr><th>Descripción</th><th style={{ textAlign: 'center' }}>Cant.</th><th style={{ textAlign: 'right' }}>Precio Unit.</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+                      <tbody>{r.items.map(item => (<tr key={item.id}><td>{item.descripcion}</td><td style={{ textAlign: 'center' }}>{item.cantidad}</td><td style={{ textAlign: 'right' }}>{formatCurrency(item.precioUnitario)}</td><td style={{ textAlign: 'right', fontWeight: 500 }}>{formatCurrency(item.total)}</td></tr>))}</tbody>
+                    </table>
+                  </div>
+                  <div className={s.detailSection}>
+                    <h4 className={s.detailSectionTitle}>Resumen</h4>
+                    <div className={s.totalsGrid}>
+                      <div className={s.totalRow}><span>Subtotal:</span><span>{formatCurrency(r.subtotal)}</span></div>
+                      <div className={s.totalRow}><span>IVA (19%):</span><span>{formatCurrency(r.iva)}</span></div>
+                      <div className={`${s.totalRow} ${s.totalRowFinal}`}><span>Total:</span><span>{formatCurrency(r.total)}</span></div>
+                    </div>
+                  </div>
+                   <div className={s.modalActions}>
+                    <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+                     <Button variant="secondary" leftIcon={<Printer size={16} />} onClick={() => { window.print(); toast.info(`Imprimiendo ${r.numeroRecibo}`); }}>Imprimir</Button>
                   </div>
                 </div>
-                <div className={s.detailSection}>
-                  <h4 className={s.detailSectionTitle}>Detalle de artículos</h4>
-                  <table className={s.detailItemsTable}>
-                    <thead><tr><th>Descripción</th><th style={{ textAlign: 'center' }}>Cant.</th><th style={{ textAlign: 'right' }}>Precio Unit.</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
-                    <tbody>{r.items.map(item => (<tr key={item.id}><td>{item.descripcion}</td><td style={{ textAlign: 'center' }}>{item.cantidad}</td><td style={{ textAlign: 'right' }}>{formatCurrency(item.precioUnitario)}</td><td style={{ textAlign: 'right', fontWeight: 500 }}>{formatCurrency(item.total)}</td></tr>))}</tbody>
-                  </table>
-                </div>
-                <div className={s.detailSection}>
-                  <h4 className={s.detailSectionTitle}>Resumen</h4>
-                  <div className={s.totalsGrid}>
-                    <div className={s.totalRow}><span>Subtotal:</span><span>{formatCurrency(r.subtotal)}</span></div>
-                    <div className={s.totalRow}><span>IVA (19%):</span><span>{formatCurrency(r.iva)}</span></div>
-                    <div className={`${s.totalRow} ${s.totalRowFinal}`}><span>Total:</span><span>{formatCurrency(r.total)}</span></div>
-                  </div>
-                </div>
-                 <div className={s.modalActions}>
-                   <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-                    <Button variant="secondary" leftIcon={<Printer size={16} />} onClick={() => { window.print(); toast.info(`Imprimiendo ${r.numeroRecibo}`); }}>Imprimir</Button>
-                 </div>
-              </div>
-            ),
-          }}
-        />
+              ),
+            }}
+          />
         )}
       </div>
 
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title="Crear Nuevo Recibo"
-        description="Registra un recibo con sus artículos y totals"
+        title={editingId ? 'Editar Recibo' : 'Crear Nuevo Recibo'}
+        description={editingId ? `Modificando ${editingNumero}` : 'Registra un recibo con sus artículos y totales'}
         size="xl"
         variant="form"
       >
@@ -513,7 +549,7 @@ export const AdminRecibos: React.FC = () => {
           <div className={f.totalsBox}>
             <div className={f.totalRow}><span>Subtotal:</span><span>{formatCurrency(subtotal)}</span></div>
             <div className={f.totalRow}><span>IVA (19%):</span><span>{formatCurrency(iva)}</span></div>
-            <div className={`${f.totalRow} ${f.totalRowFinal}`}><span>Total:</span><span>{formatCurrency(total)}</span></div>
+            <div className={`${f.totalRow} ${s.totalRowFinal}`}><span>Total:</span><span>{formatCurrency(total)}</span></div>
           </div>
 
           <div className={f.formActions}>
@@ -521,14 +557,38 @@ export const AdminRecibos: React.FC = () => {
               Cancelar
             </Button>
             <Button type="submit" loading={saving} leftIcon={<Save size={16} />}>
-              Crear recibo
+              {editingId ? 'Guardar cambios' : 'Crear recibo'}
             </Button>
           </div>
         </form>
       </Modal>
+
+      <ConfirmationModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDelete}
+        title="Eliminar recibo"
+        description={`¿Estás seguro de que deseas eliminar el recibo "${deleteConfirm?.numeroRecibo}"? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
+
+      <Modal open={!!statusConfirm} onClose={() => setStatusConfirm(null)} title="Cambiar estado del recibo" description="Selecciona el nuevo estado para el recibo." size="md" variant="form">
+        <div className={f.form}>
+          <div className={f.field}>
+            <label className={f.label}>Estado</label>
+            <select className={f.select} value={statusConfirm?.estado ?? ''} onChange={e => setStatusConfirm(prev => prev ? { ...prev, estado: e.target.value as Recibo['estado'] } : null)}>
+              {['Borrador', 'Enviado', 'Pagado', 'Vencido', 'Cancelado'].map(es => (
+                <option key={es} value={es}>{es}</option>
+              ))}
+            </select>
+          </div>
+          <div className={f.formActions}>
+            <Button variant="secondary" onClick={() => setStatusConfirm(null)} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleChangeStatus} disabled={saving}>{saving ? 'Guardando...' : 'Guardar cambios'}</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
-
-
-

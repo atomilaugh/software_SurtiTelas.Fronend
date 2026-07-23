@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Search, ClipboardCheck, CheckCircle, XCircle, Layers } from 'lucide-react';
+import { Search, ClipboardCheck, CheckCircle, XCircle, Layers, Plus, Edit, Trash2 } from 'lucide-react';
 import s from './ControlPrendas.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
+import { Modal } from '@/shared/ui/Modal';
 import { controlPrendaApi, type ControlPrenda } from '@/infrastructure/api/controlPrendaApi';
 import { ETAPAS_CONTROL, ESTADOS_CONTROL } from '@/shared/constants/options';
 
@@ -21,6 +22,15 @@ export const AdminControlPrendas: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filtroEtapa, setFiltroEtapa] = useState<'Todos' | Etapa>('Todos');
   const [filtroEstado, setFiltroEstado] = useState<'Todos' | Estado>('Todos');
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [produccionId, setProduccionId] = useState('');
+  const [etapa, setEtapa] = useState<Etapa>('Control de Calidad');
+  const [cantidadTotal, setCantidadTotal] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const fetchRegistros = useCallback(async () => {
     setLoading(true);
@@ -86,6 +96,75 @@ export const AdminControlPrendas: React.FC = () => {
     }
   };
 
+  const handleEdit = (r: ControlPrenda) => {
+    setEditingId(r.id);
+    setProduccionId(r.produccionId);
+    setEtapa(r.etapa);
+    setCantidadTotal(String(r.cantidadTotal));
+    setObservaciones(r.observaciones ?? '');
+    setModalOpen(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      const actualizado = await controlPrendaApi.update(editingId, {
+        etapa,
+        cantidadTotal: Number(cantidadTotal),
+        observaciones: observaciones.trim() || undefined,
+      });
+      setRegistros(prev => prev.map(reg => reg.id === editingId ? actualizado : reg));
+      toast.success('Control actualizado');
+      setModalOpen(false);
+      setEditingId(null);
+    } catch {
+      toast.error('No se pudo actualizar el control');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      setSaving(true);
+      await controlPrendaApi.remove(deleteId);
+      setRegistros(prev => prev.filter(reg => reg.id !== deleteId));
+      toast.success('Control eliminado');
+      setDeleteId(null);
+    } catch {
+      toast.error('No se pudo eliminar el control');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const creado = await controlPrendaApi.create({
+        produccionId: produccionId.trim(),
+        etapa,
+        cantidadTotal: Number(cantidadTotal),
+        observaciones: observaciones.trim() || undefined,
+      });
+      setRegistros(prev => [creado, ...prev]);
+      setModalOpen(false);
+      setProduccionId('');
+      setEtapa('Control de Calidad');
+      setCantidadTotal('');
+      setObservaciones('');
+      toast.success('Control de prenda creado');
+    } catch {
+      toast.error('No se pudo crear el control');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
       <div className={s.header}>
@@ -93,6 +172,10 @@ export const AdminControlPrendas: React.FC = () => {
           <h1 className={s.pageTitle}>Control de Prendas</h1>
           <p className={s.pageSubtitle}>Control de calidad de producción</p>
         </div>
+        <Button onClick={() => setModalOpen(true)}>
+          <Plus size={16} />
+          Nuevo control
+        </Button>
         <div className={s.metricsRow}>
           <div className={`${s.metricCard} ${s.metricCardWarning}`}>
             <span className={`${s.metricIcon} ${s.metricIconPending}`}>
@@ -190,6 +273,8 @@ export const AdminControlPrendas: React.FC = () => {
             { label: 'Aprobar', icon: <CheckCircle size={14} />, onClick: () => void handleReview(r, 'Aprobado') },
             { label: 'Rechazar', icon: <XCircle size={14} />, onClick: () => void handleReview(r, 'Rechazado') },
           ] : []),
+          { label: 'Editar', icon: <Edit size={14} />, onClick: () => handleEdit(r) },
+          { label: 'Eliminar', icon: <Trash2 size={14} />, onClick: () => setDeleteId(r.id) },
         ]}
         toolbarLeft={
           <div className={s.quickStats}>
@@ -268,6 +353,90 @@ export const AdminControlPrendas: React.FC = () => {
           ),
         }}
       />
+
+      <Modal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditingId(null); }}
+        title={editingId ? 'Editar control de prenda' : 'Nuevo control de prenda'}
+        description={editingId ? 'Modifica los datos del control de prenda.' : 'Registra un nuevo control de prenda para producción.'}
+        size="lg"
+        variant="form"
+        closeOnOverlay
+      >
+        <form className={s.form} onSubmit={editingId ? handleUpdate : handleCreate}>
+          <div className={s.formRow}>
+            <div className={s.field}>
+              <label className={s.label}>ID Producción</label>
+              <input
+                type="text"
+                className={s.input}
+                value={produccionId}
+                onChange={e => setProduccionId(e.target.value)}
+                placeholder="Ej: cmr..."
+                required
+                readOnly={!!editingId}
+              />
+            </div>
+            <div className={s.field}>
+              <label className={s.label}>Etapa</label>
+              <select
+                className={s.select}
+                value={etapa}
+                onChange={e => setEtapa(e.target.value as Etapa)}
+              >
+                {ETAPAS.filter(e => e !== 'Todos' as any).map(e => (
+                  <option key={e} value={e}>{e}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className={s.formRow}>
+            <div className={s.field}>
+              <label className={s.label}>Cantidad total</label>
+              <input
+                type="number"
+                className={s.input}
+                value={cantidadTotal}
+                onChange={e => setCantidadTotal(e.target.value)}
+                placeholder="Ej: 50"
+                required
+                min="1"
+              />
+            </div>
+            <div className={s.field}>
+              <label className={s.label}>Observaciones</label>
+              <input
+                type="text"
+                className={s.input}
+                value={observaciones}
+                onChange={e => setObservaciones(e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+          </div>
+          <div className={s.formActions}>
+            <Button variant="secondary" type="button" onClick={() => { setModalOpen(false); setEditingId(null); }}>Cancelar</Button>
+            <Button type="submit" disabled={saving}>{editingId ? (saving ? 'Guardando...' : 'Guardar cambios') : (saving ? 'Guardando...' : 'Crear control')}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Eliminar control"
+        description="Esta acción no se puede deshacer."
+        size="sm"
+      >
+        <div className={s.formActions}>
+          <Button variant="secondary" onClick={() => setDeleteId(null)} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleDelete} disabled={saving}>
+            {saving ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

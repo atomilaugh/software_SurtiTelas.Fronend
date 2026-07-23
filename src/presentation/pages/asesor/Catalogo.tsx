@@ -276,7 +276,7 @@ export const AsesorCatalogo: React.FC = () => {
       label: 'Eliminar',
       icon: <Trash2 size={14} />,
       danger: true,
-      onClick: (item) => setDeleteConfirm(item),
+      onClick: () => setDeleteConfirm(item),
     },
   ];
 

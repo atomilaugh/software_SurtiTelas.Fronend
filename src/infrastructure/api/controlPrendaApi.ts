@@ -65,18 +65,9 @@ export function toControlPrenda(dto: ControlPrendaDTO): ControlPrenda {
 
 export const controlPrendaApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<ControlPrenda[]> {
-    const response = await api.get<{ data: ControlPrendaDTO[]; meta: Record<string, unknown> }>('/production/control', { query });
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: ControlPrendaDTO[]; meta: Record<string, unknown> }>('/production/control', { query });
+    const data = response?.items ?? [];
     return data.map(toControlPrenda);
-  },
-
-  async getById(id: string): Promise<ControlPrenda | null> {
-    try {
-      const dto = await api.get<ControlPrendaDTO>(`/production/control/${encodeURIComponent(id)}`);
-      return dto ? toControlPrenda(dto) : null;
-    } catch {
-      return null;
-    }
   },
 
   async create(data: Partial<ControlPrenda>): Promise<ControlPrenda> {
@@ -90,14 +81,13 @@ export const controlPrendaApi = {
     return toControlPrenda(dto);
   },
 
-  async update(id: string, changes: Partial<ControlPrenda>): Promise<ControlPrenda> {
-    const body: Record<string, unknown> = {};
-    if (changes.observaciones !== undefined) body.observaciones = changes.observaciones;
-    if (changes.cantidadRevisada !== undefined) body.cantidadRevisada = changes.cantidadRevisada;
-    if (changes.cantidadAprobada !== undefined) body.cantidadAprobada = changes.cantidadAprobada;
-    if (changes.cantidadRechazada !== undefined) body.cantidadRechazada = changes.cantidadRechazada;
-    const dto = await api.patch<ControlPrendaDTO>(`/production/control/${encodeURIComponent(id)}`, body);
-    return toControlPrenda(dto);
+  async getById(id: string): Promise<ControlPrenda | null> {
+    try {
+      const dto = await api.get<ControlPrendaDTO>(`/production/control/${encodeURIComponent(id)}`);
+      return dto ? toControlPrenda(dto) : null;
+    } catch {
+      return null;
+    }
   },
 
   async review(id: string, estado: 'Aprobado' | 'Rechazado', cantidadAprobada?: number, cantidadRechazada?: number): Promise<ControlPrenda> {
@@ -107,5 +97,21 @@ export const controlPrendaApi = {
       cantidadRechazada,
     });
     return toControlPrenda(dto);
+  },
+
+  async update(id: string, changes: Partial<ControlPrenda>): Promise<ControlPrenda> {
+    const body: Record<string, unknown> = {};
+    if (changes.etapa !== undefined) body.etapa = changes.etapa.toUpperCase().replace(' ', '_');
+    if (changes.cantidadTotal !== undefined) body.cantidadTotal = changes.cantidadTotal;
+    if (changes.cantidadRevisada !== undefined) body.cantidadRevisada = changes.cantidadRevisada;
+    if (changes.cantidadAprobada !== undefined) body.cantidadAprobada = changes.cantidadAprobada;
+    if (changes.cantidadRechazada !== undefined) body.cantidadRechazada = changes.cantidadRechazada;
+    if (changes.observaciones !== undefined) body.observaciones = changes.observaciones;
+    const dto = await api.patch<ControlPrendaDTO>(`/production/control/${encodeURIComponent(id)}`, body);
+    return toControlPrenda(dto);
+  },
+
+  async remove(id: string): Promise<void> {
+    await api.delete(`/production/control/${encodeURIComponent(id)}`);
   },
 };

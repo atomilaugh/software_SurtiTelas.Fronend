@@ -45,13 +45,13 @@ export function toWebhook(dto: WebhookDTO): Webhook {
 
 export interface WebhooksListResult {
   data: Webhook[];
-  meta: PaginatedResponse<WebhookDTO>['meta'];
+  meta: PaginatedResponse<WebhookDTO>['data']['meta'];
 }
 
 export const webhooksApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<WebhooksListResult> {
-    const response = await api.get<PaginatedResponse<WebhookDTO>>('/webhooks', { query });
-    const data = (response?.data ?? []).map(toWebhook);
+    const response = await api.get<{ items: WebhookDTO[]; meta: PaginatedResponse<WebhookDTO>['data']['meta'] }>('/webhooks', { query });
+    const data = (response?.items ?? []).map(toWebhook);
     const meta = response?.meta ?? { totalRecords: 0, page: 1, limit: 10, totalPages: 1 };
     return { data, meta };
   },

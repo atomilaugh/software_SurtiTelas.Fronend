@@ -78,6 +78,8 @@ export interface Pedido {
   prioridad?: 'Estándar' | 'Prioritario';
   observaciones?: string;
   itemsList?: PedidoItem[];
+  clienteId?: string;
+  asesorId?: string;
 }
 
 export interface OrdenProduccion {

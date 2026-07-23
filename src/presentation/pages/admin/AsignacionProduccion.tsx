@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Factory, Clock, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Factory, Clock, AlertTriangle, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import s from './AsignacionProduccion.module.css';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { DataTable } from '@/shared/ui/DataTable';
 import { Modal } from '@/shared/ui/Modal';
+import f from '@/styles/Form.module.css';
 import { productionApi } from '@/infrastructure/api/productionApi';
 import { workshopsApi } from '@/infrastructure/api/workshopsApi';
 import { ESTADOS_PRODUCCION } from '@/shared/constants/options';
@@ -41,6 +42,14 @@ export const AdminAsignacionProduccion: React.FC = () => {
   const [selectedOrden, setSelectedOrden] = useState<OrdenProduccion | null>(null);
   const [tallerSeleccionado, setTallerSeleccionado] = useState('');
   const [saving, setSaving] = useState(false);
+  const [crudModalOpen, setCrudModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [formReferencia, setFormReferencia] = useState('');
+  const [formCantidad, setFormCantidad] = useState('');
+  const [formFecha, setFormFecha] = useState('');
+  const [formEstado, setFormEstado] = useState<'Pendiente' | 'Asignada' | 'En produccion' | 'Completada'>('Pendiente');
+  const [formNotas, setFormNotas] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -58,7 +67,7 @@ export const AdminAsignacionProduccion: React.FC = () => {
           referencia: o.referencia,
           cantidad: o.cantidad,
           fechaPrometida: o.fechaEstimada,
-          estado: o.estado === 'En proceso' ? 'En produccion' : o.estado === 'Terminado' ? 'Completada' : o.estado === 'Pendiente' ? 'Pendiente' : 'Asignada',
+          estado: o.estado === 'En produccion' ? 'En produccion' : o.estado === 'Completada' ? 'Completada' : o.estado === 'Pendiente' ? 'Pendiente' : 'Asignada',
           tallerAsignado: o.taller?.nombre,
           prioridad: (o.pedidoPrioridad === 'ALTA' ? 'Alta' : o.pedidoPrioridad === 'MEDIA' ? 'Media' : o.pedidoPrioridad === 'BAJA' ? 'Baja' : 'Media') as OrdenProduccion['prioridad'],
           cliente: o.pedidoCliente ?? '',
@@ -123,6 +132,93 @@ export const AdminAsignacionProduccion: React.FC = () => {
     }
   };
 
+  const openCrudModal = (orden?: OrdenProduccion) => {
+    if (orden) {
+      setEditingId(orden.id);
+      setFormReferencia(orden.referencia);
+      setFormCantidad(String(orden.cantidad));
+      setFormFecha(orden.fechaPrometida);
+      setFormEstado(orden.estado === 'Asignada' ? 'Asignada' : orden.estado === 'En produccion' ? 'En produccion' : orden.estado === 'Completada' ? 'Completada' : 'Pendiente');
+      setFormNotas('');
+    } else {
+      setEditingId(null);
+      setFormReferencia('');
+      setFormCantidad('');
+      setFormFecha('');
+      setFormEstado('Pendiente');
+      setFormNotas('');
+    }
+    setCrudModalOpen(true);
+  };
+
+  const handleCrudSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (editingId) {
+        const estadoDb = formEstado === 'Pendiente' ? 'PENDIENTE' : formEstado === 'Asignada' ? 'ASIGNADA' : formEstado === 'En produccion' ? 'EN_PROCESO' : 'TERMINADO';
+        const updated = await productionApi.update(editingId, {
+          referencia: formReferencia,
+          cantidad: Number(formCantidad),
+          fechaEstimada: formFecha,
+          estado: estadoDb as any,
+          notasTecnicas: formNotas || undefined,
+        });
+        setOrdenes(prev => prev.map(o => o.id === editingId ? {
+          ...o,
+          referencia: updated.referencia,
+          cantidad: updated.cantidad,
+          fechaPrometida: updated.fechaEstimada,
+          estado: updated.estado === 'En produccion' ? 'En produccion' : updated.estado === 'Completada' ? 'Completada' : updated.estado === 'Pendiente' ? 'Pendiente' : 'Asignada',
+        } : o));
+        toast.success('Orden actualizada');
+      } else {
+        const estadoDb = formEstado === 'Pendiente' ? 'PENDIENTE' : formEstado === 'Asignada' ? 'ASIGNADA' : formEstado === 'En produccion' ? 'EN_PROCESO' : 'TERMINADO';
+        const created = await productionApi.create({
+          referencia: formReferencia,
+          cantidad: Number(formCantidad),
+          fechaEstimada: formFecha,
+          estado: estadoDb as any,
+          notasTecnicas: formNotas || undefined,
+        });
+        setOrdenes(prev => [{
+          id: created.id,
+          numeroOrden: created.pedidoNumero || created.referencia,
+          prenda: created.pedidoItemNombre || created.referencia,
+          referencia: created.referencia,
+          cantidad: created.cantidad,
+          fechaPrometida: created.fechaEstimada,
+          estado: created.estado === 'En produccion' ? 'En produccion' : created.estado === 'Completada' ? 'Completada' : created.estado === 'Pendiente' ? 'Pendiente' : 'Asignada',
+          tallerAsignado: created.taller?.nombre,
+          prioridad: 'Media',
+          cliente: created.pedidoCliente ?? '',
+        }, ...prev]);
+        toast.success('Orden creada');
+      }
+      setCrudModalOpen(false);
+      setEditingId(null);
+    } catch {
+      toast.error(editingId ? 'No se pudo actualizar la orden' : 'No se pudo crear la orden');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      setSaving(true);
+      await productionApi.remove(deleteId);
+      setOrdenes(prev => prev.filter(o => o.id !== deleteId));
+      toast.success('Orden eliminada');
+      setDeleteId(null);
+    } catch {
+      toast.error('No se pudo eliminar la orden');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case 'Pendiente': return 'warning';
@@ -155,6 +251,10 @@ export const AdminAsignacionProduccion: React.FC = () => {
           <h1 className={s.pageTitle}>Asignación de Producción</h1>
           <p className={s.pageSubtitle}>Asignar órdenes a talleres</p>
         </div>
+        <Button size="lg" onClick={() => openCrudModal()}>
+          <Plus size={16} />
+          Nueva orden
+        </Button>
         <div className={s.statsRow}>
           <div className={s.statCard}>
             <Clock size={20} className={s.statIcon} />
@@ -222,6 +322,8 @@ export const AdminAsignacionProduccion: React.FC = () => {
         exportFileName="asignacion_produccion"
         actions={(o) => [
           ...(o.estado === 'Pendiente' ? [{ label: 'Asignar', icon: <Plus size={14} />, onClick: () => handleOpenModal(o) }] : []),
+          { label: 'Editar', icon: <Edit size={14} />, onClick: () => openCrudModal(o) },
+          { label: 'Eliminar', icon: <Trash2 size={14} />, onClick: () => setDeleteId(o.id) },
         ]}
         columns={[
           { key: 'orden', header: 'Orden', width: '180px', sortable: true, filterable: true, filterPlaceholder: 'Filtrar orden...', render: (o) => (
@@ -309,6 +411,101 @@ export const AdminAsignacionProduccion: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={crudModalOpen}
+        onClose={() => { setCrudModalOpen(false); setEditingId(null); }}
+        title={editingId ? 'Editar orden de producción' : 'Nueva orden de producción'}
+        description={editingId ? 'Modifica los datos de la orden.' : 'Crea una nueva orden de producción.'}
+        size="lg"
+        variant="form"
+      >
+        <form id="ordenForm" className={s.form} onSubmit={handleCrudSubmit}>
+          <div className={s.formRow}>
+            <div className={s.field}>
+              <label className={s.label}>Referencia</label>
+              <input
+                type="text"
+                className={s.input}
+                value={formReferencia}
+                onChange={e => setFormReferencia(e.target.value)}
+                placeholder="Ej: CMR-001"
+                required
+              />
+            </div>
+            <div className={s.field}>
+              <label className={s.label}>Cantidad</label>
+              <input
+                type="number"
+                className={s.input}
+                value={formCantidad}
+                onChange={e => setFormCantidad(e.target.value)}
+                placeholder="Ej: 50"
+                required
+                min="1"
+              />
+            </div>
+          </div>
+          <div className={s.formRow}>
+            <div className={s.field}>
+              <label className={s.label}>Fecha estimada</label>
+              <input
+                type="date"
+                className={s.input}
+                value={formFecha}
+                onChange={e => setFormFecha(e.target.value)}
+                required
+              />
+            </div>
+            <div className={s.field}>
+              <label className={s.label}>Estado</label>
+              <select className={s.select} value={formEstado} onChange={e => setFormEstado(e.target.value as any)}>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Asignada">Asignada</option>
+                <option value="En produccion">En producción</option>
+                <option value="Completada">Completada</option>
+              </select>
+            </div>
+          </div>
+          <div className={s.formRow}>
+            <div className={s.field}>
+              <label className={s.label}>Notas técnicas</label>
+              <input
+                type="text"
+                className={s.input}
+                value={formNotas}
+                onChange={e => setFormNotas(e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+          </div>
+          <div className={s.formActions}>
+            <Button variant="secondary" type="button" onClick={() => { setCrudModalOpen(false); setEditingId(null); }} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {editingId ? (saving ? 'Guardando...' : 'Guardar cambios') : (saving ? 'Creando...' : 'Crear orden')}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Eliminar orden"
+        description="Esta acción no se puede deshacer."
+        size="sm"
+      >
+        <div className={s.formActions}>
+          <Button variant="secondary" onClick={() => setDeleteId(null)} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleDelete} disabled={saving}>
+            {saving ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </div>
       </Modal>
     </div>
   );

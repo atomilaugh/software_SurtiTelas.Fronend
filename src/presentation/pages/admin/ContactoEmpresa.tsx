@@ -198,7 +198,7 @@ export const AdminContactoEmpresa: React.FC = () => {
           </div>
           <div className={s.formActions}>
             <Button variant="secondary" onClick={() => setShowNuevoMensaje(false)}>Cancelar</Button>
-            <Button leftIcon={<Send size={16} />} onClick={() => { alert('Mensaje enviado'); setShowNuevoMensaje(false); }}>Enviar mensaje</Button>
+            <Button leftIcon={<Send size={16} />} onClick={() => { toast.info('La creación de mensajes desde el panel administrativo no está implementada'); setShowNuevoMensaje(false); }} disabled>Enviar mensaje</Button>
           </div>
         </div>
       )}
@@ -333,8 +333,18 @@ export const AdminContactoEmpresa: React.FC = () => {
           ),
         }}
         actions={(m) => [
-           ...((m.estado === 'Nuevo' || m.estado === 'Leído') ? [{ label: 'Responder', icon: <Send size={14} />, onClick: () => { alert('Responder mensaje'); } }] : []),
-          ...(m.estado === 'Respondido' ? [{ label: 'Cerrar mensaje', icon: <Archive size={14} />, onClick: () => alert(`Mensaje ${m.id} cerrado`) }] : []),
+           ...((m.estado === 'Nuevo' || m.estado === 'Leído') ? [{ label: 'Responder', icon: <Send size={14} />, onClick: async () => {
+             if (!respuesta.trim()) { toast.error('Escribe una respuesta antes de enviar'); return; }
+             await contactApi.reply(m.id, respuesta.trim());
+             setMensajes(prev => prev.map(msg => msg.id === m.id ? { ...msg, estado: 'Respondido', respuesta: respuesta.trim(), respondidoPor: 'Tú', respondidoEn: new Date().toISOString() } : msg));
+             setRespuesta('');
+             toast.success('Respuesta enviada');
+           } }] : []),
+          ...(m.estado === 'Respondido' ? [{ label: 'Cerrar mensaje', icon: <Archive size={14} />, onClick: async () => {
+             await contactApi.close(m.id);
+             setMensajes(prev => prev.map(msg => msg.id === m.id ? { ...msg, estado: 'Cerrado' } : msg));
+             toast.success(`Mensaje ${m.id} cerrado`);
+           } }] : []),
         ]}
         columns={[
           { key: 'id', header: 'ID', width: '80px', sortable: true, render: (m) => <span className={s.tdMono}>{m.id}</span> },

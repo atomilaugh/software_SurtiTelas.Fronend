@@ -92,14 +92,46 @@ export const CatalogoCliente: React.FC = () => {
     toast.success('Mensaje enviado a tu asesor');
   };
 
-  const handleCrearPedido = () => {
+  const handleCrearPedido = async () => {
     if (!pedidoData.detalle.trim()) {
       toast.error('Describe tu requerimiento');
       return;
     }
+
+    try {
+      const currentUser = useAuthStore.getState().user;
+      if (!currentUser?.email) {
+        toast.error('No se pudo identificar tu cuenta para crear el pedido');
+        return;
+      }
+
+      const clientsResult = await customersApi.list();
+      const myClient = clientsResult.data.find((c) => c.email === currentUser.email || c.nombre === currentUser.name || currentUser.email.includes(c.nombre));
+      const clienteId = myClient?.id || currentUser.uid;
+
+      await ordersApi.create({
+        clienteId,
+        asesorId: myClient?.asesor || undefined,
+        itemsList: [],
+        prioridad: pedidoData.urgencia === 'Prioritario' ? 'ALTA' : 'MEDIA',
+        observaciones: pedidoData.detalle,
+      });
+
       toast.success('Pedido enviado a tu asesor para cotización');
-    setIsPedidoModalOpen(false);
-    setPedidoData({ detalle: '', urgencia: 'Estándar' });
+      setIsPedidoModalOpen(false);
+      setPedidoData({ detalle: '', urgencia: 'Estándar' });
+
+      const ordersData = await ordersApi.list();
+      setMisPedidos(ordersData.pedidos.slice(0, 2).map((p) => ({
+        id: p.id,
+        estado: p.estado === 'Entregado' ? 'Completado' : 'En Proceso',
+        fecha: p.fecha,
+        total: p.total,
+        items: `${p.items} artículos`,
+      })));
+    } catch {
+      toast.error('No se pudo crear el pedido. Intenta nuevamente.');
+    }
   };
 
   const handleAttach = () => fileInputRef.current?.click();

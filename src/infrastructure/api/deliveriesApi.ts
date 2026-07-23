@@ -99,8 +99,8 @@ export function aggregateDomiciliarios(deliveries: DeliveryDTO[]): Domiciliario[
 export const deliveriesApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<DeliveryDTO[]> {
     try {
-      const response = await api.get<{ data: DeliveryDTO[]; meta: Record<string, unknown> }>('/deliveries', { query });
-      return response?.data ?? [];
+      const response = await api.get<{ items: DeliveryDTO[]; meta: Record<string, unknown> }>('/deliveries', { query });
+      return response?.items ?? [];
     } catch {
       return [];
     }

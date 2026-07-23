@@ -24,8 +24,6 @@ import {
 } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
-
-import '../styles/App.css';
 import { appContent } from '@/shared/config/appContent';
 
 /* =========================

@@ -52,8 +52,18 @@ export function toContactMessage(dto: ContactMessageDTO): ContactMessage {
 
 export const contactApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<ContactMessage[]> {
-    const response = await api.get<{ data: ContactMessageDTO[]; meta: Record<string, unknown> }>('/contact', { query });
-    const data = response?.data ?? [];
+    const response = await api.get<{ data: { items: ContactMessageDTO[]; meta: Record<string, unknown> } }>('/contact', { query });
+    const data = response?.data?.items ?? [];
     return data.map(toContactMessage);
+  },
+
+  async reply(id: string, respuesta: string): Promise<ContactMessage> {
+    const dto = await api.post<ContactMessageDTO>(`/contact/${encodeURIComponent(id)}/reply`, { respuesta });
+    return toContactMessage(dto);
+  },
+
+  async close(id: string): Promise<ContactMessage> {
+    const dto = await api.patch<ContactMessageDTO>(`/contact/${encodeURIComponent(id)}/status`, { estado: 'CERRADO' });
+    return toContactMessage(dto);
   },
 };

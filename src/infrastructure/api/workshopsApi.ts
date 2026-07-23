@@ -47,8 +47,8 @@ function toWorkshopBody(w: Partial<Workshop>): Record<string, unknown> {
 
 export const workshopsApi = {
   async list(): Promise<Workshop[]> {
-    const response = await api.get<{ data: WorkshopDTO[]; meta: Record<string, unknown> }>('/production/workshops');
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: WorkshopDTO[]; meta: Record<string, unknown> }>('/production/workshops');
+    const data = response?.items ?? [];
     return data.map(toWorkshop);
   },
 

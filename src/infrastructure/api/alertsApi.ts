@@ -52,8 +52,8 @@ export function toAlert(dto: AlertDTO): Alert {
 
 export const alertsApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<Alert[]> {
-    const response = await api.get<{ data: AlertDTO[]; meta: Record<string, unknown> }>('/alerts', { query });
-    const data = response?.data ?? [];
+    const response = await api.get<{ items: AlertDTO[]; meta: Record<string, unknown> }>('/alerts', { query });
+    const data = response?.items ?? [];
     return data.map(toAlert);
   },
 

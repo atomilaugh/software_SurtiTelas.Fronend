@@ -1,4 +1,5 @@
 import { api } from './httpClient';
+import type { PaginatedResponse } from './pagination';
 
 export interface CommissionDTO {
   id: string;
@@ -40,8 +41,8 @@ export function toCommission(dto: CommissionDTO): Commission {
 
 export const commissionsApi = {
   async list(query?: Record<string, string | number | boolean | undefined | null>): Promise<Commission[]> {
-    const data = await api.get<CommissionDTO[]>('/commissions', { query });
-    return (data ?? []).map(toCommission);
+    const response = await api.get<{ items: CommissionDTO[]; meta: Record<string, unknown> }>('/commissions', { query });
+    return (response?.items ?? []).map(toCommission);
   },
 
   async getById(id: string): Promise<Commission | null> {
